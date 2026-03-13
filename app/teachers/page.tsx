@@ -66,7 +66,8 @@ export default function TeachersPage() {
       </div>
 
       <div className="overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-slate-200">
-        <div className="overflow-x-auto">
+        {/* Desktop Table View */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="min-w-full divide-y divide-slate-200">
             <thead className="bg-slate-50">
               <tr>
@@ -122,6 +123,52 @@ export default function TeachersPage() {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile Card View */}
+        <div className="md:hidden divide-y divide-slate-200">
+          {loading ? (
+            <div className="py-10 text-center text-sm text-slate-500">
+              جاري تحميل البيانات...
+            </div>
+          ) : filteredTeachers.length === 0 ? (
+            <div className="py-10 text-center text-sm text-slate-500">
+              لا يوجد معلمين لعرضهم.
+            </div>
+          ) : (
+            filteredTeachers.map((teacher) => (
+              <div key={teacher.id} className="p-4 space-y-3">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h3 className="font-medium text-slate-900">{teacher.users?.full_name || 'غير محدد'}</h3>
+                    <p className="text-xs text-slate-500">{teacher.national_id}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button className="p-1 text-slate-400 hover:text-indigo-600">
+                      <Edit className="h-4 w-4" />
+                    </button>
+                    <button className="p-1 text-slate-400 hover:text-red-600">
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div>
+                    <span className="text-slate-400 block">التخصص</span>
+                    <span className="text-slate-700">{teacher.specialization || 'غير محدد'}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block">رقم الهاتف</span>
+                    <span className="text-slate-700">{teacher.users?.phone || 'غير محدد'}</span>
+                  </div>
+                  <div className="col-span-2">
+                    <span className="text-slate-400 block">البريد الإلكتروني</span>
+                    <span className="text-slate-700">{teacher.users?.email || 'غير محدد'}</span>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
     </div>

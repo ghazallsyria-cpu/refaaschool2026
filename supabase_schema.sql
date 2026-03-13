@@ -4,7 +4,7 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- Create custom types
-CREATE TYPE user_role AS ENUM ('admin', 'management', 'teacher', 'student', 'parent');
+CREATE TYPE user_role AS ENUM ('admin', 'management', 'teacher', 'student', 'parent', 'all');
 CREATE TYPE attendance_status AS ENUM ('present', 'absent', 'late', 'excused');
 
 -- 1. Users Table (Extends auth.users)

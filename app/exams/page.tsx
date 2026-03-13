@@ -363,7 +363,8 @@ export default function ExamsPage() {
       </div>
 
       <div className="bg-white rounded-xl shadow-sm ring-1 ring-slate-200 overflow-hidden">
-        <div className="overflow-x-auto">
+        {/* Desktop Table View */}
+        <div className="hidden lg:block overflow-x-auto">
           <table className="min-w-full divide-y divide-slate-200">
             <thead className="bg-slate-50">
               <tr>
@@ -446,6 +447,79 @@ export default function ExamsPage() {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile Card View */}
+        <div className="lg:hidden divide-y divide-slate-200">
+          {loading ? (
+            <div className="py-10 text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto"></div>
+            </div>
+          ) : filteredExams.length === 0 ? (
+            <div className="py-10 text-center text-sm text-slate-500">
+              لا توجد اختبارات مسجلة
+            </div>
+          ) : (
+            filteredExams.map((exam) => (
+              <div key={exam.id} className="p-4 space-y-4">
+                <div className="flex justify-between items-start">
+                  <div className="flex items-start gap-3">
+                    <div className="bg-indigo-50 p-2 rounded-lg text-indigo-600 mt-1">
+                      <FileText className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-slate-900">{exam.title}</h3>
+                      <p className="text-sm text-slate-500">{exam.subjects?.name}</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => {
+                        setCurrentExam(exam);
+                        setShowAddModal(true);
+                      }}
+                      className="p-1.5 text-slate-400 hover:text-indigo-600"
+                    >
+                      <Edit className="h-4 w-4" />
+                    </button>
+                    <button 
+                      onClick={() => setExamToDelete(exam.id)}
+                      className="p-1.5 text-slate-400 hover:text-red-600"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-y-3 gap-x-4 text-xs">
+                  <div>
+                    <span className="text-slate-400 block mb-1">الفصل / الشعبة</span>
+                    <span className="text-slate-700 font-medium">{exam.sections?.classes?.name} - {exam.sections?.name}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block mb-1">تاريخ الاختبار</span>
+                    <span className="text-slate-700 font-medium">{new Date(exam.exam_date).toLocaleDateString('ar-EG')}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block mb-1">المعلم</span>
+                    <span className="text-slate-700 font-medium">{exam.teachers?.users?.full_name}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block mb-1">الدرجة القصوى</span>
+                    <span className="text-slate-700 font-bold text-indigo-600">{exam.max_score}</span>
+                  </div>
+                </div>
+
+                <button 
+                  onClick={() => openGradesModal(exam)}
+                  className="w-full flex items-center justify-center gap-2 rounded-lg bg-emerald-50 py-2.5 text-sm font-medium text-emerald-700 hover:bg-emerald-100 transition-colors"
+                >
+                  <CheckCircle className="h-4 w-4" />
+                  رصد الدرجات
+                </button>
+              </div>
+            ))
+          )}
         </div>
       </div>
 

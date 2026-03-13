@@ -82,8 +82,8 @@ export default function Dashboard() {
           يرجى إعداد متغيرات البيئة الخاصة بـ Supabase في ملف .env.example وتشغيل ملف supabase_schema.sql في قاعدة البيانات الخاصة بك.
         </p>
         <div className="bg-slate-100 p-4 rounded-lg text-left w-full max-w-2xl overflow-auto text-sm font-mono text-slate-800">
-          NEXT_PUBLIC_SUPABASE_URL="your-url"<br/>
-          NEXT_PUBLIC_SUPABASE_ANON_KEY="your-key"
+          NEXT_PUBLIC_SUPABASE_URL=&quot;your-url&quot;<br/>
+          NEXT_PUBLIC_SUPABASE_ANON_KEY=&quot;your-key&quot;
         </div>
       </div>
     );
@@ -114,21 +114,21 @@ export default function Dashboard() {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-1 gap-4 sm:gap-6 sm:grid-cols-2 lg:grid-cols-4">
             {statCards.map((stat) => (
               <div key={stat.name} className="overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-slate-200">
-                <div className="p-5">
+                <div className="p-4 sm:p-5">
                   <div className="flex items-center">
                     <div className="flex-shrink-0">
-                      <div className={`flex h-12 w-12 items-center justify-center rounded-md ${stat.color}`}>
-                        <stat.icon className="h-6 w-6 text-white" aria-hidden="true" />
+                      <div className={`flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-md ${stat.color}`}>
+                        <stat.icon className="h-5 w-5 sm:h-6 sm:w-6 text-white" aria-hidden="true" />
                       </div>
                     </div>
-                    <div className="ml-5 w-0 flex-1 mr-4">
+                    <div className="ml-4 sm:ml-5 w-0 flex-1 mr-3 sm:mr-4">
                       <dl>
-                        <dt className="truncate text-sm font-medium text-slate-500">{stat.name}</dt>
+                        <dt className="truncate text-xs sm:text-sm font-medium text-slate-500">{stat.name}</dt>
                         <dd>
-                          <div className="text-2xl font-bold text-slate-900">{stat.value}</div>
+                          <div className="text-xl sm:text-2xl font-bold text-slate-900">{stat.value}</div>
                         </dd>
                       </dl>
                     </div>
@@ -139,29 +139,29 @@ export default function Dashboard() {
           </div>
 
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <div className="rounded-xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
-              <h3 className="text-lg font-medium text-slate-900 mb-4">إحصائيات الحضور (الأسبوع الحالي)</h3>
-              <div className="h-72 w-full flex items-center justify-center bg-slate-50 rounded-lg border border-dashed border-slate-200">
+            <div className="rounded-xl bg-white p-4 sm:p-6 shadow-sm ring-1 ring-slate-200">
+              <h3 className="text-base sm:text-lg font-medium text-slate-900 mb-4">إحصائيات الحضور (الأسبوع الحالي)</h3>
+              <div className="h-64 sm:h-72 w-full flex items-center justify-center bg-slate-50 rounded-lg border border-dashed border-slate-200">
                 {attendanceChartData.length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={attendanceChartData}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                      <XAxis dataKey="name" />
-                      <YAxis />
+                      <XAxis dataKey="name" tick={{fontSize: 12}} />
+                      <YAxis tick={{fontSize: 12}} />
                       <Tooltip />
                       <Bar dataKey="present" name="حاضر" fill="#10b981" radius={[4, 4, 0, 0]} />
                       <Bar dataKey="absent" name="غائب" fill="#ef4444" radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 ) : (
-                  <span className="text-slate-400">لا توجد بيانات كافية لعرض الرسم البياني</span>
+                  <span className="text-sm text-slate-400">لا توجد بيانات كافية لعرض الرسم البياني</span>
                 )}
               </div>
             </div>
 
-            <div className="rounded-xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
-              <h3 className="text-lg font-medium text-slate-900 mb-4">توزيع الطلاب حسب المرحلة</h3>
-              <div className="h-72 w-full flex items-center justify-center bg-slate-50 rounded-lg border border-dashed border-slate-200">
+            <div className="rounded-xl bg-white p-4 sm:p-6 shadow-sm ring-1 ring-slate-200">
+              <h3 className="text-base sm:text-lg font-medium text-slate-900 mb-4">توزيع الطلاب حسب المرحلة</h3>
+              <div className="h-64 sm:h-72 w-full flex items-center justify-center bg-slate-50 rounded-lg border border-dashed border-slate-200">
                 {distributionData.length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
@@ -169,8 +169,8 @@ export default function Dashboard() {
                         data={distributionData}
                         cx="50%"
                         cy="50%"
-                        innerRadius={60}
-                        outerRadius={80}
+                        innerRadius={50}
+                        outerRadius={70}
                         paddingAngle={5}
                         dataKey="value"
                       >
@@ -182,7 +182,7 @@ export default function Dashboard() {
                     </PieChart>
                   </ResponsiveContainer>
                 ) : (
-                  <span className="text-slate-400">لا توجد بيانات كافية لعرض الرسم البياني</span>
+                  <span className="text-sm text-slate-400">لا توجد بيانات كافية لعرض الرسم البياني</span>
                 )}
               </div>
             </div>

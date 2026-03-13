@@ -16,11 +16,12 @@ export default function SeedPage() {
       });
     };
 
-    let generatedSql = `-- سكربت إعداد قاعدة البيانات وإدخال بيانات المعلمين والمواد والفصول لمدرسة الرفعة النموذجية\n\n`;
+    const generateData = () => {
+      let generatedSql = `-- سكربت إعداد قاعدة البيانات وإدخال بيانات المعلمين والمواد والفصول لمدرسة الرفعة النموذجية\n\n`;
 
-    // 0. Create Tables if they don't exist
-    generatedSql += `-- 0. إنشاء الجداول الأساسية إذا لم تكن موجودة\n`;
-    generatedSql += `
+      // 0. Create Tables if they don't exist
+      generatedSql += `-- 0. إنشاء الجداول الأساسية إذا لم تكن موجودة\n`;
+      generatedSql += `
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
@@ -28,7 +29,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 DO $$
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'user_role') THEN
-        CREATE TYPE user_role AS ENUM ('admin', 'management', 'teacher', 'student', 'parent');
+        CREATE TYPE user_role AS ENUM ('admin', 'management', 'teacher', 'student', 'parent', 'all');
     END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'attendance_status') THEN
         CREATE TYPE attendance_status AS ENUM ('present', 'absent', 'late', 'excused');
@@ -291,102 +292,109 @@ CREATE POLICY "Allow all on documents" ON public.documents FOR ALL USING (true);
 
 `;
 
-    // 1. Subjects
-    const subjects = new Set<string>();
-    schoolData.forEach(t => t.subjects.forEach(s => subjects.add(s)));
+      // 1. Subjects
+      const subjects = new Set<string>();
+      schoolData.forEach(t => t.subjects.forEach(s => subjects.add(s)));
 
-    const subjectMap: Record<string, string> = {};
-    generatedSql += `-- 1. إضافة المواد الدراسية\n`;
-    Array.from(subjects).forEach(sub => {
-      const id = generateUUID();
-      subjectMap[sub] = id;
-      generatedSql += `INSERT INTO public.subjects (id, name, code) VALUES ('${id}', '${sub}', 'SUB_${Math.floor(Math.random()*1000)}');\n`;
-    });
-    generatedSql += `\n`;
+      const subjectMap: Record<string, string> = {};
+      generatedSql += `-- 1. إضافة المواد الدراسية\n`;
+      Array.from(subjects).forEach(sub => {
+        const id = generateUUID();
+        subjectMap[sub] = id;
+        generatedSql += `INSERT INTO public.subjects (id, name, code) VALUES ('${id}', '${sub}', 'SUB_${Math.floor(Math.random()*1000)}');\n`;
+      });
+      generatedSql += `\n`;
 
-    // 2. Classes and Sections
-    const classMap: Record<string, string> = {}; 
-    const sectionMap: Record<string, string> = {}; 
+      // 2. Classes and Sections
+      const classMap: Record<string, string> = {}; 
+      const sectionMap: Record<string, string> = {}; 
 
-    const classNames: Record<string, string> = {
-      6: "الصف السادس",
-      7: "الصف السابع",
-      8: "الصف الثامن",
-      9: "الصف التاسع",
-      10: "الصف العاشر",
-      11: "الصف الحادي عشر",
-      12: "الصف الثاني عشر"
-    };
+      const classNames: Record<string, string> = {
+        6: "الصف السادس",
+        7: "الصف السابع",
+        8: "الصف الثامن",
+        9: "الصف التاسع",
+        10: "الصف العاشر",
+        11: "الصف الحادي عشر",
+        12: "الصف الثاني عشر"
+      };
 
-    generatedSql += `-- 2. إضافة الصفوف الدراسية\n`;
-    Object.keys(classNames).forEach(level => {
-      const id = generateUUID();
-      classMap[level] = id;
-      generatedSql += `INSERT INTO public.classes (id, name, level) VALUES ('${id}', '${classNames[level]}', ${level});\n`;
-    });
-    generatedSql += `\n`;
+      generatedSql += `-- 2. إضافة الصفوف الدراسية\n`;
+      Object.keys(classNames).forEach(level => {
+        const id = generateUUID();
+        classMap[level] = id;
+        generatedSql += `INSERT INTO public.classes (id, name, level) VALUES ('${id}', '${classNames[level]}', ${level});\n`;
+      });
+      generatedSql += `\n`;
 
-    generatedSql += `-- 3. إضافة الشعب\n`;
-    const uniqueSections = new Set<string>();
-    schoolData.forEach(t => t.classes.forEach(c => uniqueSections.add(c)));
+      generatedSql += `-- 3. إضافة الشعب\n`;
+      const uniqueSections = new Set<string>();
+      schoolData.forEach(t => t.classes.forEach(c => uniqueSections.add(c)));
 
-    Array.from(uniqueSections).forEach(sec => {
-      let level = 10;
-      if (sec.includes('م')) {
-        level = parseInt(sec.split('م')[0]);
-      } else {
-        const parts = sec.split('-');
-        if (parts.length > 1) {
-          if (['10', '11', '12'].includes(parts[1].replace('د', ''))) {
-            level = parseInt(parts[1].replace('د', ''));
-          } else if (['10', '11', '12'].includes(parts[0])) {
-            level = parseInt(parts[0]);
+      Array.from(uniqueSections).forEach(sec => {
+        let level = 10;
+        if (sec.includes('م')) {
+          level = parseInt(sec.split('م')[0]);
+        } else {
+          const parts = sec.split('-');
+          if (parts.length > 1) {
+            if (['10', '11', '12'].includes(parts[1].replace('د', ''))) {
+              level = parseInt(parts[1].replace('د', ''));
+            } else if (['10', '11', '12'].includes(parts[0])) {
+              level = parseInt(parts[0]);
+            }
           }
         }
-      }
-      
-      if (!classMap[level]) {
-        level = 10; // Fallback
-      }
+        
+        if (!classMap[level]) {
+          level = 10; // Fallback
+        }
 
-      const id = generateUUID();
-      sectionMap[sec] = id;
-      generatedSql += `INSERT INTO public.sections (id, class_id, name) VALUES ('${id}', '${classMap[level]}', '${sec}');\n`;
-    });
-    generatedSql += `\n`;
+        const id = generateUUID();
+        sectionMap[sec] = id;
+        generatedSql += `INSERT INTO public.sections (id, class_id, name) VALUES ('${id}', '${classMap[level]}', '${sec}');\n`;
+      });
+      generatedSql += `\n`;
 
-    // 3. Teachers
-    generatedSql += `-- 4. إضافة المعلمين وربطهم بالمواد والفصول\n`;
-    schoolData.forEach((t, i) => {
-      const userId = generateUUID();
-      const email = `teacher${i+1}@alrefaa.edu`;
-      
-      generatedSql += `-- المعلم: ${t.name}\n`;
-      // Insert into auth.users
-      generatedSql += `INSERT INTO auth.users (id, instance_id, aud, role, email, encrypted_password, created_at, updated_at) 
+      // 3. Teachers
+      generatedSql += `-- 4. إضافة المعلمين وربطهم بالمواد والفصول\n`;
+      schoolData.forEach((t, i) => {
+        const userId = generateUUID();
+        const email = `teacher${i+1}@alrefaa.edu`;
+        
+        generatedSql += `-- المعلم: ${t.name}\n`;
+        // Insert into auth.users
+        generatedSql += `INSERT INTO auth.users (id, instance_id, aud, role, email, encrypted_password, created_at, updated_at) 
 VALUES ('${userId}', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', '${email}', crypt('password123', gen_salt('bf')), now(), now());\n`;
 
-      generatedSql += `INSERT INTO public.users (id, email, full_name, role) VALUES ('${userId}', '${email}', '${t.name}', 'teacher');\n`;
-      
-      const nationalId = `2${Math.floor(Math.random() * 90000000000) + 10000000000}`;
-      generatedSql += `INSERT INTO public.teachers (id, national_id, specialization) VALUES ('${userId}', '${nationalId}', '${t.subjects.join(', ')}');\n`;
+        generatedSql += `INSERT INTO public.users (id, email, full_name, role) VALUES ('${userId}', '${email}', '${t.name}', 'teacher');\n`;
+        
+        const nationalId = `2${Math.floor(Math.random() * 90000000000) + 10000000000}`;
+        generatedSql += `INSERT INTO public.teachers (id, national_id, specialization) VALUES ('${userId}', '${nationalId}', '${t.subjects.join(', ')}');\n`;
 
-      // Teacher Subjects
-      t.subjects.forEach(sub => {
-        generatedSql += `INSERT INTO public.teacher_subjects (teacher_id, subject_id) VALUES ('${userId}', '${subjectMap[sub]}');\n`;
-      });
-
-      // Teacher Sections
-      t.classes.forEach(cls => {
+        // Teacher Subjects
         t.subjects.forEach(sub => {
-          generatedSql += `INSERT INTO public.teacher_sections (teacher_id, section_id, subject_id) VALUES ('${userId}', '${sectionMap[cls]}', '${subjectMap[sub]}');\n`;
+          generatedSql += `INSERT INTO public.teacher_subjects (teacher_id, subject_id) VALUES ('${userId}', '${subjectMap[sub]}');\n`;
         });
-      });
-      
-      generatedSql += `\n`;
-    });
 
-    setSql(generatedSql);
+        // Teacher Sections
+        t.classes.forEach(cls => {
+          t.subjects.forEach(sub => {
+            generatedSql += `INSERT INTO public.teacher_sections (teacher_id, section_id, subject_id) VALUES ('${userId}', '${sectionMap[cls]}', '${subjectMap[sub]}');\n`;
+          });
+        });
+        
+        generatedSql += `\n`;
+      });
+
+      return generatedSql;
+    };
+
+    const timer = setTimeout(() => {
+      setSql(generateData());
+    }, 0);
+
+    return () => clearTimeout(timer);
   }, []);
 
   const handleCopy = () => {
@@ -431,7 +439,7 @@ VALUES ('${userId}', '00000000-0000-0000-0000-000000000000', 'authenticated', 'a
       <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
         <h4 className="text-blue-800 font-semibold mb-2">تعليمات الاستخدام:</h4>
         <ol className="list-decimal list-inside text-blue-700 space-y-1 text-sm">
-          <li>انسخ الكود أعلاه بالضغط على زر "نسخ الكود".</li>
+          <li>انسخ الكود أعلاه بالضغط على زر &quot;نسخ الكود&quot;.</li>
           <li>اذهب إلى لوحة تحكم Supabase الخاصة بك.</li>
           <li>اختر <strong>SQL Editor</strong> من القائمة الجانبية.</li>
           <li>قم بإنشاء استعلام جديد (New Query) والصق الكود فيه.</li>

@@ -186,14 +186,15 @@ export default function AttendancePage() {
       <div className="bg-white rounded-xl shadow-sm ring-1 ring-slate-200 overflow-hidden">
         <div className="p-4 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
           <h3 className="font-medium text-slate-900">قائمة الطلاب</h3>
-          <div className="flex gap-2">
-            <button onClick={() => markAllAs('present')} className="text-xs text-emerald-600 hover:underline">الكل حاضر</button>
+          <div className="flex gap-4">
+            <button onClick={() => markAllAs('present')} className="text-xs text-emerald-600 hover:underline font-medium">الكل حاضر</button>
             <span className="text-slate-300">|</span>
-            <button onClick={() => markAllAs('absent')} className="text-xs text-red-600 hover:underline">الكل غائب</button>
+            <button onClick={() => markAllAs('absent')} className="text-xs text-red-600 hover:underline font-medium">الكل غائب</button>
           </div>
         </div>
         
-        <div className="overflow-x-auto">
+        {/* Desktop Table View */}
+        <div className="hidden sm:block overflow-x-auto">
           <table className="min-w-full divide-y divide-slate-200">
             <thead className="bg-white">
               <tr>
@@ -264,6 +265,71 @@ export default function AttendancePage() {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile View */}
+        <div className="sm:hidden divide-y divide-slate-200">
+          {loading ? (
+            <div className="py-10 text-center text-sm text-slate-500">
+              جاري تحميل قائمة الطلاب...
+            </div>
+          ) : students.length === 0 ? (
+            <div className="py-10 text-center text-sm text-slate-500">
+              لا يوجد طلاب مسجلين في هذه الشعبة
+            </div>
+          ) : (
+            students.map((student) => (
+              <div key={student.id} className="p-4 space-y-3">
+                <div className="font-medium text-slate-900">{student.users?.full_name}</div>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => handleStatusChange(student.id, 'present')}
+                    className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg border text-sm transition-colors ${
+                      attendance[student.id] === 'present'
+                        ? 'bg-emerald-50 border-emerald-200 text-emerald-700 font-bold'
+                        : 'bg-white border-slate-200 text-slate-600'
+                    }`}
+                  >
+                    <CheckCircle2 className={`h-4 w-4 ${attendance[student.id] === 'present' ? 'text-emerald-600' : 'text-slate-300'}`} />
+                    حاضر
+                  </button>
+                  <button
+                    onClick={() => handleStatusChange(student.id, 'absent')}
+                    className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg border text-sm transition-colors ${
+                      attendance[student.id] === 'absent'
+                        ? 'bg-red-50 border-red-200 text-red-700 font-bold'
+                        : 'bg-white border-slate-200 text-slate-600'
+                    }`}
+                  >
+                    <XCircle className={`h-4 w-4 ${attendance[student.id] === 'absent' ? 'text-red-600' : 'text-slate-300'}`} />
+                    غائب
+                  </button>
+                  <button
+                    onClick={() => handleStatusChange(student.id, 'late')}
+                    className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg border text-sm transition-colors ${
+                      attendance[student.id] === 'late'
+                        ? 'bg-amber-50 border-amber-200 text-amber-700 font-bold'
+                        : 'bg-white border-slate-200 text-slate-600'
+                    }`}
+                  >
+                    <Clock className={`h-4 w-4 ${attendance[student.id] === 'late' ? 'text-amber-600' : 'text-slate-300'}`} />
+                    متأخر
+                  </button>
+                  <button
+                    onClick={() => handleStatusChange(student.id, 'excused')}
+                    className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg border text-sm transition-colors ${
+                      attendance[student.id] === 'excused'
+                        ? 'bg-blue-50 border-blue-200 text-blue-700 font-bold'
+                        : 'bg-white border-slate-200 text-slate-600'
+                    }`}
+                  >
+                    <AlertCircle className={`h-4 w-4 ${attendance[student.id] === 'excused' ? 'text-blue-600' : 'text-slate-300'}`} />
+                    مستأذن
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
     </div>

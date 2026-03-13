@@ -89,7 +89,7 @@ export default function SeedStudentsPage() {
       <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
         <h4 className="text-blue-800 font-semibold mb-2">تعليمات الاستخدام:</h4>
         <ol className="list-decimal list-inside text-blue-700 space-y-1 text-sm">
-          <li>انسخ الكود أعلاه بالضغط على زر "نسخ الكود" أو قم بتحميل الملف.</li>
+          <li>انسخ الكود أعلاه بالضغط على زر &quot;نسخ الكود&quot; أو قم بتحميل الملف.</li>
           <li>اذهب إلى لوحة تحكم Supabase الخاصة بك.</li>
           <li>اختر <strong>SQL Editor</strong> من القائمة الجانبية.</li>
           <li>قم بإنشاء استعلام جديد (New Query) والصق الكود فيه.</li>

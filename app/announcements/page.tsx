@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Plus, Search, Edit2, Trash2, Megaphone, Bell, X, Users, Calendar, Filter } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
@@ -17,9 +17,9 @@ type Announcement = {
 
 const AUDIENCE_OPTIONS = [
   { value: 'all', label: 'الجميع' },
-  { value: 'teachers', label: 'المعلمين' },
-  { value: 'students', label: 'الطلاب' },
-  { value: 'parents', label: 'أولياء الأمور' },
+  { value: 'teacher', label: 'المعلمين' },
+  { value: 'student', label: 'الطلاب' },
+  { value: 'parent', label: 'أولياء الأمور' },
 ];
 
 export default function AnnouncementsPage() {
@@ -41,11 +41,7 @@ export default function AnnouncementsPage() {
     setTimeout(() => setNotification(null), 5000);
   };
 
-  useEffect(() => {
-    fetchAnnouncements();
-  }, []);
-
-  const fetchAnnouncements = async () => {
+  const fetchAnnouncements = useCallback(async () => {
     setLoading(true);
     try {
       const { data, error } = await supabase
@@ -72,7 +68,11 @@ export default function AnnouncementsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchAnnouncements();
+  }, [fetchAnnouncements]);
 
   const handleSaveAnnouncement = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -166,9 +166,9 @@ export default function AnnouncementsPage() {
   const getAudienceColor = (value: string) => {
     switch (value) {
       case 'all': return 'bg-indigo-50 text-indigo-700 ring-indigo-600/20';
-      case 'teachers': return 'bg-emerald-50 text-emerald-700 ring-emerald-600/20';
-      case 'students': return 'bg-blue-50 text-blue-700 ring-blue-600/20';
-      case 'parents': return 'bg-amber-50 text-amber-700 ring-amber-600/20';
+      case 'teacher': return 'bg-emerald-50 text-emerald-700 ring-emerald-600/20';
+      case 'student': return 'bg-blue-50 text-blue-700 ring-blue-600/20';
+      case 'parent': return 'bg-amber-50 text-amber-700 ring-amber-600/20';
       default: return 'bg-slate-50 text-slate-700 ring-slate-600/20';
     }
   };

@@ -79,6 +79,27 @@ export default function QuizBuilder() {
   const [sections, setSections] = useState<{id: string, name: string}[]>([]);
   const [activeTab, setActiveTab] = useState('questions');
 
+  const addQuestion = useCallback((type: QuestionType) => {
+    const newQuestion: Question = {
+      id: crypto.randomUUID(),
+      type,
+      content: '',
+      points: 1,
+      options: type === 'multiple_choice' || type === 'multi_select' 
+        ? [
+            { id: crypto.randomUUID(), content: 'الخيار الأول', is_correct: true },
+            { id: crypto.randomUUID(), content: 'الخيار الثاني', is_correct: false }
+          ]
+        : type === 'true_false'
+        ? [
+            { id: crypto.randomUUID(), content: 'صح', is_correct: true },
+            { id: crypto.randomUUID(), content: 'خطأ', is_correct: false }
+          ]
+        : []
+    };
+    setQuestions(prev => [...prev, newQuestion]);
+  }, []);
+
   const fetchInitialData = useCallback(async () => {
     try {
       const [subjectsRes, sectionsRes] = await Promise.all([
@@ -123,27 +144,6 @@ export default function QuizBuilder() {
   useEffect(() => {
     fetchInitialData();
   }, [fetchInitialData]);
-
-  const addQuestion = useCallback((type: QuestionType) => {
-    const newQuestion: Question = {
-      id: crypto.randomUUID(),
-      type,
-      content: '',
-      points: 1,
-      options: type === 'multiple_choice' || type === 'multi_select' 
-        ? [
-            { id: crypto.randomUUID(), content: 'الخيار الأول', is_correct: true },
-            { id: crypto.randomUUID(), content: 'الخيار الثاني', is_correct: false }
-          ]
-        : type === 'true_false'
-        ? [
-            { id: crypto.randomUUID(), content: 'صح', is_correct: true },
-            { id: crypto.randomUUID(), content: 'خطأ', is_correct: false }
-          ]
-        : []
-    };
-    setQuestions(prev => [...prev, newQuestion]);
-  }, []);
 
   const updateQuestion = (id: string, updates: Partial<Question>) => {
     setQuestions(questions.map(q => q.id === id ? { ...q, ...updates } : q));
@@ -228,10 +228,13 @@ export default function QuizBuilder() {
 
       if (isNew) {
         // Need to find teacher_id first
-        const { data: teacher } = await supabase.from('teachers').select('id').eq('id', examPayload.teacher_id).single();
+        const { data: teacher, error: teacherError } = await supabase.from('teachers').select('id').eq('id', examPayload.teacher_id).single();
+        if (teacherError || !teacher) {
+          throw new Error('لم يتم العثور على سجل المعلم. يرجى التأكد من تسجيل الدخول كمعلم.');
+        }
         const { data: newExam, error } = await supabase
           .from('exams')
-          .insert([{ ...exam, teacher_id: teacher?.id }])
+          .insert([{ ...exam, teacher_id: teacher.id }])
           .select()
           .single();
         if (error) throw error;
@@ -279,9 +282,9 @@ export default function QuizBuilder() {
       }
 
       router.push('/exams');
-    } catch (err) {
-      console.error('Error saving quiz:', err);
-      alert('حدث خطأ أثناء حفظ الاختبار');
+    } catch (err: any) {
+      console.error('Error saving quiz:', JSON.stringify(err, null, 2));
+      alert(`حدث خطأ أثناء حفظ الاختبار: ${err.message || 'يرجى المحاولة مرة أخرى'}`);
     } finally {
       setSaving(false);
     }

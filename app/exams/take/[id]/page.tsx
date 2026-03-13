@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { supabase } from '@/lib/supabase';
 import { 
   Clock, ChevronLeft, ChevronRight, Send, 
@@ -281,8 +282,14 @@ export default function TakeQuiz() {
                 {currentQuestion?.content}
               </h2>
               {currentQuestion?.media_url && (
-                <div className="rounded-2xl overflow-hidden border border-slate-100">
-                  <img src={currentQuestion.media_url} alt="Question media" className="w-full h-auto" />
+                <div className="relative w-full aspect-video rounded-2xl overflow-hidden border border-slate-100">
+                  <Image 
+                    src={currentQuestion.media_url} 
+                    alt="Question media" 
+                    fill 
+                    className="object-contain"
+                    referrerPolicy="no-referrer"
+                  />
                 </div>
               )}
             </div>

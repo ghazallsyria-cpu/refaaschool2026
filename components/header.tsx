@@ -1,11 +1,11 @@
 'use client';
 
-import { Bell, Search, User, LogOut } from 'lucide-react';
+import { Bell, Search, User, LogOut, Menu } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 
-export function Header() {
+export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
   const [user, setUser] = useState<any>(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const router = useRouter();
@@ -30,9 +30,19 @@ export function Header() {
   };
 
   return (
-    <header className="flex h-16 shrink-0 items-center justify-between border-b border-slate-200 bg-white px-6 shadow-sm">
-      <div className="flex flex-1 items-center">
-        <div className="w-full max-w-md relative">
+    <header className="flex h-16 shrink-0 items-center justify-between border-b border-slate-200 bg-white px-4 sm:px-6 shadow-sm">
+      <div className="flex flex-1 items-center gap-4">
+        {onMenuClick && (
+          <button
+            type="button"
+            className="lg:hidden -ml-2 p-2 text-slate-500 hover:text-slate-700 rounded-md"
+            onClick={onMenuClick}
+          >
+            <span className="sr-only">فتح القائمة</span>
+            <Menu className="h-6 w-6" aria-hidden="true" />
+          </button>
+        )}
+        <div className="w-full max-w-md relative hidden sm:block">
           <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
             <Search className="h-4 w-4 text-slate-400" aria-hidden="true" />
           </div>
@@ -45,7 +55,7 @@ export function Header() {
           />
         </div>
       </div>
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-2 sm:gap-4">
         <button
           type="button"
           className="relative rounded-full bg-white p-1 text-slate-400 hover:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
@@ -57,9 +67,9 @@ export function Header() {
         </button>
 
         {/* Profile dropdown */}
-        <div className="relative ml-3">
-          <div className="flex items-center gap-3">
-            <div className="flex flex-col items-end">
+        <div className="relative ml-1 sm:ml-3">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="hidden sm:flex flex-col items-end">
               <span className="text-sm font-medium text-slate-700">{user ? user.email : 'تسجيل الدخول'}</span>
               <span className="text-xs text-slate-500">{user ? 'مستخدم' : 'زائر'}</span>
             </div>

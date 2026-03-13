@@ -34,6 +34,14 @@ export default function AssignmentsPage() {
   const [currentAssignment, setCurrentAssignment] = useState<Partial<Assignment>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const [notification, setNotification] = useState<{type: 'success' | 'error', message: string} | null>(null);
+  const [assignmentToDelete, setAssignmentToDelete] = useState<string | null>(null);
+
+  const showNotification = (type: 'success' | 'error', message: string) => {
+    setNotification({ type, message });
+    setTimeout(() => setNotification(null), 5000);
+  };
+
   useEffect(() => {
     fetchAssignments();
     fetchFormData();
@@ -61,8 +69,9 @@ export default function AssignmentsPage() {
 
       if (error) throw error;
       setAssignments((data as unknown) as Assignment[] || []);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching assignments:', error);
+      showNotification('error', 'حدث خطأ أثناء جلب الواجبات: ' + error.message);
     } finally {
       setLoading(false);
     }
@@ -87,7 +96,7 @@ export default function AssignmentsPage() {
   const handleSaveAssignment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentAssignment.title || !currentAssignment.subject_id || !currentAssignment.section_id || !currentAssignment.teacher_id || !currentAssignment.due_date) {
-      alert('يرجى تعبئة جميع الحقول المطلوبة');
+      showNotification('error', 'يرجى تعبئة جميع الحقول المطلوبة');
       return;
     }
 
@@ -121,24 +130,28 @@ export default function AssignmentsPage() {
       await fetchAssignments();
       setIsModalOpen(false);
       setCurrentAssignment({});
-    } catch (error) {
+      showNotification('success', 'تم حفظ الواجب بنجاح!');
+    } catch (error: any) {
       console.error('Error saving assignment:', error);
-      alert('حدث خطأ أثناء حفظ الواجب');
+      showNotification('error', error.message || 'حدث خطأ أثناء حفظ الواجب');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleDeleteAssignment = async (id: string) => {
-    if (!confirm('هل أنت متأكد من حذف هذا الواجب؟')) return;
+  const confirmDelete = async () => {
+    if (!assignmentToDelete) return;
     
     try {
-      const { error } = await supabase.from('assignments').delete().eq('id', id);
+      const { error } = await supabase.from('assignments').delete().eq('id', assignmentToDelete);
       if (error) throw error;
       await fetchAssignments();
-    } catch (error) {
+      showNotification('success', 'تم حذف الواجب بنجاح');
+    } catch (error: any) {
       console.error('Error deleting assignment:', error);
-      alert('حدث خطأ أثناء حذف الواجب');
+      showNotification('error', error.message || 'حدث خطأ أثناء حذف الواجب');
+    } finally {
+      setAssignmentToDelete(null);
     }
   };
 
@@ -183,7 +196,50 @@ export default function AssignmentsPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
+      {/* Notification Toast */}
+      {notification && (
+        <div className={`fixed top-4 left-1/2 transform -translate-x-1/2 z-50 px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 transition-all ${
+          notification.type === 'success' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-red-50 text-red-800 border border-red-200'
+        }`}>
+          <div className="font-medium">{notification.message}</div>
+          <button onClick={() => setNotification(null)} className="text-slate-400 hover:text-slate-600">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      <Dialog.Root open={!!assignmentToDelete} onOpenChange={(open) => !open && setAssignmentToDelete(null)}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-40" />
+          <Dialog.Content className="fixed left-[50%] top-[50%] z-50 w-full max-w-md translate-x-[-50%] translate-y-[-50%] rounded-xl bg-white p-6 shadow-lg focus:outline-none" dir="rtl">
+            <div className="flex items-center justify-between mb-5">
+              <Dialog.Title className="text-lg font-semibold text-slate-900">
+                تأكيد الحذف
+              </Dialog.Title>
+              <Dialog.Close className="text-slate-400 hover:text-slate-500">
+                <X className="h-5 w-5" />
+              </Dialog.Close>
+            </div>
+            <p className="text-slate-600 mb-6">هل أنت متأكد من رغبتك في حذف هذا الواجب؟ لا يمكن التراجع عن هذا الإجراء.</p>
+            <div className="flex justify-end gap-3">
+              <Dialog.Close asChild>
+                <button className="rounded-md bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-inset ring-slate-300 hover:bg-slate-50">
+                  إلغاء
+                </button>
+              </Dialog.Close>
+              <button
+                onClick={confirmDelete}
+                className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+              >
+                تأكيد الحذف
+              </button>
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
+
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">الواجبات المدرسية</h1>
@@ -245,7 +301,7 @@ export default function AssignmentsPage() {
                         <Edit2 className="h-4 w-4" />
                       </button>
                       <button 
-                        onClick={() => handleDeleteAssignment(assignment.id)}
+                        onClick={() => setAssignmentToDelete(assignment.id)}
                         className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
                         title="حذف الواجب"
                       >

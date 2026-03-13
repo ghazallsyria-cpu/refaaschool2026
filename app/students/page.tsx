@@ -2,13 +2,19 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Plus, Search, MoreHorizontal, Edit, Trash2 } from 'lucide-react';
+import { Plus, Search, MoreHorizontal, Edit, Trash2, X } from 'lucide-react';
 
 export default function StudentsPage() {
   const [students, setStudents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [notification, setNotification] = useState<{type: 'success' | 'error', message: string} | null>(null);
+
+  const showNotification = (type: 'success' | 'error', message: string) => {
+    setNotification({ type, message });
+    setTimeout(() => setNotification(null), 5000);
+  };
 
   useEffect(() => {
     fetchStudents();
@@ -42,7 +48,19 @@ export default function StudentsPage() {
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
+      {/* Notification Toast */}
+      {notification && (
+        <div className={`fixed top-4 left-1/2 transform -translate-x-1/2 z-50 px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 transition-all ${
+          notification.type === 'success' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-red-50 text-red-800 border border-red-200'
+        }`}>
+          <div className="font-medium">{notification.message}</div>
+          <button onClick={() => setNotification(null)} className="text-slate-400 hover:text-slate-600">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">إدارة الطلاب</h1>
@@ -187,7 +205,7 @@ export default function StudentsPage() {
                   type="button"
                   className="inline-flex w-full justify-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 sm:ml-3 sm:w-auto"
                   onClick={() => {
-                    alert('في بيئة الإنتاج، سيتم إنشاء حساب مصادقة للطالب وحفظ بياناته في قاعدة البيانات.');
+                    showNotification('success', 'في بيئة الإنتاج، سيتم إنشاء حساب مصادقة للطالب وحفظ بياناته في قاعدة البيانات.');
                     setShowAddModal(false);
                   }}
                 >

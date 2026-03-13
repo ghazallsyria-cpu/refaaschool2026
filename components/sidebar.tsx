@@ -18,7 +18,8 @@ import {
   Bell,
   FolderOpen,
   Settings,
-  Database
+  Database,
+  X
 } from 'lucide-react';
 
 const navigation = [
@@ -39,18 +40,26 @@ const navigation = [
   { name: 'الإعدادات', href: '/settings', icon: Settings },
 ];
 
-export function Sidebar() {
+export function Sidebar({ onClose }: { onClose?: () => void }) {
   const pathname = usePathname();
 
   return (
     <div className="flex h-full w-64 flex-col bg-slate-900 text-slate-300">
-      <div className="flex h-16 shrink-0 items-center px-6 bg-slate-950">
+      <div className="flex h-16 shrink-0 items-center justify-between px-6 bg-slate-950">
         <div className="flex items-center gap-3">
           <div className="flex h-8 w-8 items-center justify-center rounded-md bg-indigo-600">
             <School className="h-5 w-5 text-white" />
           </div>
           <span className="text-lg font-bold text-white tracking-tight">مدرسة الرفعة</span>
         </div>
+        {onClose && (
+          <button 
+            onClick={onClose}
+            className="lg:hidden p-2 -mr-2 text-slate-400 hover:text-white rounded-md"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        )}
       </div>
       <div className="flex flex-1 flex-col overflow-y-auto">
         <nav className="flex-1 space-y-1 px-3 py-4">

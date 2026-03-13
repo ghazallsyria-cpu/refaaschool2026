@@ -10,6 +10,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const [isChecking, setIsChecking] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const isLoginPage = pathname === '/login';
 
   useEffect(() => {
@@ -66,14 +67,23 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-full">
-      <div className="print:hidden">
-        <Sidebar />
+      {/* Mobile sidebar backdrop */}
+      {isSidebarOpen && (
+        <div 
+          className="fixed inset-0 z-40 bg-slate-900/80 lg:hidden"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+      
+      <div className={`fixed inset-y-0 right-0 z-50 w-64 transform transition-transform duration-300 ease-in-out lg:static lg:translate-x-0 print:hidden ${isSidebarOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+        <Sidebar onClose={() => setIsSidebarOpen(false)} />
       </div>
-      <div className="flex flex-1 flex-col overflow-hidden print:overflow-visible">
+      
+      <div className="flex flex-1 flex-col overflow-hidden print:overflow-visible w-full">
         <div className="print:hidden">
-          <Header />
+          <Header onMenuClick={() => setIsSidebarOpen(true)} />
         </div>
-        <main className="flex-1 overflow-y-auto p-6 print:p-0 print:overflow-visible">
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 print:p-0 print:overflow-visible">
           {children}
         </main>
       </div>

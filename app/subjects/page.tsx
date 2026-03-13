@@ -38,6 +38,14 @@ export default function SubjectsPage() {
   const [selectedTeacherIds, setSelectedTeacherIds] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const [notification, setNotification] = useState<{type: 'success' | 'error', message: string} | null>(null);
+  const [subjectToDelete, setSubjectToDelete] = useState<string | null>(null);
+
+  const showNotification = (type: 'success' | 'error', message: string) => {
+    setNotification({ type, message });
+    setTimeout(() => setNotification(null), 5000);
+  };
+
   useEffect(() => {
     fetchData();
   }, []);
@@ -101,8 +109,9 @@ export default function SubjectsPage() {
       });
 
       setSubjects(organizedSubjects);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching subjects data:', error);
+      showNotification('error', 'حدث خطأ أثناء جلب البيانات: ' + error.message);
     } finally {
       setLoading(false);
     }
@@ -134,28 +143,32 @@ export default function SubjectsPage() {
       await fetchData();
       setIsSubjectModalOpen(false);
       setCurrentSubject({});
-    } catch (error) {
+      showNotification('success', 'تم حفظ المادة بنجاح!');
+    } catch (error: any) {
       console.error('Error saving subject:', error);
-      alert('حدث خطأ أثناء حفظ المادة الدراسية. قد يكون رمز المادة مستخدماً بالفعل.');
+      showNotification('error', error.message || 'حدث خطأ أثناء حفظ المادة الدراسية. قد يكون رمز المادة مستخدماً بالفعل.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleDeleteSubject = async (id: string) => {
-    if (!confirm('هل أنت متأكد من حذف هذه المادة؟ سيتم إزالة جميع ارتباطات المعلمين بها.')) return;
+  const confirmDelete = async () => {
+    if (!subjectToDelete) return;
     
     try {
       const { error } = await supabase
         .from('subjects')
         .delete()
-        .eq('id', id);
+        .eq('id', subjectToDelete);
         
       if (error) throw error;
       await fetchData();
-    } catch (error) {
+      showNotification('success', 'تم حذف المادة بنجاح');
+    } catch (error: any) {
       console.error('Error deleting subject:', error);
-      alert('حدث خطأ أثناء حذف المادة.');
+      showNotification('error', error.message || 'حدث خطأ أثناء حذف المادة.');
+    } finally {
+      setSubjectToDelete(null);
     }
   };
 
@@ -202,9 +215,10 @@ export default function SubjectsPage() {
       
       await fetchData();
       setIsAssignModalOpen(false);
-    } catch (error) {
+      showNotification('success', 'تم حفظ تعيينات المعلمين بنجاح!');
+    } catch (error: any) {
       console.error('Error saving assignments:', error);
-      alert('حدث خطأ أثناء حفظ تعيينات المعلمين.');
+      showNotification('error', error.message || 'حدث خطأ أثناء حفظ تعيينات المعلمين.');
     } finally {
       setIsSubmitting(false);
     }
@@ -224,7 +238,50 @@ export default function SubjectsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
+      {/* Notification Toast */}
+      {notification && (
+        <div className={`fixed top-4 left-1/2 transform -translate-x-1/2 z-50 px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 transition-all ${
+          notification.type === 'success' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-red-50 text-red-800 border border-red-200'
+        }`}>
+          <div className="font-medium">{notification.message}</div>
+          <button onClick={() => setNotification(null)} className="text-slate-400 hover:text-slate-600">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      <Dialog.Root open={!!subjectToDelete} onOpenChange={(open) => !open && setSubjectToDelete(null)}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-40" />
+          <Dialog.Content className="fixed left-[50%] top-[50%] z-50 w-full max-w-md translate-x-[-50%] translate-y-[-50%] rounded-xl bg-white p-6 shadow-lg focus:outline-none" dir="rtl">
+            <div className="flex items-center justify-between mb-5">
+              <Dialog.Title className="text-lg font-semibold text-slate-900">
+                تأكيد الحذف
+              </Dialog.Title>
+              <Dialog.Close className="text-slate-400 hover:text-slate-500">
+                <X className="h-5 w-5" />
+              </Dialog.Close>
+            </div>
+            <p className="text-slate-600 mb-6">هل أنت متأكد من حذف هذه المادة؟ سيتم إزالة جميع ارتباطات المعلمين بها. لا يمكن التراجع عن هذا الإجراء.</p>
+            <div className="flex justify-end gap-3">
+              <Dialog.Close asChild>
+                <button className="rounded-md bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-inset ring-slate-300 hover:bg-slate-50">
+                  إلغاء
+                </button>
+              </Dialog.Close>
+              <button
+                onClick={confirmDelete}
+                className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+              >
+                تأكيد الحذف
+              </button>
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
+
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">إدارة المواد الدراسية</h1>
@@ -293,7 +350,7 @@ export default function SubjectsPage() {
                       <Edit2 className="h-4 w-4" />
                     </button>
                     <button 
-                      onClick={() => handleDeleteSubject(subject.id)}
+                      onClick={() => setSubjectToDelete(subject.id)}
                       className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
                       title="حذف المادة"
                     >

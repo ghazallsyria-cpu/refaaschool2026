@@ -55,6 +55,14 @@ export default function SchedulesPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
+  const [notification, setNotification] = useState<{type: 'success' | 'error', message: string} | null>(null);
+  const [scheduleToDelete, setScheduleToDelete] = useState<string | null>(null);
+
+  const showNotification = (type: 'success' | 'error', message: string) => {
+    setNotification({ type, message });
+    setTimeout(() => setNotification(null), 5000);
+  };
+
   // Current Cell State
   const [currentCell, setCurrentCell] = useState<{
     day: number;
@@ -127,7 +135,7 @@ export default function SchedulesPage() {
 
   const openCellModal = (day: number, period: number, existingSchedule?: Schedule) => {
     if (!selectedSectionId) {
-      alert('الرجاء اختيار الشعبة أولاً');
+      showNotification('error', 'الرجاء اختيار الشعبة أولاً');
       return;
     }
     
@@ -144,7 +152,7 @@ export default function SchedulesPage() {
   const handleSaveSchedule = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentCell.subjectId || !currentCell.teacherId) {
-      alert('الرجاء اختيار المادة والمعلم');
+      showNotification('error', 'الرجاء اختيار المادة والمعلم');
       return;
     }
 
@@ -187,25 +195,28 @@ export default function SchedulesPage() {
 
       await fetchSchedules(selectedSectionId);
       setIsModalOpen(false);
+      showNotification('success', 'تم حفظ الحصة بنجاح');
     } catch (error: any) {
       console.error('Error saving schedule:', error);
-      alert(error.message || 'حدث خطأ أثناء حفظ الحصة');
+      showNotification('error', error.message || 'حدث خطأ أثناء حفظ الحصة');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleDeleteSchedule = async (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!confirm('هل أنت متأكد من حذف هذه الحصة؟')) return;
+  const confirmDelete = async () => {
+    if (!scheduleToDelete) return;
     
     try {
-      const { error } = await supabase.from('schedules').delete().eq('id', id);
+      const { error } = await supabase.from('schedules').delete().eq('id', scheduleToDelete);
       if (error) throw error;
       await fetchSchedules(selectedSectionId);
+      showNotification('success', 'تم حذف الحصة بنجاح');
     } catch (error) {
       console.error('Error deleting schedule:', error);
-      alert('حدث خطأ أثناء حذف الحصة');
+      showNotification('error', 'حدث خطأ أثناء حذف الحصة');
+    } finally {
+      setScheduleToDelete(null);
     }
   };
 
@@ -214,7 +225,50 @@ export default function SchedulesPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
+      {/* Notification Toast */}
+      {notification && (
+        <div className={`fixed top-4 left-1/2 transform -translate-x-1/2 z-50 px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 transition-all ${
+          notification.type === 'success' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-red-50 text-red-800 border border-red-200'
+        }`}>
+          <div className="font-medium">{notification.message}</div>
+          <button onClick={() => setNotification(null)} className="text-slate-400 hover:text-slate-600">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      <Dialog.Root open={!!scheduleToDelete} onOpenChange={(open) => !open && setScheduleToDelete(null)}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-40" />
+          <Dialog.Content className="fixed left-[50%] top-[50%] z-50 w-full max-w-md translate-x-[-50%] translate-y-[-50%] rounded-xl bg-white p-6 shadow-lg focus:outline-none" dir="rtl">
+            <div className="flex items-center justify-between mb-5">
+              <Dialog.Title className="text-lg font-semibold text-slate-900">
+                تأكيد الحذف
+              </Dialog.Title>
+              <Dialog.Close className="text-slate-400 hover:text-slate-500">
+                <X className="h-5 w-5" />
+              </Dialog.Close>
+            </div>
+            <p className="text-slate-600 mb-6">هل أنت متأكد من حذف هذه الحصة؟ لا يمكن التراجع عن هذا الإجراء.</p>
+            <div className="flex justify-end gap-3">
+              <Dialog.Close asChild>
+                <button className="rounded-md bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-inset ring-slate-300 hover:bg-slate-50">
+                  إلغاء
+                </button>
+              </Dialog.Close>
+              <button
+                onClick={confirmDelete}
+                className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+              >
+                تأكيد الحذف
+              </button>
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
+
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">الجدول الدراسي</h1>
@@ -297,7 +351,10 @@ export default function SchedulesPage() {
                               </div>
                               <div className="flex justify-end opacity-0 group-hover:opacity-100 transition-opacity mt-2">
                                 <button 
-                                  onClick={(e) => handleDeleteSchedule(cellData.id, e)}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setScheduleToDelete(cellData.id);
+                                  }}
                                   className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded"
                                   title="حذف الحصة"
                                 >

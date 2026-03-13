@@ -18,16 +18,38 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState({ text: '', type: '' });
 
-  const handleSave = () => {
+  const [schoolSettings, setSchoolSettings] = useState({
+    name: 'مدرسة الرفعة النموذجية',
+    academic_year: '2025 - 2026',
+    semester: 'الفصل الدراسي الأول',
+    address: 'شارع الملك فهد، حي الياسمين، الرياض',
+    phone: '0112345678',
+    email: 'info@alrifaa.edu'
+  });
+
+  const [profileSettings, setProfileSettings] = useState({
+    full_name: 'أحمد محمد',
+    email: 'admin@alrifaa.edu',
+    phone: '0501234567',
+    role: 'مدير النظام'
+  });
+
+  const handleSave = async () => {
     setSaving(true);
     setMessage({ text: '', type: '' });
     
-    // Simulate API call
-    setTimeout(() => {
-      setSaving(false);
+    try {
+      // In a real app, this would save to the database via Supabase
+      // For now, we simulate a successful save with a slight delay
+      await new Promise(resolve => setTimeout(resolve, 800));
+      
       setMessage({ text: 'تم حفظ الإعدادات بنجاح', type: 'success' });
       setTimeout(() => setMessage({ text: '', type: '' }), 3000);
-    }, 1000);
+    } catch (error) {
+      setMessage({ text: 'حدث خطأ أثناء حفظ الإعدادات', type: 'error' });
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -131,38 +153,66 @@ export default function SettingsPage() {
 
                   <div className="sm:col-span-2">
                     <label className="block text-sm font-medium leading-6 text-slate-900">اسم المدرسة</label>
-                    <input type="text" defaultValue="مدرسة الرفعة النموذجية" className="mt-2 block w-full rounded-md border-0 py-1.5 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6" />
+                    <input 
+                      type="text" 
+                      value={schoolSettings.name}
+                      onChange={(e) => setSchoolSettings({...schoolSettings, name: e.target.value})}
+                      className="mt-2 block w-full rounded-md border-0 py-1.5 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6" 
+                    />
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium leading-6 text-slate-900">العام الدراسي الحالي</label>
-                    <select className="mt-2 block w-full rounded-md border-0 py-1.5 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6">
-                      <option>2025 - 2026</option>
-                      <option>2026 - 2027</option>
+                    <select 
+                      value={schoolSettings.academic_year}
+                      onChange={(e) => setSchoolSettings({...schoolSettings, academic_year: e.target.value})}
+                      className="mt-2 block w-full rounded-md border-0 py-1.5 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                    >
+                      <option value="2025 - 2026">2025 - 2026</option>
+                      <option value="2026 - 2027">2026 - 2027</option>
                     </select>
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium leading-6 text-slate-900">الفصل الدراسي</label>
-                    <select className="mt-2 block w-full rounded-md border-0 py-1.5 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6">
-                      <option>الفصل الدراسي الأول</option>
-                      <option>الفصل الدراسي الثاني</option>
+                    <select 
+                      value={schoolSettings.semester}
+                      onChange={(e) => setSchoolSettings({...schoolSettings, semester: e.target.value})}
+                      className="mt-2 block w-full rounded-md border-0 py-1.5 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                    >
+                      <option value="الفصل الدراسي الأول">الفصل الدراسي الأول</option>
+                      <option value="الفصل الدراسي الثاني">الفصل الدراسي الثاني</option>
                     </select>
                   </div>
 
                   <div className="sm:col-span-2">
                     <label className="block text-sm font-medium leading-6 text-slate-900">العنوان</label>
-                    <input type="text" defaultValue="شارع الملك فهد، حي الياسمين، الرياض" className="mt-2 block w-full rounded-md border-0 py-1.5 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6" />
+                    <input 
+                      type="text" 
+                      value={schoolSettings.address}
+                      onChange={(e) => setSchoolSettings({...schoolSettings, address: e.target.value})}
+                      className="mt-2 block w-full rounded-md border-0 py-1.5 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6" 
+                    />
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium leading-6 text-slate-900">رقم الهاتف الرسمي</label>
-                    <input type="text" defaultValue="0112345678" className="mt-2 block w-full rounded-md border-0 py-1.5 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6" />
+                    <input 
+                      type="text" 
+                      value={schoolSettings.phone}
+                      onChange={(e) => setSchoolSettings({...schoolSettings, phone: e.target.value})}
+                      className="mt-2 block w-full rounded-md border-0 py-1.5 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6" 
+                    />
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium leading-6 text-slate-900">البريد الإلكتروني الرسمي</label>
-                    <input type="email" defaultValue="info@alrifaa.edu" className="mt-2 block w-full rounded-md border-0 py-1.5 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6" />
+                    <input 
+                      type="email" 
+                      value={schoolSettings.email}
+                      onChange={(e) => setSchoolSettings({...schoolSettings, email: e.target.value})}
+                      className="mt-2 block w-full rounded-md border-0 py-1.5 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6" 
+                    />
                   </div>
                 </div>
               </div>
@@ -192,17 +242,32 @@ export default function SettingsPage() {
 
                   <div className="sm:col-span-2">
                     <label className="block text-sm font-medium leading-6 text-slate-900">الاسم الكامل</label>
-                    <input type="text" defaultValue="أحمد محمد" className="mt-2 block w-full rounded-md border-0 py-1.5 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6" />
+                    <input 
+                      type="text" 
+                      value={profileSettings.full_name}
+                      onChange={(e) => setProfileSettings({...profileSettings, full_name: e.target.value})}
+                      className="mt-2 block w-full rounded-md border-0 py-1.5 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6" 
+                    />
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium leading-6 text-slate-900">البريد الإلكتروني</label>
-                    <input type="email" defaultValue="admin@alrifaa.edu" className="mt-2 block w-full rounded-md border-0 py-1.5 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6" />
+                    <input 
+                      type="email" 
+                      value={profileSettings.email}
+                      onChange={(e) => setProfileSettings({...profileSettings, email: e.target.value})}
+                      className="mt-2 block w-full rounded-md border-0 py-1.5 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6" 
+                    />
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium leading-6 text-slate-900">رقم الهاتف</label>
-                    <input type="text" defaultValue="0501234567" className="mt-2 block w-full rounded-md border-0 py-1.5 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6" />
+                    <input 
+                      type="text" 
+                      value={profileSettings.phone}
+                      onChange={(e) => setProfileSettings({...profileSettings, phone: e.target.value})}
+                      className="mt-2 block w-full rounded-md border-0 py-1.5 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6" 
+                    />
                   </div>
                 </div>
               </div>

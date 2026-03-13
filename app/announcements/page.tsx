@@ -9,7 +9,7 @@ type Announcement = {
   id: string;
   title: string;
   content: string;
-  target_audience: string;
+  target_role: string;
   created_at: string;
   author_id?: string;
   users?: { full_name: string };
@@ -33,6 +33,14 @@ export default function AnnouncementsPage() {
   const [currentAnnouncement, setCurrentAnnouncement] = useState<Partial<Announcement>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const [notification, setNotification] = useState<{type: 'success' | 'error', message: string} | null>(null);
+  const [announcementToDelete, setAnnouncementToDelete] = useState<string | null>(null);
+
+  const showNotification = (type: 'success' | 'error', message: string) => {
+    setNotification({ type, message });
+    setTimeout(() => setNotification(null), 5000);
+  };
+
   useEffect(() => {
     fetchAnnouncements();
   }, []);
@@ -46,20 +54,21 @@ export default function AnnouncementsPage() {
           id,
           title,
           content,
-          target_audience,
+          target_role,
           created_at
         `)
         .order('created_at', { ascending: false });
 
       if (error) {
-        // If table doesn't exist or other error, just set empty array for UI demonstration
         console.error('Error fetching announcements:', error);
+        showNotification('error', 'حدث خطأ أثناء جلب الإعلانات: ' + error.message);
         setAnnouncements([]);
       } else {
         setAnnouncements((data as unknown) as Announcement[] || []);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error:', error);
+      showNotification('error', 'حدث خطأ غير متوقع: ' + error.message);
     } finally {
       setLoading(false);
     }
@@ -67,8 +76,8 @@ export default function AnnouncementsPage() {
 
   const handleSaveAnnouncement = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!currentAnnouncement.title || !currentAnnouncement.content || !currentAnnouncement.target_audience) {
-      alert('يرجى تعبئة جميع الحقول المطلوبة');
+    if (!currentAnnouncement.title || !currentAnnouncement.content || !currentAnnouncement.target_role) {
+      showNotification('error', 'يرجى تعبئة جميع الحقول المطلوبة');
       return;
     }
 
@@ -77,50 +86,64 @@ export default function AnnouncementsPage() {
       const payload = {
         title: currentAnnouncement.title,
         content: currentAnnouncement.content,
-        target_audience: currentAnnouncement.target_audience,
+        target_role: currentAnnouncement.target_role,
       };
 
       if (currentAnnouncement.id) {
         // Update
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from('announcements')
           .update(payload)
-          .eq('id', currentAnnouncement.id);
-        if (error) throw error;
+          .eq('id', currentAnnouncement.id)
+          .select();
+          
+        if (error) {
+          console.error('Supabase Update Error Details:', JSON.stringify(error, null, 2));
+          throw error;
+        }
       } else {
         // Insert
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from('announcements')
-          .insert([payload]);
-        if (error) throw error;
+          .insert([payload])
+          .select();
+          
+        if (error) {
+          console.error('Supabase Insert Error Details:', JSON.stringify(error, null, 2));
+          throw error;
+        }
       }
 
       await fetchAnnouncements();
       setIsModalOpen(false);
       setCurrentAnnouncement({});
+      showNotification('success', 'تم حفظ الإعلان بنجاح!');
     } catch (error: any) {
       console.error('Error saving announcement:', error);
-      alert(error.message || 'حدث خطأ أثناء حفظ الإعلان');
+      showNotification('error', error.message || 'حدث خطأ أثناء حفظ الإعلان');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleDeleteAnnouncement = async (id: string) => {
-    if (!confirm('هل أنت متأكد من حذف هذا الإعلان؟')) return;
+  const confirmDelete = async () => {
+    if (!announcementToDelete) return;
     
     try {
-      const { error } = await supabase.from('announcements').delete().eq('id', id);
+      const { error } = await supabase.from('announcements').delete().eq('id', announcementToDelete);
       if (error) throw error;
       await fetchAnnouncements();
+      showNotification('success', 'تم حذف الإعلان بنجاح');
     } catch (error) {
       console.error('Error deleting announcement:', error);
-      alert('حدث خطأ أثناء حذف الإعلان');
+      showNotification('error', 'حدث خطأ أثناء حذف الإعلان');
+    } finally {
+      setAnnouncementToDelete(null);
     }
   };
 
   const openAddModal = () => {
-    setCurrentAnnouncement({ target_audience: 'all' });
+    setCurrentAnnouncement({ target_role: 'all' });
     setIsModalOpen(true);
   };
 
@@ -132,7 +155,7 @@ export default function AnnouncementsPage() {
   const filteredAnnouncements = announcements.filter(a => {
     const matchesSearch = a.title?.toLowerCase().includes(searchTerm.toLowerCase()) || 
                           a.content?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesAudience = audienceFilter === 'all_types' || a.target_audience === audienceFilter;
+    const matchesAudience = audienceFilter === 'all_types' || a.target_role === audienceFilter;
     return matchesSearch && matchesAudience;
   });
 
@@ -151,7 +174,50 @@ export default function AnnouncementsPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
+      {/* Notification Toast */}
+      {notification && (
+        <div className={`fixed top-4 left-1/2 transform -translate-x-1/2 z-50 px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 transition-all ${
+          notification.type === 'success' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-red-50 text-red-800 border border-red-200'
+        }`}>
+          <div className="font-medium">{notification.message}</div>
+          <button onClick={() => setNotification(null)} className="text-slate-400 hover:text-slate-600">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      <Dialog.Root open={!!announcementToDelete} onOpenChange={(open) => !open && setAnnouncementToDelete(null)}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-40" />
+          <Dialog.Content className="fixed left-[50%] top-[50%] z-50 w-full max-w-md translate-x-[-50%] translate-y-[-50%] rounded-xl bg-white p-6 shadow-lg focus:outline-none" dir="rtl">
+            <div className="flex items-center justify-between mb-5">
+              <Dialog.Title className="text-lg font-semibold text-slate-900">
+                تأكيد الحذف
+              </Dialog.Title>
+              <Dialog.Close className="text-slate-400 hover:text-slate-500">
+                <X className="h-5 w-5" />
+              </Dialog.Close>
+            </div>
+            <p className="text-slate-600 mb-6">هل أنت متأكد من رغبتك في حذف هذا الإعلان؟ لا يمكن التراجع عن هذا الإجراء.</p>
+            <div className="flex justify-end gap-3">
+              <Dialog.Close asChild>
+                <button className="rounded-md bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-inset ring-slate-300 hover:bg-slate-50">
+                  إلغاء
+                </button>
+              </Dialog.Close>
+              <button
+                onClick={confirmDelete}
+                className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+              >
+                تأكيد الحذف
+              </button>
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
+
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">الإعلانات والتعاميم</h1>
@@ -218,8 +284,8 @@ export default function AnnouncementsPage() {
                 <div className="p-6 flex-1">
                   <div className="flex justify-between items-start mb-4">
                     <div className="flex items-center gap-3">
-                      <div className={`p-2 rounded-lg ${getAudienceColor(announcement.target_audience).split(' ')[0]}`}>
-                        <Bell className={`h-6 w-6 ${getAudienceColor(announcement.target_audience).split(' ')[1]}`} />
+                      <div className={`p-2 rounded-lg ${getAudienceColor(announcement.target_role).split(' ')[0]}`}>
+                        <Bell className={`h-6 w-6 ${getAudienceColor(announcement.target_role).split(' ')[1]}`} />
                       </div>
                       <div>
                         <h3 className="text-lg font-bold text-slate-900 leading-tight">
@@ -232,7 +298,7 @@ export default function AnnouncementsPage() {
                           </div>
                           <div className="flex items-center gap-1">
                             <Users className="h-4 w-4" />
-                            <span>{getAudienceLabel(announcement.target_audience)}</span>
+                            <span>{getAudienceLabel(announcement.target_role)}</span>
                           </div>
                         </div>
                       </div>
@@ -247,7 +313,7 @@ export default function AnnouncementsPage() {
                         <Edit2 className="h-4 w-4" />
                       </button>
                       <button 
-                        onClick={() => handleDeleteAnnouncement(announcement.id)}
+                        onClick={() => setAnnouncementToDelete(announcement.id)}
                         className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
                         title="حذف الإعلان"
                       >
@@ -261,7 +327,7 @@ export default function AnnouncementsPage() {
                   </div>
                 </div>
                 
-                <div className={`w-full sm:w-2 ${getAudienceColor(announcement.target_audience).split(' ')[0]} hidden sm:block`}></div>
+                <div className={`w-full sm:w-2 ${getAudienceColor(announcement.target_role).split(' ')[0]} hidden sm:block`}></div>
               </div>
             );
           })}
@@ -300,8 +366,8 @@ export default function AnnouncementsPage() {
                 <select 
                   required
                   className="mt-2 block w-full rounded-md border-0 py-2 px-3 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
-                  value={currentAnnouncement.target_audience || ''}
-                  onChange={(e) => setCurrentAnnouncement({...currentAnnouncement, target_audience: e.target.value})}
+                  value={currentAnnouncement.target_role || ''}
+                  onChange={(e) => setCurrentAnnouncement({...currentAnnouncement, target_role: e.target.value})}
                 >
                   {AUDIENCE_OPTIONS.map(opt => (
                     <option key={opt.value} value={opt.value}>{opt.label}</option>

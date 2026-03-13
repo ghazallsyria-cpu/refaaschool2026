@@ -187,63 +187,122 @@ CREATE TABLE public.messages (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
 );
 
--- 17. Documents Table (المستندات)
-CREATE TABLE public.documents (
+-- 18. Exams Table (الاختبارات المطورة)
+CREATE TABLE public.exams (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    teacher_id UUID REFERENCES public.teachers(id) ON DELETE CASCADE NOT NULL,
+    subject_id UUID REFERENCES public.subjects(id) ON DELETE CASCADE NOT NULL,
+    section_id UUID REFERENCES public.sections(id) ON DELETE SET NULL, -- Optional: target specific section
     title TEXT NOT NULL,
-    file_url TEXT NOT NULL,
-    owner_id UUID REFERENCES public.users(id) ON DELETE CASCADE NOT NULL,
-    document_type TEXT,
+    description TEXT,
+    duration INTEGER, -- in minutes, null means unlimited
+    max_attempts INTEGER DEFAULT 1,
+    pass_score NUMERIC DEFAULT 50,
+    start_at TIMESTAMP WITH TIME ZONE,
+    end_at TIMESTAMP WITH TIME ZONE,
+    settings JSONB DEFAULT '{
+        "shuffle_questions": false,
+        "shuffle_options": false,
+        "show_result_immediately": true,
+        "allow_backtracking": true
+    }'::JSONB,
+    status TEXT DEFAULT 'draft' CHECK (status IN ('draft', 'published', 'archived')),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
+);
+
+-- 19. Questions Table
+CREATE TYPE question_type AS ENUM (
+    'multiple_choice', 
+    'true_false', 
+    'multi_select', 
+    'essay', 
+    'fill_in_blank', 
+    'matching', 
+    'ordering'
+);
+
+CREATE TABLE public.questions (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    exam_id UUID REFERENCES public.exams(id) ON DELETE CASCADE NOT NULL,
+    type question_type NOT NULL,
+    content TEXT NOT NULL,
+    media_url TEXT,
+    media_type TEXT, -- 'image', 'video', 'pdf'
+    points NUMERIC DEFAULT 1 NOT NULL,
+    order_index INTEGER NOT NULL,
+    explanation TEXT,
+    metadata JSONB DEFAULT '{}'::JSONB, -- For matching/ordering specific data
     created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
 );
 
--- RLS POLICIES (Row Level Security)
--- Enable RLS on all tables
-ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.classes ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.sections ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.subjects ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.parents ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.students ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.teachers ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.teacher_subjects ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.teacher_sections ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.attendance ENABLE ROW LEVEL SECURITY;
+-- 20. Question Options Table
+CREATE TABLE public.question_options (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    question_id UUID REFERENCES public.questions(id) ON DELETE CASCADE NOT NULL,
+    content TEXT NOT NULL,
+    is_correct BOOLEAN DEFAULT FALSE,
+    order_index INTEGER NOT NULL
+);
+
+-- 21. Exam Attempts Table
+CREATE TABLE public.exam_attempts (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    exam_id UUID REFERENCES public.exams(id) ON DELETE CASCADE NOT NULL,
+    student_id UUID REFERENCES public.students(id) ON DELETE CASCADE NOT NULL,
+    started_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
+    completed_at TIMESTAMP WITH TIME ZONE,
+    score NUMERIC DEFAULT 0,
+    status TEXT DEFAULT 'ongoing' CHECK (status IN ('ongoing', 'completed', 'graded')),
+    feedback TEXT
+);
+
+-- 22. Student Answers Table
+CREATE TABLE public.student_answers (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    attempt_id UUID REFERENCES public.exam_attempts(id) ON DELETE CASCADE NOT NULL,
+    question_id UUID REFERENCES public.questions(id) ON DELETE CASCADE NOT NULL,
+    selected_option_id UUID REFERENCES public.question_options(id) ON DELETE SET NULL, -- For MCQ/Multi
+    text_answer TEXT, -- For essay/fill
+    is_correct BOOLEAN,
+    points_earned NUMERIC DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
+);
+
+-- Enable RLS for new tables
 ALTER TABLE public.exams ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.grades ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.assignments ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.schedules ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.announcements ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.documents ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.questions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.question_options ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.exam_attempts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.student_answers ENABLE ROW LEVEL SECURITY;
 
--- Helper function to get user role
-CREATE OR REPLACE FUNCTION public.get_user_role()
-RETURNS user_role AS $$
-  SELECT role FROM public.users WHERE id = auth.uid();
-$$ LANGUAGE sql SECURITY DEFINER;
+-- Policies for Exams
+CREATE POLICY "Teachers can manage their own exams" ON public.exams
+    FOR ALL USING (teacher_id = auth.uid() OR public.get_user_role() IN ('admin', 'management'));
+CREATE POLICY "Students can view published exams" ON public.exams
+    FOR SELECT USING (status = 'published');
 
--- Example Policies (Simplified for demonstration)
--- Users: Can read their own data, Admins can read all
-CREATE POLICY "Users can view own profile" ON public.users FOR SELECT USING (auth.uid() = id);
-CREATE POLICY "Admins can view all profiles" ON public.users FOR SELECT USING (public.get_user_role() IN ('admin', 'management'));
+-- Policies for Questions & Options
+CREATE POLICY "Teachers can manage questions" ON public.questions
+    FOR ALL USING (EXISTS (SELECT 1 FROM public.exams WHERE id = exam_id AND teacher_id = auth.uid()) OR public.get_user_role() IN ('admin', 'management'));
+CREATE POLICY "Students can view questions of published exams" ON public.questions
+    FOR SELECT USING (EXISTS (SELECT 1 FROM public.exams WHERE id = exam_id AND status = 'published'));
 
--- Students: Admins/Management can do all, Teachers can view, Students can view own, Parents can view their children
-CREATE POLICY "Admins manage students" ON public.students FOR ALL USING (public.get_user_role() IN ('admin', 'management'));
-CREATE POLICY "Teachers view students" ON public.students FOR SELECT USING (public.get_user_role() = 'teacher');
-CREATE POLICY "Students view own" ON public.students FOR SELECT USING (auth.uid() = id);
-CREATE POLICY "Parents view children" ON public.students FOR SELECT USING (parent_id = auth.uid());
+CREATE POLICY "Teachers can manage options" ON public.question_options
+    FOR ALL USING (EXISTS (SELECT 1 FROM public.questions q JOIN public.exams e ON q.exam_id = e.id WHERE q.id = question_id AND e.teacher_id = auth.uid()) OR public.get_user_role() IN ('admin', 'management'));
+CREATE POLICY "Students can view options" ON public.question_options
+    FOR SELECT USING (EXISTS (SELECT 1 FROM public.questions q JOIN public.exams e ON q.exam_id = e.id WHERE q.id = question_id AND e.status = 'published'));
 
--- Triggers for updated_at
-CREATE OR REPLACE FUNCTION update_modified_column()
-RETURNS TRIGGER AS $$
-BEGIN
-    NEW.updated_at = now();
-    RETURN NEW;
-END;
-$$ language 'plpgsql';
+-- Policies for Attempts & Answers
+CREATE POLICY "Students can manage own attempts" ON public.exam_attempts
+    FOR ALL USING (student_id = auth.uid());
+CREATE POLICY "Teachers can view attempts of their exams" ON public.exam_attempts
+    FOR SELECT USING (EXISTS (SELECT 1 FROM public.exams WHERE id = exam_id AND teacher_id = auth.uid()) OR public.get_user_role() IN ('admin', 'management'));
 
-CREATE TRIGGER update_users_modtime BEFORE UPDATE ON public.users FOR EACH ROW EXECUTE PROCEDURE update_modified_column();
-CREATE TRIGGER update_students_modtime BEFORE UPDATE ON public.students FOR EACH ROW EXECUTE PROCEDURE update_modified_column();
-CREATE TRIGGER update_teachers_modtime BEFORE UPDATE ON public.teachers FOR EACH ROW EXECUTE PROCEDURE update_modified_column();
--- (Add triggers for other tables as needed)
+CREATE POLICY "Students can manage own answers" ON public.student_answers
+    FOR ALL USING (EXISTS (SELECT 1 FROM public.exam_attempts WHERE id = attempt_id AND student_id = auth.uid()));
+CREATE POLICY "Teachers can view answers of their exams" ON public.student_answers
+    FOR SELECT USING (EXISTS (SELECT 1 FROM public.exam_attempts a JOIN public.exams e ON a.exam_id = e.id WHERE a.id = attempt_id AND e.teacher_id = auth.uid()) OR public.get_user_role() IN ('admin', 'management'));
+
+-- Trigger for updated_at on exams
+CREATE TRIGGER update_exams_modtime BEFORE UPDATE ON public.exams FOR EACH ROW EXECUTE PROCEDURE update_modified_column();

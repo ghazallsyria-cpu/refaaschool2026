@@ -86,7 +86,7 @@ export default function AnnouncementsPage() {
       const payload = {
         title: currentAnnouncement.title,
         content: currentAnnouncement.content,
-        target_role: currentAnnouncement.target_role,
+        target_role: currentAnnouncement.target_role === 'all' ? null : currentAnnouncement.target_role,
       };
 
       if (currentAnnouncement.id) {

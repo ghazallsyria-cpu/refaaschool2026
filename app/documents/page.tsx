@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Plus, Search, Edit2, Trash2, FileText, X, Filter, Link as LinkIcon, ExternalLink, Calendar, Folder, FileArchive, UploadCloud } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
@@ -45,11 +45,7 @@ export default function DocumentsPage() {
     setTimeout(() => setNotification(null), 5000);
   };
 
-  useEffect(() => {
-    fetchDocuments();
-  }, []);
-
-  const fetchDocuments = async () => {
+  const fetchDocuments = useCallback(async () => {
     setLoading(true);
     try {
       const { data, error } = await supabase
@@ -70,7 +66,11 @@ export default function DocumentsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchDocuments();
+  }, [fetchDocuments]);
 
   const handleSaveDocument = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -96,7 +96,7 @@ export default function DocumentsPage() {
       // Handle File Upload to Supabase Storage bucket 'refaa'
       if (uploadType === 'file' && selectedFile) {
         const fileExt = selectedFile.name.split('.').pop();
-        const fileName = `${Math.random().toString(36).substring(2, 15)}_${Date.now()}.${fileExt}`;
+        const fileName = `${crypto.randomUUID()}_${Date.now()}.${fileExt}`;
         const filePath = `${currentDocument.category}/${fileName}`;
 
         const { error: uploadError } = await supabase.storage

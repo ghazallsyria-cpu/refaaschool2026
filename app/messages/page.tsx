@@ -157,7 +157,7 @@ export default function MessagesPage() {
           author_id: author.id,
           title: newAnnouncement.title,
           content: newAnnouncement.content,
-          target_role: newAnnouncement.target_role
+          target_role: newAnnouncement.target_role === 'all' ? null : newAnnouncement.target_role
         }]);
 
       if (error) throw error;

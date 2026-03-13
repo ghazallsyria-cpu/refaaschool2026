@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { BookOpen, Plus, Search, Edit2, Trash2, Users, X, Check, User } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
@@ -46,11 +46,7 @@ export default function SubjectsPage() {
     setTimeout(() => setNotification(null), 5000);
   };
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       setLoading(true);
       
@@ -115,7 +111,11 @@ export default function SubjectsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const handleSaveSubject = async (e: React.FormEvent) => {
     e.preventDefault();

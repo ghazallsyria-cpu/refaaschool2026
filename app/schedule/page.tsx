@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Printer, User, Users, Info } from 'lucide-react';
 
@@ -16,70 +16,27 @@ export default function SchedulePage() {
   const [loading, setLoading] = useState(true);
   const [isVirtual, setIsVirtual] = useState(false);
 
-  useEffect(() => {
-    const fetchFilters = async () => {
-      try {
-        const [teachersRes, sectionsRes] = await Promise.all([
-          supabase.from('teachers').select('id, users(full_name)'),
-          supabase.from('sections').select('id, name, classes(name)')
-        ]);
+  const fetchFilters = useCallback(async () => {
+    try {
+      const [teachersRes, sectionsRes] = await Promise.all([
+        supabase.from('teachers').select('id, users(full_name)'),
+        supabase.from('sections').select('id, name, classes(name)')
+      ]);
 
-        if (teachersRes.data) setTeachers(teachersRes.data);
-        if (sectionsRes.data) setSections(sectionsRes.data);
+      if (teachersRes.data) setTeachers(teachersRes.data);
+      if (sectionsRes.data) setSections(sectionsRes.data);
 
-        if (teachersRes.data?.[0]) setSelectedId(teachersRes.data[0].id);
-      } catch (err) {
-        console.error(err);
-      }
-    };
-    fetchFilters();
+      if (teachersRes.data?.[0]) setSelectedId(teachersRes.data[0].id);
+    } catch (err) {
+      console.error(err);
+    }
   }, []);
 
   useEffect(() => {
-    if (!selectedId) return;
+    fetchFilters();
+  }, [fetchFilters]);
 
-    const fetchSchedule = async () => {
-      setLoading(true);
-      setIsVirtual(false);
-      try {
-        // Attempt to fetch from real schedules table
-        let query = supabase.from('schedules').select(`
-          id, day_of_week, period,
-          teachers(id, users(full_name)),
-          sections(id, name, classes(name)),
-          subjects(id, name)
-        `);
-
-        if (viewType === 'teacher') {
-          query = query.eq('teacher_id', selectedId);
-        } else {
-          query = query.eq('section_id', selectedId);
-        }
-
-        const { data, error } = await query;
-
-        if (error) {
-          throw error;
-        }
-
-        if (data && data.length > 0) {
-          setScheduleData(data);
-        } else {
-          // Fallback to virtual schedule if empty
-          generateVirtualSchedule();
-        }
-      } catch (err: any) {
-        console.log('Schedules table might not exist or is empty, generating virtual schedule...');
-        generateVirtualSchedule();
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchSchedule();
-  }, [selectedId, viewType]);
-
-  const generateVirtualSchedule = async () => {
+  const generateVirtualSchedule = useCallback(async () => {
     setIsVirtual(true);
     try {
       let query = supabase.from('teacher_sections').select(`
@@ -143,7 +100,50 @@ export default function SchedulePage() {
       console.error('Error generating virtual schedule:', err);
       setScheduleData([]);
     }
-  };
+  }, [selectedId, viewType]);
+
+  const fetchSchedule = useCallback(async () => {
+    setLoading(true);
+    setIsVirtual(false);
+    try {
+      // Attempt to fetch from real schedules table
+      let query = supabase.from('schedules').select(`
+        id, day_of_week, period,
+        teachers(id, users(full_name)),
+        sections(id, name, classes(name)),
+        subjects(id, name)
+      `);
+
+      if (viewType === 'teacher') {
+        query = query.eq('teacher_id', selectedId);
+      } else {
+        query = query.eq('section_id', selectedId);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        throw error;
+      }
+
+      if (data && data.length > 0) {
+        setScheduleData(data);
+      } else {
+        // Fallback to virtual schedule if empty
+        generateVirtualSchedule();
+      }
+    } catch (err: any) {
+      console.log('Schedules table might not exist or is empty, generating virtual schedule...');
+      generateVirtualSchedule();
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedId, viewType, generateVirtualSchedule]);
+
+  useEffect(() => {
+    if (!selectedId) return;
+    fetchSchedule();
+  }, [selectedId, viewType, fetchSchedule]);
 
   const handlePrint = () => {
     window.print();

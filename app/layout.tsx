@@ -12,8 +12,8 @@ export const metadata: Metadata = {
 
 export default function RootLayout({children}: {children: React.ReactNode}) {
   return (
-    <html lang="ar" dir="rtl">
-      <body className={`${inter.className} h-screen overflow-hidden bg-slate-50`} suppressHydrationWarning>
+    <html lang="ar" dir="rtl" suppressHydrationWarning>
+      <body className={`${inter.className} h-screen overflow-hidden bg-slate-50`}>
         <AppLayout>{children}</AppLayout>
       </body>
     </html>

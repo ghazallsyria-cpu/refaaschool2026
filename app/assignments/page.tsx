@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Plus, Search, Edit2, Trash2, FileText, Calendar, Clock, Link as LinkIcon, X, BookOpen, Users, User } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
@@ -42,12 +42,7 @@ export default function AssignmentsPage() {
     setTimeout(() => setNotification(null), 5000);
   };
 
-  useEffect(() => {
-    fetchAssignments();
-    fetchFormData();
-  }, []);
-
-  const fetchAssignments = async () => {
+  const fetchAssignments = useCallback(async () => {
     setLoading(true);
     try {
       const { data, error } = await supabase
@@ -75,9 +70,9 @@ export default function AssignmentsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const fetchFormData = async () => {
+  const fetchFormData = useCallback(async () => {
     try {
       const [subjectsRes, sectionsRes, teachersRes] = await Promise.all([
         supabase.from('subjects').select('id, name').order('name'),
@@ -91,7 +86,12 @@ export default function AssignmentsPage() {
     } catch (error) {
       console.error('Error fetching form data:', error);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchAssignments();
+    fetchFormData();
+  }, [fetchAssignments, fetchFormData]);
 
   const handleSaveAssignment = async (e: React.FormEvent) => {
     e.preventDefault();

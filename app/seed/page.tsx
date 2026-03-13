@@ -10,13 +10,16 @@ export default function SeedPage() {
 
   useEffect(() => {
     const generateUUID = () => {
-      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-        const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
-        return v.toString(16);
-      });
+      return crypto.randomUUID();
     };
 
     const generateData = () => {
+      let seed = 123;
+      const deterministicRandom = () => {
+        const x = Math.sin(seed++) * 10000;
+        return x - Math.floor(x);
+      };
+
       let generatedSql = `-- سكربت إعداد قاعدة البيانات وإدخال بيانات المعلمين والمواد والفصول لمدرسة الرفعة النموذجية\n\n`;
 
       // 0. Create Tables if they don't exist
@@ -301,7 +304,7 @@ CREATE POLICY "Allow all on documents" ON public.documents FOR ALL USING (true);
       Array.from(subjects).forEach(sub => {
         const id = generateUUID();
         subjectMap[sub] = id;
-        generatedSql += `INSERT INTO public.subjects (id, name, code) VALUES ('${id}', '${sub}', 'SUB_${Math.floor(Math.random()*1000)}');\n`;
+        generatedSql += `INSERT INTO public.subjects (id, name, code) VALUES ('${id}', '${sub}', 'SUB_${Math.floor(deterministicRandom()*1000)}');\n`;
       });
       generatedSql += `\n`;
 
@@ -369,7 +372,7 @@ VALUES ('${userId}', '00000000-0000-0000-0000-000000000000', 'authenticated', 'a
 
         generatedSql += `INSERT INTO public.users (id, email, full_name, role) VALUES ('${userId}', '${email}', '${t.name}', 'teacher');\n`;
         
-        const nationalId = `2${Math.floor(Math.random() * 90000000000) + 10000000000}`;
+        const nationalId = `2${Math.floor(deterministicRandom() * 90000000000) + 10000000000}`;
         generatedSql += `INSERT INTO public.teachers (id, national_id, specialization) VALUES ('${userId}', '${nationalId}', '${t.subjects.join(', ')}');\n`;
 
         // Teacher Subjects

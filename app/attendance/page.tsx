@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Calendar, Save, CheckCircle2, XCircle, Clock, AlertCircle } from 'lucide-react';
 
@@ -16,17 +16,7 @@ export default function AttendancePage() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState({ text: '', type: '' });
 
-  useEffect(() => {
-    fetchSections();
-  }, []);
-
-  useEffect(() => {
-    if (selectedSection && date) {
-      fetchStudentsAndAttendance();
-    }
-  }, [selectedSection, date]);
-
-  const fetchSections = async () => {
+  const fetchSections = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('sections')
@@ -41,9 +31,13 @@ export default function AttendancePage() {
     } catch (error) {
       console.error('Error fetching sections:', error);
     }
-  };
+  }, []);
 
-  const fetchStudentsAndAttendance = async () => {
+  useEffect(() => {
+    fetchSections();
+  }, [fetchSections]);
+
+  const fetchStudentsAndAttendance = useCallback(async () => {
     setLoading(true);
     setMessage({ text: '', type: '' });
     try {
@@ -84,7 +78,13 @@ export default function AttendancePage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedSection, date]);
+
+  useEffect(() => {
+    if (selectedSection && date) {
+      fetchStudentsAndAttendance();
+    }
+  }, [selectedSection, date, fetchStudentsAndAttendance]);
 
   const handleStatusChange = (studentId: string, status: AttendanceStatus) => {
     setAttendance(prev => ({ ...prev, [studentId]: status }));

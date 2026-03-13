@@ -283,8 +283,11 @@ export default function QuizBuilder() {
 
       router.push('/exams');
     } catch (err: any) {
-      console.error('Error saving quiz:', JSON.stringify(err, null, 2));
-      alert(`حدث خطأ أثناء حفظ الاختبار: ${err.message || 'يرجى المحاولة مرة أخرى'}`);
+      console.error('Error saving quiz:', err);
+      // If err is an object, try to stringify it, otherwise use message
+      const errorMessage = (err && typeof err === 'object') ? JSON.stringify(err, Object.getOwnPropertyNames(err)) : String(err);
+      console.error('Full error details:', errorMessage);
+      alert(`حدث خطأ أثناء حفظ الاختبار: ${err.message || errorMessage}`);
     } finally {
       setSaving(false);
     }

@@ -35,7 +35,10 @@ export async function middleware(request: NextRequest) {
     data: { session },
   } = await supabase.auth.getSession();
 
+  console.log('Middleware - Session:', session ? 'Active' : 'None');
+
   if (!session && !request.nextUrl.pathname.startsWith('/login')) {
+    console.log('Middleware - Redirecting to login');
     return NextResponse.redirect(new URL('/login', request.url));
   }
 

@@ -40,32 +40,10 @@ export async function middleware(request: NextRequest) {
   }
 
   if (session && request.nextUrl.pathname.startsWith('/login')) {
-    console.log('Login successful, checking user role for ID:', session.user.id);
-    const { data: user, error } = await supabase
-      .from('users')
-      .select('role')
-      .eq('id', session.user.id)
-      .single();
-
-    if (error) {
-      console.error('Error querying users table (details):', JSON.stringify(error, null, 2));
-      return NextResponse.redirect(new URL('/login', request.url));
-    }
-    
-    if (!user) {
-      console.error('User found in Auth but not in public.users table for ID:', session.user.id);
-      return NextResponse.redirect(new URL('/login', request.url));
-    }
-
-    console.log('User role found:', user.role);
-    const role = user.role;
-    
-    if (role === 'admin') return NextResponse.redirect(new URL('/dashboard/admin', request.url));
-    if (role === 'teacher') return NextResponse.redirect(new URL('/dashboard/teacher', request.url));
-    if (role === 'student') return NextResponse.redirect(new URL('/dashboard/student', request.url));
-    if (role === 'parent') return NextResponse.redirect(new URL('/dashboard/parent', request.url));
-    
+  if (session && request.nextUrl.pathname.startsWith('/login')) {
+    // توجيه بسيط للتأكد من أن المشكلة ليست في استعلام الدور
     return NextResponse.redirect(new URL('/dashboard', request.url));
+  }
   }
 
   return response;

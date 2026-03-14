@@ -70,11 +70,12 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           }
         }
 
-        if (!session && !isLoginPage) {
-          router.push('/login');
-        } else if (session && isLoginPage) {
-          router.push('/');
-        }
+        // Temporarily disabled strict auth redirect for demo purposes
+        // if (!session && !isLoginPage) {
+        //   router.push('/login');
+        // } else if (session && isLoginPage) {
+        //   router.push('/');
+        // }
       } catch (error) {
         console.error('Auth check error:', error);
       } finally {
@@ -85,11 +86,12 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     checkAuth();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_OUT' && !isLoginPage) {
-        router.push('/login');
-      } else if (event === 'SIGNED_IN' && isLoginPage) {
-        router.push('/');
-      }
+      // Temporarily disabled strict auth redirect for demo purposes
+      // if (event === 'SIGNED_OUT' && !isLoginPage) {
+      //   router.push('/login');
+      // } else if (event === 'SIGNED_IN' && isLoginPage) {
+      //   router.push('/');
+      // }
     });
 
     return () => subscription.unsubscribe();

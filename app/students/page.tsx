@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
+import { supabase, supabaseAdmin } from '@/lib/supabase';
 import { Plus, Search, MoreHorizontal, Edit, Trash2, X } from 'lucide-react';
 
 export default function StudentsPage() {
@@ -50,27 +50,40 @@ export default function StudentsPage() {
         return;
       }
 
-      const response = await fetch('/api/users/create', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email: addForm.email,
-          password: 'password123',
-          full_name: addForm.full_name,
-          national_id: addForm.national_id,
-          phone: addForm.phone,
-          role: 'student',
-          section_id: addForm.section_id || null,
-        }),
+      // 1. Create auth user
+      const { data: authData, error: authError } = await supabaseAdmin.auth.signUp({
+        email: addForm.email,
+        password: 'password123', // Default password
       });
 
-      const data = await response.json();
+      if (authError) throw authError;
+      if (!authData.user) throw new Error('فشل إنشاء حساب المستخدم');
 
-      if (!response.ok) {
-        throw new Error(data.error || 'فشل إنشاء حساب الطالب');
-      }
+      const userId = authData.user.id;
+
+      // 2. Insert into users table
+      const { error: userError } = await supabase
+        .from('users')
+        .insert({
+          id: userId,
+          full_name: addForm.full_name,
+          email: addForm.email,
+          phone: addForm.phone,
+          role: 'student'
+        });
+
+      if (userError) throw userError;
+
+      // 3. Insert into students table
+      const { error: studentError } = await supabase
+        .from('students')
+        .insert({
+          id: userId,
+          national_id: addForm.national_id,
+          section_id: addForm.section_id || null
+        });
+
+      if (studentError) throw studentError;
 
       showNotification('success', 'تم إضافة الطالب بنجاح (كلمة المرور الافتراضية: password123)');
       setShowAddModal(false);
@@ -158,15 +171,21 @@ export default function StudentsPage() {
     if (!confirm('هل أنت متأكد من حذف هذا الطالب؟')) return;
     
     try {
-      const response = await fetch(`/api/users/delete?id=${id}`, {
-        method: 'DELETE',
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'فشل حذف الطالب');
-      }
+      // First delete from students table
+      const { error: studentError } = await supabase
+        .from('students')
+        .delete()
+        .eq('id', id);
+        
+      if (studentError) throw studentError;
+      
+      // Then delete from users table
+      const { error: userError } = await supabase
+        .from('users')
+        .delete()
+        .eq('id', id);
+        
+      if (userError) throw userError;
       
       showNotification('success', 'تم حذف الطالب بنجاح');
       fetchStudents();

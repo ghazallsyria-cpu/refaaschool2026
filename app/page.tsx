@@ -25,6 +25,8 @@ export default function Dashboard() {
   });
   const [loading, setLoading] = useState(true);
   const [isConfigured, setIsConfigured] = useState(true);
+  const [attendanceChartData, setAttendanceChartData] = useState<any[]>([]);
+  const [distributionData, setDistributionData] = useState<any[]>([]);
 
   useEffect(() => {
     const checkConfigAndFetchData = async () => {
@@ -43,18 +45,58 @@ export default function Dashboard() {
           { count: studentsCount },
           { count: teachersCount },
           { count: classesCount },
-          { data: attendanceData }
+          { data: attendanceData },
+          { data: classDistributionData }
         ] = await Promise.all([
           supabase.from('students').select('*', { count: 'exact', head: true }),
           supabase.from('teachers').select('*', { count: 'exact', head: true }),
           supabase.from('classes').select('*', { count: 'exact', head: true }),
-          supabase.from('attendance').select('status').eq('date', new Date().toISOString().split('T')[0])
+          supabase.from('attendance').select('status, date').gte('date', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]),
+          supabase.from('classes').select('level, sections(students(id))')
         ]);
 
+        // Process attendance for today
+        const todayStr = new Date().toISOString().split('T')[0];
+        const todayAttendance = attendanceData?.filter(a => a.date === todayStr) || [];
         let attendanceRate = 0;
-        if (attendanceData && attendanceData.length > 0) {
-          const presentCount = attendanceData.filter(a => a.status === 'present').length;
-          attendanceRate = Math.round((presentCount / attendanceData.length) * 100);
+        if (todayAttendance.length > 0) {
+          const presentCount = todayAttendance.filter(a => a.status === 'present').length;
+          attendanceRate = Math.round((presentCount / todayAttendance.length) * 100);
+        }
+
+        // Process attendance chart data (last 7 days)
+        const last7Days = Array.from({length: 7}, (_, i) => {
+          const d = new Date();
+          d.setDate(d.getDate() - i);
+          return d.toISOString().split('T')[0];
+        }).reverse();
+
+        const chartData = last7Days.map(date => {
+          const dayData = attendanceData?.filter(a => a.date === date) || [];
+          const present = dayData.filter(a => a.status === 'present').length;
+          const absent = dayData.filter(a => a.status === 'absent').length;
+          const dayName = new Date(date).toLocaleDateString('ar-SA', { weekday: 'short' });
+          return { name: dayName, present, absent };
+        }).filter(d => d.present > 0 || d.absent > 0);
+
+        setAttendanceChartData(chartData);
+
+        // Process distribution data
+        if (classDistributionData) {
+          const levelCounts: Record<number, number> = {};
+          classDistributionData.forEach(cls => {
+            const studentCount = cls.sections?.reduce((acc: number, sec: any) => acc + (sec.students?.length || 0), 0) || 0;
+            levelCounts[cls.level] = (levelCounts[cls.level] || 0) + studentCount;
+          });
+
+          const colors = ['#4f46e5', '#10b981', '#f59e0b', '#f43f5e', '#0ea5e9'];
+          const distData = Object.entries(levelCounts).map(([level, count], index) => ({
+            name: `الصف ${level}`,
+            value: count,
+            color: colors[index % colors.length]
+          })).filter(d => d.value > 0);
+          
+          setDistributionData(distData);
         }
 
         setStats({
@@ -96,10 +138,7 @@ export default function Dashboard() {
     { name: 'نسبة الحضور اليوم', value: `${stats.attendanceRate}%`, icon: Percent, color: 'bg-emerald-500' },
   ];
 
-  // Since we need to show charts but might not have data, we'll fetch real data for charts if possible.
-  // For now, we'll use empty arrays if no data, as requested (no mock data).
-  const attendanceChartData: any[] = []; 
-  const distributionData: any[] = [];
+  // The data is now fetched from the database
 
   return (
     <div className="space-y-6">

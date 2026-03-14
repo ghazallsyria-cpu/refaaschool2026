@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { supabase, supabaseAdmin } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase';
 import { Plus, Search, Filter, Edit, Trash2 } from 'lucide-react';
 
 export default function TeachersPage() {
@@ -34,40 +34,27 @@ export default function TeachersPage() {
         return;
       }
 
-      // 1. Create auth user
-      const { data: authData, error: authError } = await supabaseAdmin.auth.signUp({
-        email: addForm.email,
-        password: 'password123', // Default password
+      const response = await fetch('/api/users/create', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: addForm.email,
+          password: 'password123',
+          full_name: addForm.full_name,
+          national_id: addForm.national_id,
+          phone: addForm.phone,
+          role: 'teacher',
+          specialization: addForm.specialization,
+        }),
       });
 
-      if (authError) throw authError;
-      if (!authData.user) throw new Error('فشل إنشاء حساب المستخدم');
+      const data = await response.json();
 
-      const userId = authData.user.id;
-
-      // 2. Insert into users table
-      const { error: userError } = await supabase
-        .from('users')
-        .insert({
-          id: userId,
-          full_name: addForm.full_name,
-          email: addForm.email,
-          phone: addForm.phone,
-          role: 'teacher'
-        });
-
-      if (userError) throw userError;
-
-      // 3. Insert into teachers table
-      const { error: teacherError } = await supabase
-        .from('teachers')
-        .insert({
-          id: userId,
-          national_id: addForm.national_id,
-          specialization: addForm.specialization
-        });
-
-      if (teacherError) throw teacherError;
+      if (!response.ok) {
+        throw new Error(data.error || 'فشل إنشاء حساب المعلم');
+      }
 
       alert('تم إضافة المعلم بنجاح (كلمة المرور الافتراضية: password123)');
       setShowAddModal(false);
@@ -152,21 +139,15 @@ export default function TeachersPage() {
     if (!confirm('هل أنت متأكد من حذف هذا المعلم؟')) return;
     
     try {
-      // First delete from teachers table
-      const { error: teacherError } = await supabase
-        .from('teachers')
-        .delete()
-        .eq('id', id);
-        
-      if (teacherError) throw teacherError;
-      
-      // Then delete from users table
-      const { error: userError } = await supabase
-        .from('users')
-        .delete()
-        .eq('id', id);
-        
-      if (userError) throw userError;
+      const response = await fetch(`/api/users/delete?id=${id}`, {
+        method: 'DELETE',
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'فشل حذف المعلم');
+      }
       
       alert('تم حذف المعلم بنجاح');
       fetchTeachers();

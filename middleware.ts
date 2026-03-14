@@ -2,7 +2,7 @@ import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
 export async function middleware(request: NextRequest) {
-  // إنشاء نسخة أولية للرد
+  // إنشاء رد أولي
   const response = NextResponse.next();
 
   const supabase = createServerClient(
@@ -11,7 +11,7 @@ export async function middleware(request: NextRequest) {
     {
       cookies: {
         getAll: () => request.cookies.getAll(),
-        setAll: (cookiesToSet) => {
+        setAll: (cookiesToSet: { name: string; value: string; options?: any }[]) => {
           cookiesToSet.forEach(({ name, value, options }) => {
             response.cookies.set(name, value, options);
           });
@@ -20,23 +20,26 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  // جلب الجلسة الحالية
-  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+  try {
+    // الحصول على الجلسة الحالية
+    const {
+      data: { session },
+      error: sessionError,
+    } = await supabase.auth.getSession();
 
-  if (sessionError) {
-    console.error('Error fetching session:', sessionError);
-  }
+    if (sessionError) {
+      console.error('Error fetching session:', sessionError);
+    }
 
-  const pathname = request.nextUrl.pathname;
+    const pathname = request.nextUrl.pathname;
 
-  // إذا لم يكن هناك جلسة، وأنت لست في صفحة تسجيل الدخول
-  if (!session && !pathname.startsWith('/login')) {
-    return NextResponse.redirect(new URL('/login', request.url));
-  }
+    // إذا لم يكن هناك جلسة وأنت لست في صفحة تسجيل الدخول
+    if (!session && !pathname.startsWith('/login')) {
+      return NextResponse.redirect(new URL('/login', request.url));
+    }
 
-  // إذا هناك جلسة وأنت في صفحة تسجيل الدخول، أعد التوجيه حسب الدور
-  if (session && pathname.startsWith('/login')) {
-    try {
+    // إذا هناك جلسة وأنت في صفحة تسجيل الدخول، أعد التوجيه حسب الدور
+    if (session && pathname.startsWith('/login')) {
       const { data: user, error } = await supabase
         .from('users')
         .select('role')
@@ -49,6 +52,7 @@ export async function middleware(request: NextRequest) {
       }
 
       const role = user.role;
+
       switch (role) {
         case 'admin':
           return NextResponse.redirect(new URL('/dashboard/admin', request.url));
@@ -61,13 +65,14 @@ export async function middleware(request: NextRequest) {
         default:
           return NextResponse.redirect(new URL('/dashboard', request.url));
       }
-    } catch (err) {
-      console.error('Unexpected error in middleware:', err);
-      return NextResponse.redirect(new URL('/login', request.url));
     }
-  }
 
-  return response;
+    // إذا لم تنطبق أي حالة، ارجع الرد الأصلي
+    return response;
+  } catch (err) {
+    console.error('Unexpected error in middleware:', err);
+    return NextResponse.redirect(new URL('/login', request.url));
+  }
 }
 
 export const config = {

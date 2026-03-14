@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { supabase, supabaseAdmin } from '@/lib/supabase';
 import { Plus, Search, Filter, Edit, Trash2 } from 'lucide-react';
 
 export default function TeachersPage() {
@@ -12,6 +12,13 @@ export default function TeachersPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingTeacher, setEditingTeacher] = useState<any>(null);
+  const [addForm, setAddForm] = useState({
+    full_name: '',
+    national_id: '',
+    email: '',
+    phone: '',
+    specialization: ''
+  });
   const [editForm, setEditForm] = useState({
     full_name: '',
     national_id: '',
@@ -19,6 +26,58 @@ export default function TeachersPage() {
     phone: '',
     specialization: ''
   });
+
+  const handleAddSubmit = async () => {
+    try {
+      if (!addForm.full_name || !addForm.national_id || !addForm.email) {
+        alert('يرجى تعبئة الحقول الإلزامية');
+        return;
+      }
+
+      // 1. Create auth user
+      const { data: authData, error: authError } = await supabaseAdmin.auth.signUp({
+        email: addForm.email,
+        password: 'password123', // Default password
+      });
+
+      if (authError) throw authError;
+      if (!authData.user) throw new Error('فشل إنشاء حساب المستخدم');
+
+      const userId = authData.user.id;
+
+      // 2. Insert into users table
+      const { error: userError } = await supabase
+        .from('users')
+        .insert({
+          id: userId,
+          full_name: addForm.full_name,
+          email: addForm.email,
+          phone: addForm.phone,
+          role: 'teacher'
+        });
+
+      if (userError) throw userError;
+
+      // 3. Insert into teachers table
+      const { error: teacherError } = await supabase
+        .from('teachers')
+        .insert({
+          id: userId,
+          national_id: addForm.national_id,
+          specialization: addForm.specialization
+        });
+
+      if (teacherError) throw teacherError;
+
+      alert('تم إضافة المعلم بنجاح (كلمة المرور الافتراضية: password123)');
+      setShowAddModal(false);
+      setAddForm({ full_name: '', national_id: '', email: '', phone: '', specialization: '' });
+      fetchTeachers();
+    } catch (error: any) {
+      console.error('Error adding teacher:', error);
+      alert(error.message || 'حدث خطأ أثناء إضافة المعلم');
+    }
+  };
 
   const handleEditClick = (teacher: any) => {
     setEditingTeacher(teacher);
@@ -366,23 +425,48 @@ export default function TeachersPage() {
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div>
                       <label className="block text-sm font-medium leading-6 text-slate-900">الاسم الرباعي</label>
-                      <input type="text" className="mt-2 block w-full rounded-md border-0 py-1.5 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6" />
+                      <input 
+                        type="text" 
+                        value={addForm.full_name}
+                        onChange={(e) => setAddForm({...addForm, full_name: e.target.value})}
+                        className="mt-2 block w-full rounded-md border-0 py-1.5 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6" 
+                      />
                     </div>
                     <div>
                       <label className="block text-sm font-medium leading-6 text-slate-900">الرقم المدني</label>
-                      <input type="text" className="mt-2 block w-full rounded-md border-0 py-1.5 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6" />
+                      <input 
+                        type="text" 
+                        value={addForm.national_id}
+                        onChange={(e) => setAddForm({...addForm, national_id: e.target.value})}
+                        className="mt-2 block w-full rounded-md border-0 py-1.5 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6" 
+                      />
                     </div>
                     <div>
                       <label className="block text-sm font-medium leading-6 text-slate-900">البريد الإلكتروني</label>
-                      <input type="email" className="mt-2 block w-full rounded-md border-0 py-1.5 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6" />
+                      <input 
+                        type="email" 
+                        value={addForm.email}
+                        onChange={(e) => setAddForm({...addForm, email: e.target.value})}
+                        className="mt-2 block w-full rounded-md border-0 py-1.5 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6" 
+                      />
                     </div>
                     <div>
                       <label className="block text-sm font-medium leading-6 text-slate-900">رقم الهاتف</label>
-                      <input type="text" className="mt-2 block w-full rounded-md border-0 py-1.5 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6" />
+                      <input 
+                        type="text" 
+                        value={addForm.phone}
+                        onChange={(e) => setAddForm({...addForm, phone: e.target.value})}
+                        className="mt-2 block w-full rounded-md border-0 py-1.5 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6" 
+                      />
                     </div>
                     <div className="sm:col-span-2">
                       <label className="block text-sm font-medium leading-6 text-slate-900">التخصص</label>
-                      <input type="text" className="mt-2 block w-full rounded-md border-0 py-1.5 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6" />
+                      <input 
+                        type="text" 
+                        value={addForm.specialization}
+                        onChange={(e) => setAddForm({...addForm, specialization: e.target.value})}
+                        className="mt-2 block w-full rounded-md border-0 py-1.5 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6" 
+                      />
                     </div>
                   </div>
                 </form>
@@ -391,10 +475,7 @@ export default function TeachersPage() {
                 <button
                   type="button"
                   className="inline-flex w-full justify-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 sm:ml-3 sm:w-auto"
-                  onClick={() => {
-                    alert('في بيئة الإنتاج، سيتم إنشاء حساب مصادقة للمعلم وحفظ بياناته في قاعدة البيانات.');
-                    setShowAddModal(false);
-                  }}
+                  onClick={handleAddSubmit}
                 >
                   حفظ البيانات
                 </button>

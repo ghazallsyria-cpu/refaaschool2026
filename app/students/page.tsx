@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
+import { supabase, supabaseAdmin } from '@/lib/supabase';
 import { Plus, Search, MoreHorizontal, Edit, Trash2, X } from 'lucide-react';
 
 export default function StudentsPage() {
@@ -11,12 +11,89 @@ export default function StudentsPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingStudent, setEditingStudent] = useState<any>(null);
+  const [addForm, setAddForm] = useState({
+    full_name: '',
+    national_id: '',
+    email: '',
+    phone: '',
+    section_id: ''
+  });
   const [editForm, setEditForm] = useState({
     full_name: '',
     national_id: '',
     email: '',
     phone: ''
   });
+  const [sections, setSections] = useState<any[]>([]);
+
+  useEffect(() => {
+    fetchStudents();
+    fetchSections();
+  }, []);
+
+  const fetchSections = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('sections')
+        .select('id, name, classes(name)');
+      if (error) throw error;
+      setSections(data || []);
+    } catch (error) {
+      console.error('Error fetching sections:', error);
+    }
+  };
+
+  const handleAddSubmit = async () => {
+    try {
+      if (!addForm.full_name || !addForm.national_id || !addForm.email) {
+        showNotification('error', 'يرجى تعبئة الحقول الإلزامية');
+        return;
+      }
+
+      // 1. Create auth user
+      const { data: authData, error: authError } = await supabaseAdmin.auth.signUp({
+        email: addForm.email,
+        password: 'password123', // Default password
+      });
+
+      if (authError) throw authError;
+      if (!authData.user) throw new Error('فشل إنشاء حساب المستخدم');
+
+      const userId = authData.user.id;
+
+      // 2. Insert into users table
+      const { error: userError } = await supabase
+        .from('users')
+        .insert({
+          id: userId,
+          full_name: addForm.full_name,
+          email: addForm.email,
+          phone: addForm.phone,
+          role: 'student'
+        });
+
+      if (userError) throw userError;
+
+      // 3. Insert into students table
+      const { error: studentError } = await supabase
+        .from('students')
+        .insert({
+          id: userId,
+          national_id: addForm.national_id,
+          section_id: addForm.section_id || null
+        });
+
+      if (studentError) throw studentError;
+
+      showNotification('success', 'تم إضافة الطالب بنجاح (كلمة المرور الافتراضية: password123)');
+      setShowAddModal(false);
+      setAddForm({ full_name: '', national_id: '', email: '', phone: '', section_id: '' });
+      fetchStudents();
+    } catch (error: any) {
+      console.error('Error adding student:', error);
+      showNotification('error', error.message || 'حدث خطأ أثناء إضافة الطالب');
+    }
+  };
 
   const handleEditClick = (student: any) => {
     setEditingStudent(student);
@@ -67,10 +144,6 @@ export default function StudentsPage() {
     setNotification({ type, message });
     setTimeout(() => setNotification(null), 5000);
   };
-
-  useEffect(() => {
-    fetchStudents();
-  }, []);
 
   const fetchStudents = async () => {
     setLoading(true);
@@ -377,35 +450,53 @@ export default function StudentsPage() {
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div>
                       <label className="block text-sm font-medium leading-6 text-slate-900">الاسم الرباعي</label>
-                      <input type="text" className="mt-2 block w-full rounded-md border-0 py-1.5 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6" />
+                      <input 
+                        type="text" 
+                        value={addForm.full_name}
+                        onChange={(e) => setAddForm({...addForm, full_name: e.target.value})}
+                        className="mt-2 block w-full rounded-md border-0 py-1.5 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6" 
+                      />
                     </div>
                     <div>
                       <label className="block text-sm font-medium leading-6 text-slate-900">الرقم المدني</label>
-                      <input type="text" className="mt-2 block w-full rounded-md border-0 py-1.5 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6" />
+                      <input 
+                        type="text" 
+                        value={addForm.national_id}
+                        onChange={(e) => setAddForm({...addForm, national_id: e.target.value})}
+                        className="mt-2 block w-full rounded-md border-0 py-1.5 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6" 
+                      />
                     </div>
                     <div>
                       <label className="block text-sm font-medium leading-6 text-slate-900">البريد الإلكتروني</label>
-                      <input type="email" className="mt-2 block w-full rounded-md border-0 py-1.5 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6" />
+                      <input 
+                        type="email" 
+                        value={addForm.email}
+                        onChange={(e) => setAddForm({...addForm, email: e.target.value})}
+                        className="mt-2 block w-full rounded-md border-0 py-1.5 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6" 
+                      />
                     </div>
                     <div>
                       <label className="block text-sm font-medium leading-6 text-slate-900">رقم الهاتف</label>
-                      <input type="text" className="mt-2 block w-full rounded-md border-0 py-1.5 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6" />
+                      <input 
+                        type="text" 
+                        value={addForm.phone}
+                        onChange={(e) => setAddForm({...addForm, phone: e.target.value})}
+                        className="mt-2 block w-full rounded-md border-0 py-1.5 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6" 
+                      />
                     </div>
-                    <div>
-                      <label className="block text-sm font-medium leading-6 text-slate-900">الصف الدراسي</label>
-                      <select className="mt-2 block w-full rounded-md border-0 py-1.5 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6">
-                        <option>اختر الصف</option>
-                        <option>الصف العاشر</option>
-                        <option>الصف الحادي عشر</option>
-                        <option>الصف الثاني عشر</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium leading-6 text-slate-900">الشعبة</label>
-                      <select className="mt-2 block w-full rounded-md border-0 py-1.5 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6">
-                        <option>اختر الشعبة</option>
-                        <option>1-10</option>
-                        <option>2-10</option>
+                    <div className="sm:col-span-2">
+                      <label className="block text-sm font-medium leading-6 text-slate-900">الشعبة (الصف)</label>
+                      <select 
+                        value={addForm.section_id}
+                        onChange={(e) => setAddForm({...addForm, section_id: e.target.value})}
+                        className="mt-2 block w-full rounded-md border-0 py-1.5 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                      >
+                        <option value="">اختر الشعبة</option>
+                        {sections.map(section => (
+                          <option key={section.id} value={section.id}>
+                            {section.classes?.name} - {section.name}
+                          </option>
+                        ))}
                       </select>
                     </div>
                   </div>
@@ -415,10 +506,7 @@ export default function StudentsPage() {
                 <button
                   type="button"
                   className="inline-flex w-full justify-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 sm:ml-3 sm:w-auto"
-                  onClick={() => {
-                    showNotification('success', 'في بيئة الإنتاج، سيتم إنشاء حساب مصادقة للطالب وحفظ بياناته في قاعدة البيانات.');
-                    setShowAddModal(false);
-                  }}
+                  onClick={handleAddSubmit}
                 >
                   حفظ البيانات
                 </button>

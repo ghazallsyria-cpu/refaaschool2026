@@ -101,24 +101,6 @@ export default function TakeQuiz() {
     fetchQuiz();
   }, [fetchQuiz]);
 
-  useEffect(() => {
-    if (timeLeft !== null && timeLeft > 0 && !isFinished) {
-      timerRef.current = setInterval(() => {
-        setTimeLeft(prev => (prev !== null ? prev - 1 : null));
-      }, 1000);
-    } else if (timeLeft === 0 && !isFinished) {
-      handleSubmit();
-    }
-
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, [timeLeft, isFinished, handleSubmit]);
-
-  const handleAnswerChange = (questionId: string, value: any) => {
-    setAnswers(prev => ({ ...prev, [questionId]: value }));
-  };
-
   const handleSubmit = useCallback(async () => {
     if (isSubmitting) return;
     setIsSubmitting(true);
@@ -139,9 +121,9 @@ export default function TakeQuiz() {
           isCorrect = studentAnswer === correctOpt?.id;
           pointsEarned = isCorrect ? q.points : 0;
         } else if (q.type === 'multi_select') {
-          const correctOpts = q.options.filter((o: any) => o.is_correct).map(o => o.id);
+          const correctOpts = q.options.filter((o: any) => o.is_correct).map((o: any) => o.id);
           const studentOpts = studentAnswer || [];
-          isCorrect = correctOpts.length === studentOpts.length && correctOpts.every(id => studentOpts.includes(id));
+          isCorrect = correctOpts.length === studentOpts.length && correctOpts.every((id: any) => studentOpts.includes(id));
           pointsEarned = isCorrect ? q.points : 0;
         }
 
@@ -180,6 +162,24 @@ export default function TakeQuiz() {
       setIsSubmitting(false);
     }
   }, [isSubmitting, questions, answers, attemptId]);
+
+  useEffect(() => {
+    if (timeLeft !== null && timeLeft > 0 && !isFinished) {
+      timerRef.current = setInterval(() => {
+        setTimeLeft(prev => (prev !== null ? prev - 1 : null));
+      }, 1000);
+    } else if (timeLeft === 0 && !isFinished) {
+      handleSubmit();
+    }
+
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [timeLeft, isFinished, handleSubmit]);
+
+  const handleAnswerChange = (questionId: string, value: any) => {
+    setAnswers(prev => ({ ...prev, [questionId]: value }));
+  };
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);

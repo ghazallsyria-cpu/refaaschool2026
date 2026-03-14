@@ -173,6 +173,15 @@ export default function LoginPage() {
             </button>
           </div>
         </form>
+
+        <div className="mt-8 bg-blue-50 p-4 rounded-xl border border-blue-100 text-sm text-blue-800">
+          <h4 className="font-bold mb-2">بيانات تجريبية للدخول:</h4>
+          <ul className="space-y-1 list-disc list-inside">
+            <li><strong>مدير:</strong> 123456789012 (كلمة المرور: admin123)</li>
+            <li><strong>معلم:</strong> 290123456789 (كلمة المرور: teacher123)</li>
+            <li><strong>طالب:</strong> 305123456789 (كلمة المرور: student123)</li>
+          </ul>
+        </div>
       </div>
     </div>
   );

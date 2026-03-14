@@ -39,14 +39,42 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/login', request.url));
   }
 
-  if (session && request.nextUrl.pathname.startsWith('/login')) {
-    const { data: user } = await supabase
+  // إعادة توجيه المستخدم المسجل للدخول من الصفحة الرئيسية إلى لوحة التحكم
+  if (session && request.nextUrl.pathname === '/') {
+    const { data: user, error } = await supabase
       .from('users')
       .select('role')
       .eq('id', session.user.id)
       .single();
 
-    const role = user?.role;
+    if (error || !user) {
+      console.error('Error fetching user role:', error);
+      return NextResponse.next();
+    }
+
+    const role = user.role;
+    
+    if (role === 'admin') return NextResponse.redirect(new URL('/dashboard/admin', request.url));
+    if (role === 'teacher') return NextResponse.redirect(new URL('/dashboard/teacher', request.url));
+    if (role === 'student') return NextResponse.redirect(new URL('/dashboard/student', request.url));
+    if (role === 'parent') return NextResponse.redirect(new URL('/dashboard/parent', request.url));
+    
+    return NextResponse.redirect(new URL('/dashboard', request.url));
+  }
+
+  if (session && request.nextUrl.pathname.startsWith('/login')) {
+    const { data: user, error } = await supabase
+      .from('users')
+      .select('role')
+      .eq('id', session.user.id)
+      .single();
+
+    if (error || !user) {
+      console.error('Error fetching user role:', error);
+      return NextResponse.redirect(new URL('/login', request.url));
+    }
+
+    const role = user.role;
     
     if (role === 'admin') return NextResponse.redirect(new URL('/dashboard/admin', request.url));
     if (role === 'teacher') return NextResponse.redirect(new URL('/dashboard/teacher', request.url));

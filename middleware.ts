@@ -47,8 +47,8 @@ export async function middleware(request: NextRequest) {
       .single();
 
     if (error || !user) {
-      // إذا لم يتم العثور على المستخدم، قد يكون هناك خطأ في إعداد الحساب
-      console.error('User not found in database:', error);
+      // تسجيل تفاصيل الخطأ بالكامل لفهم سبب الفشل
+      console.error('Error querying users table:', JSON.stringify(error, null, 2));
       return NextResponse.redirect(new URL('/login', request.url));
     }
 

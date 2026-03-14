@@ -14,17 +14,14 @@ export default function LoginPage() {
     e.preventDefault();
     setError('');
     
-    console.log('Attempting login for:', email);
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
 
     if (error) {
-      console.error('Login error:', error);
       setError(error.message);
     } else {
-      console.log('Login successful, session:', data.session);
       router.push('/dashboard');
     }
   };

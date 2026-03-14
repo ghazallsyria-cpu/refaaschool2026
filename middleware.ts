@@ -35,18 +35,30 @@ export async function middleware(request: NextRequest) {
     data: { session },
   } = await supabase.auth.getSession();
 
-  console.log('Middleware - Session:', session ? 'Active' : 'None');
-
   if (!session && !request.nextUrl.pathname.startsWith('/login')) {
-    console.log('Middleware - Redirecting to login');
     return NextResponse.redirect(new URL('/login', request.url));
   }
 
   if (session && request.nextUrl.pathname.startsWith('/login')) {
-  if (session && request.nextUrl.pathname.startsWith('/login')) {
-    // توجيه بسيط للتأكد من أن المشكلة ليست في استعلام الدور
+    const { data: user, error } = await supabase
+      .from('users')
+      .select('role')
+      .eq('id', session.user.id)
+      .single();
+
+    if (error || !user) {
+      console.error('Error fetching user role:', error);
+      return NextResponse.redirect(new URL('/login', request.url));
+    }
+
+    const role = user.role;
+    
+    if (role === 'admin') return NextResponse.redirect(new URL('/dashboard/admin', request.url));
+    if (role === 'teacher') return NextResponse.redirect(new URL('/dashboard/teacher', request.url));
+    if (role === 'student') return NextResponse.redirect(new URL('/dashboard/student', request.url));
+    if (role === 'parent') return NextResponse.redirect(new URL('/dashboard/parent', request.url));
+    
     return NextResponse.redirect(new URL('/dashboard', request.url));
-  }
   }
 
   return response;

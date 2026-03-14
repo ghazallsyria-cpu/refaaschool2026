@@ -5,12 +5,15 @@ import { Sidebar } from '@/components/sidebar';
 import { Header } from '@/components/header';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { School, AlertTriangle } from 'lucide-react';
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const [isChecking, setIsChecking] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [platformClosed, setPlatformClosed] = useState(false);
+  const [closeMessage, setCloseMessage] = useState('');
   const isLoginPage = pathname === '/login';
 
   useEffect(() => {
@@ -26,6 +29,47 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
       try {
         const { data: { session } } = await supabase.auth.getSession();
+        
+        // Check platform settings
+        const { data: settings } = await supabase
+          .from('platform_settings')
+          .select('*')
+          .limit(1)
+          .single();
+
+        if (settings) {
+          let isOpen = settings.is_open;
+          const now = new Date();
+          
+          if (settings.open_date && new Date(settings.open_date) > now) {
+            isOpen = false;
+          }
+          if (settings.close_date && new Date(settings.close_date) < now) {
+            isOpen = false;
+          }
+
+          if (!isOpen) {
+            // Check if user is admin
+            let isAdmin = false;
+            if (session?.user) {
+              const { data: userData } = await supabase
+                .from('users')
+                .select('role')
+                .eq('id', session.user.id)
+                .single();
+              
+              if (userData?.role === 'admin') {
+                isAdmin = true;
+              }
+            }
+
+            if (!isAdmin) {
+              setPlatformClosed(true);
+              setCloseMessage(settings.message || 'المنصة مغلقة حاليا للصيانة');
+            }
+          }
+        }
+
         // Temporarily disabled strict auth redirect for demo purposes
         // if (!session && !isLoginPage) {
         //   router.push('/login');
@@ -57,6 +101,36 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-slate-50">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent"></div>
+      </div>
+    );
+  }
+
+  if (platformClosed && !isLoginPage) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-slate-50 p-4 text-center" dir="rtl">
+        <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-indigo-600 shadow-xl mb-8">
+          <School className="h-12 w-12 text-white" />
+        </div>
+        <div className="bg-white p-8 rounded-2xl shadow-sm ring-1 ring-slate-200 max-w-md w-full">
+          <div className="flex justify-center mb-6">
+            <div className="bg-amber-100 p-3 rounded-full">
+              <AlertTriangle className="h-8 w-8 text-amber-600" />
+            </div>
+          </div>
+          <h1 className="text-2xl font-bold text-slate-900 mb-4">المنصة مغلقة</h1>
+          <p className="text-slate-600 mb-8 leading-relaxed">
+            {closeMessage}
+          </p>
+          <button
+            onClick={() => {
+              supabase.auth.signOut();
+              router.push('/login');
+            }}
+            className="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors"
+          >
+            العودة لتسجيل الدخول
+          </button>
+        </div>
       </div>
     );
   }

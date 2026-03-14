@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabase';
 import { 
   Building2, 
   User, 
@@ -11,12 +12,56 @@ import {
   Camera 
 } from 'lucide-react';
 
-type Tab = 'school' | 'profile' | 'notifications' | 'security';
+type Tab = 'school' | 'profile' | 'notifications' | 'security' | 'platform';
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<Tab>('school');
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState({ text: '', type: '' });
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  const [platformSettings, setPlatformSettings] = useState({
+    id: '',
+    is_open: true,
+    open_date: '',
+    close_date: '',
+    message: 'المنصة مغلقة حاليا للصيانة'
+  });
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: userData } = await supabase
+          .from('users')
+          .select('role')
+          .eq('id', user.id)
+          .single();
+        
+        if (userData?.role === 'admin') {
+          setIsAdmin(true);
+        }
+      }
+
+      const { data, error } = await supabase
+        .from('platform_settings')
+        .select('*')
+        .limit(1)
+        .single();
+
+      if (data) {
+        setPlatformSettings({
+          id: data.id,
+          is_open: data.is_open,
+          open_date: data.open_date ? new Date(data.open_date).toISOString().slice(0, 16) : '',
+          close_date: data.close_date ? new Date(data.close_date).toISOString().slice(0, 16) : '',
+          message: data.message || 'المنصة مغلقة حاليا للصيانة'
+        });
+      }
+    };
+
+    fetchSettings();
+  }, []);
 
   const [schoolSettings, setSchoolSettings] = useState({
     name: 'مدرسة الرفعة النموذجية',
@@ -39,13 +84,50 @@ export default function SettingsPage() {
     setMessage({ text: '', type: '' });
     
     try {
-      // In a real app, this would save to the database via Supabase
-      // For now, we simulate a successful save with a slight delay
-      await new Promise(resolve => setTimeout(resolve, 800));
+      if (activeTab === 'platform' && isAdmin) {
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        const updateData: any = {
+          is_open: platformSettings.is_open,
+          message: platformSettings.message,
+          updated_by: user?.id,
+          updated_at: new Date().toISOString()
+        };
+
+        if (platformSettings.open_date) {
+          updateData.open_date = new Date(platformSettings.open_date).toISOString();
+        } else {
+          updateData.open_date = null;
+        }
+
+        if (platformSettings.close_date) {
+          updateData.close_date = new Date(platformSettings.close_date).toISOString();
+        } else {
+          updateData.close_date = null;
+        }
+
+        if (platformSettings.id) {
+          const { error } = await supabase
+            .from('platform_settings')
+            .update(updateData)
+            .eq('id', platformSettings.id);
+          if (error) throw error;
+        } else {
+          const { error } = await supabase
+            .from('platform_settings')
+            .insert([updateData]);
+          if (error) throw error;
+        }
+      } else {
+        // In a real app, this would save to the database via Supabase
+        // For now, we simulate a successful save with a slight delay
+        await new Promise(resolve => setTimeout(resolve, 800));
+      }
       
       setMessage({ text: 'تم حفظ الإعدادات بنجاح', type: 'success' });
       setTimeout(() => setMessage({ text: '', type: '' }), 3000);
     } catch (error) {
+      console.error(error);
       setMessage({ text: 'حدث خطأ أثناء حفظ الإعدادات', type: 'error' });
     } finally {
       setSaving(false);
@@ -122,6 +204,17 @@ export default function SettingsPage() {
             >
               <Shield className={`h-5 w-5 ${activeTab === 'security' ? 'text-indigo-700' : 'text-slate-400'}`} />
               الأمان وكلمة المرور
+            </button>
+            <button
+              onClick={() => setActiveTab('platform')}
+              className={`flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-colors ${
+                activeTab === 'platform' 
+                  ? 'bg-indigo-50 text-indigo-700' 
+                  : 'text-slate-700 hover:bg-slate-50 hover:text-slate-900'
+              }`}
+            >
+              <Building2 className={`h-5 w-5 ${activeTab === 'platform' ? 'text-indigo-700' : 'text-slate-400'}`} />
+              حالة المنصة
             </button>
           </nav>
         </aside>
@@ -347,6 +440,69 @@ export default function SettingsPage() {
                   <button type="button" className="rounded-md bg-white px-3 py-2 text-sm font-semibold text-slate-900 shadow-sm ring-1 ring-inset ring-slate-300 hover:bg-slate-50">
                     تسجيل الخروج من جميع الأجهزة الأخرى
                   </button>
+                </div>
+              </div>
+            )}
+            {/* Platform Settings */}
+            {activeTab === 'platform' && (
+              <div className="p-6 space-y-8">
+                <div>
+                  <h3 className="text-lg font-medium leading-6 text-slate-900">حالة المنصة</h3>
+                  <p className="mt-1 text-sm text-slate-500">التحكم في فتح وإغلاق المنصة وجدولة أوقات العمل.</p>
+                </div>
+
+                <div className="grid grid-cols-1 gap-y-6 sm:grid-cols-2 sm:gap-x-6">
+                  <div className="sm:col-span-2 flex items-center justify-between p-4 border border-slate-200 rounded-lg bg-slate-50">
+                    <div>
+                      <h4 className="text-base font-medium text-slate-900">حالة المنصة الحالية</h4>
+                      <p className="text-sm text-slate-500">
+                        {platformSettings.is_open ? 'المنصة مفتوحة وتعمل بشكل طبيعي' : 'المنصة مغلقة حالياً'}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setPlatformSettings({...platformSettings, is_open: !platformSettings.is_open})}
+                      className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-offset-2 ${platformSettings.is_open ? 'bg-indigo-600' : 'bg-slate-200'}`}
+                      role="switch"
+                      aria-checked={platformSettings.is_open}
+                    >
+                      <span className="sr-only">تفعيل المنصة</span>
+                      <span
+                        aria-hidden="true"
+                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${platformSettings.is_open ? '-translate-x-5' : 'translate-x-0'}`}
+                      />
+                    </button>
+                  </div>
+
+                  <div className="sm:col-span-1">
+                    <label className="block text-sm font-medium leading-6 text-slate-900">تاريخ ووقت الفتح التلقائي</label>
+                    <input 
+                      type="datetime-local" 
+                      value={platformSettings.open_date}
+                      onChange={(e) => setPlatformSettings({...platformSettings, open_date: e.target.value})}
+                      className="mt-2 block w-full rounded-md border-0 py-1.5 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6" 
+                    />
+                  </div>
+
+                  <div className="sm:col-span-1">
+                    <label className="block text-sm font-medium leading-6 text-slate-900">تاريخ ووقت الإغلاق التلقائي</label>
+                    <input 
+                      type="datetime-local" 
+                      value={platformSettings.close_date}
+                      onChange={(e) => setPlatformSettings({...platformSettings, close_date: e.target.value})}
+                      className="mt-2 block w-full rounded-md border-0 py-1.5 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6" 
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="block text-sm font-medium leading-6 text-slate-900">رسالة الإغلاق</label>
+                    <p className="mt-1 text-sm text-slate-500">تظهر للمستخدمين عندما تكون المنصة مغلقة.</p>
+                    <textarea 
+                      rows={3} 
+                      value={platformSettings.message}
+                      onChange={(e) => setPlatformSettings({...platformSettings, message: e.target.value})}
+                      className="mt-2 block w-full rounded-md border-0 py-1.5 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6" 
+                    />
+                  </div>
                 </div>
               </div>
             )}

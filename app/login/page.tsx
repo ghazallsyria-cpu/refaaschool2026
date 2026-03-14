@@ -18,10 +18,47 @@ export default function LoginPage() {
     setError(null);
 
     try {
-      // In a real scenario, you might map the Civil ID to an email in Supabase, 
-      // or use a custom auth provider. For demo purposes, we append a dummy domain if it's not an email.
-      const authEmail = civilId.includes('@') ? civilId : `${civilId}@alrefaa.edu`;
+      let authEmail = civilId;
       
+      // If the input is not an email, assume it's a Civil ID and look up the email
+      if (!civilId.includes('@')) {
+        // First check students
+        const { data: studentData } = await supabase
+          .from('students')
+          .select('id, users!inner(email)')
+          .eq('national_id', civilId)
+          .single();
+          
+        if (studentData && studentData.users) {
+          authEmail = (studentData.users as any).email;
+        } else {
+          // Check teachers
+          const { data: teacherData } = await supabase
+            .from('teachers')
+            .select('id, users!inner(email)')
+            .eq('national_id', civilId)
+            .single();
+            
+          if (teacherData && teacherData.users) {
+            authEmail = (teacherData.users as any).email;
+          } else {
+            // Check parents
+            const { data: parentData } = await supabase
+              .from('parents')
+              .select('id, users!inner(email)')
+              .eq('national_id', civilId)
+              .single();
+              
+            if (parentData && parentData.users) {
+              authEmail = (parentData.users as any).email;
+            } else {
+              // Fallback for admins or others
+              authEmail = `${civilId}@alrefaa.edu`;
+            }
+          }
+        }
+      }
+
       const { error } = await supabase.auth.signInWithPassword({
         email: authEmail,
         password,

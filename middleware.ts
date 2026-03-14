@@ -1,13 +1,16 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
-// قائمة المسارات التي تتطلب جلسة
+// المسارات التي تتطلب جلسة للمستخدم
 const protectedPaths = ['/dashboard', '/profile', '/settings'];
+
+// المسارات الخاصة بالصفحة الرئيسية أو صفحة الدخول
+const loginPaths = ['/', '/login'];
 
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
-  // تجاهل الملفات الثابتة والصور والfavicon
+  // تجاهل الملفات الثابتة والصور وfavicon
   if (
     pathname.startsWith('/_next/') ||
     pathname.match(/\.(svg|png|jpg|jpeg|gif|webp)$/) ||
@@ -18,8 +21,8 @@ export async function middleware(request: NextRequest) {
 
   const response = NextResponse.next();
 
-  // فقط نفّذ Supabase إذا المسار يتطلب جلسة
-  if (protectedPaths.some((path) => pathname.startsWith(path)) || pathname.startsWith('/login')) {
+  // إنشاء Supabase client فقط للصفحات التي تحتاج جلسة أو login
+  if (protectedPaths.some((path) => pathname.startsWith(path)) || loginPaths.includes(pathname)) {
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -40,35 +43,41 @@ export async function middleware(request: NextRequest) {
         data: { session },
       } = await supabase.auth.getSession();
 
-      // إعادة التوجيه إذا لم يكن هناك جلسة
-      if (!session && !pathname.startsWith('/login')) {
-        return NextResponse.redirect(new URL('/login', request.url));
+      // إذا الصفحة login أو الصفحة الرئيسية
+      if (loginPaths.includes(pathname)) {
+        if (session) {
+          // استعلام الدور من جدول users
+          const { data: user, error } = await supabase
+            .from('users')
+            .select('role')
+            .eq('id', session.user.id)
+            .single();
+
+          if (!error && user) {
+            switch (user.role) {
+              case 'admin':
+                return NextResponse.redirect(new URL('/dashboard/admin', request.url));
+              case 'teacher':
+                return NextResponse.redirect(new URL('/dashboard/teacher', request.url));
+              case 'student':
+                return NextResponse.redirect(new URL('/dashboard/student', request.url));
+              case 'parent':
+                return NextResponse.redirect(new URL('/dashboard/parent', request.url));
+              default:
+                return NextResponse.redirect(new URL('/dashboard', request.url));
+            }
+          } else {
+            console.error('Error fetching user role:', error);
+          }
+        }
+        // إذا لا توجد جلسة، السماح بعرض صفحة login
+        return response;
       }
 
-      // إعادة التوجيه حسب الدور إذا هناك جلسة وأنت في صفحة تسجيل الدخول
-      if (session && pathname.startsWith('/login')) {
-        const { data: user, error } = await supabase
-          .from('users')
-          .select('role')
-          .eq('id', session.user.id)
-          .single();
-
-        if (error || !user) {
-          console.error('Error querying users table:', error);
+      // إذا الصفحة محمية (dashboard/profile/settings)
+      if (protectedPaths.some((path) => pathname.startsWith(path))) {
+        if (!session) {
           return NextResponse.redirect(new URL('/login', request.url));
-        }
-
-        switch (user.role) {
-          case 'admin':
-            return NextResponse.redirect(new URL('/dashboard/admin', request.url));
-          case 'teacher':
-            return NextResponse.redirect(new URL('/dashboard/teacher', request.url));
-          case 'student':
-            return NextResponse.redirect(new URL('/dashboard/student', request.url));
-          case 'parent':
-            return NextResponse.redirect(new URL('/dashboard/parent', request.url));
-          default:
-            return NextResponse.redirect(new URL('/dashboard', request.url));
         }
       }
     } catch (err) {

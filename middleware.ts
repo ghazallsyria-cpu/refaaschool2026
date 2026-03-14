@@ -40,13 +40,19 @@ export async function middleware(request: NextRequest) {
   }
 
   if (session && request.nextUrl.pathname.startsWith('/login')) {
-    const { data: user } = await supabase
+    const { data: user, error } = await supabase
       .from('users')
       .select('role')
       .eq('id', session.user.id)
       .single();
 
-    const role = user?.role;
+    if (error || !user) {
+      // إذا لم يتم العثور على المستخدم، قد يكون هناك خطأ في إعداد الحساب
+      console.error('User not found in database:', error);
+      return NextResponse.redirect(new URL('/login', request.url));
+    }
+
+    const role = user.role;
     
     if (role === 'admin') return NextResponse.redirect(new URL('/dashboard/admin', request.url));
     if (role === 'teacher') return NextResponse.redirect(new URL('/dashboard/teacher', request.url));

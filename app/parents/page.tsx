@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Plus, Search, MoreHorizontal, Edit, Trash2, X } from 'lucide-react';
 
@@ -29,16 +29,7 @@ export default function ParentsPage() {
   });
   const [notification, setNotification] = useState<{type: 'success' | 'error', message: string} | null>(null);
 
-  useEffect(() => {
-    fetchParents();
-  }, []);
-
-  const showNotification = (type: 'success' | 'error', message: string) => {
-    setNotification({ type, message });
-    setTimeout(() => setNotification(null), 5000);
-  };
-
-  const fetchParents = async () => {
+  const fetchParents = useCallback(async () => {
     setLoading(true);
     try {
       const { data, error } = await supabase
@@ -59,12 +50,16 @@ export default function ParentsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchParents();
+  }, [fetchParents]);
 
   const handleAddSubmit = async () => {
     try {
-      if (!addForm.full_name || !addForm.national_id || !addForm.email) {
-        showNotification('error', 'يرجى تعبئة الحقول الإلزامية');
+      if (!addForm.full_name || !addForm.national_id) {
+        showNotification('error', 'يرجى تعبئة الحقول الإلزامية (الاسم والرقم المدني)');
         return;
       }
 
@@ -78,7 +73,7 @@ export default function ParentsPage() {
           'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
-          email: addForm.email,
+          email: addForm.email || null,
           full_name: addForm.full_name,
           national_id: addForm.national_id,
           phone: addForm.phone,

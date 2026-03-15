@@ -37,10 +37,11 @@ export async function POST(request: Request) {
 
     // Generate a default password based on national_id
     const generatedPassword = password || `${national_id}123`;
+    const generatedEmail = email || `${national_id}@alrefaa.edu`;
 
     // 1. Create user in auth
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-      email,
+      email: generatedEmail,
       password: generatedPassword,
       email_confirm: true,
     });
@@ -56,7 +57,7 @@ export async function POST(request: Request) {
       .insert({
         id: userId,
         full_name,
-        email,
+        email: generatedEmail,
         phone,
         role,
         must_reset_password: true,

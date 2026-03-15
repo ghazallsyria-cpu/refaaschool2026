@@ -1,20 +1,20 @@
-import type { Metadata } from "next";
-import "./globals.css";
+import type {Metadata} from 'next';
+import { Inter } from 'next/font/google';
+import './globals.css'; // Global styles
+import { AppLayout } from '@/components/app-layout';
+
+const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: "Digital School Platform",
-  description: "Professional Digital School Management System",
+  title: 'مدرسة الرفعة النموذجية - نظام الإدارة',
+  description: 'نظام إدارة مدرسة الرفعة النموذجية',
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({children}: {children: React.ReactNode}) {
   return (
-    <html lang="ar" dir="rtl">
-      <body className="antialiased bg-stone-50 text-stone-900">
-        {children}
+    <html lang="ar" dir="rtl" suppressHydrationWarning>
+      <body className={`${inter.className} h-screen overflow-hidden bg-slate-50`}>
+        <AppLayout>{children}</AppLayout>
       </body>
     </html>
   );

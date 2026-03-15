@@ -133,7 +133,7 @@ export default function LoginPage() {
                 كلمة المرور
               </label>
               <div className="text-sm">
-                <a href="/login/forgot-password" className="font-semibold text-indigo-600 hover:text-indigo-500">
+                <a href="#" className="font-semibold text-indigo-600 hover:text-indigo-500">
                   نسيت كلمة المرور؟
                 </a>
               </div>

@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 
 export async function POST(request: Request) {
   try {
-    const { email, password, full_name, national_id, phone, role, specialization, section_id } = await request.json();
+    const { email, password, full_name, national_id, phone, role, specialization, section_id, address, job_title } = await request.json();
 
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -92,6 +92,19 @@ export async function POST(request: Request) {
       if (teacherError) {
         await supabaseAdmin.auth.admin.deleteUser(userId);
         throw teacherError;
+      }
+    } else if (role === 'parent') {
+      const { error: parentError } = await supabaseAdmin
+        .from('parents')
+        .insert({
+          id: userId,
+          national_id,
+          address,
+          job_title,
+        });
+      if (parentError) {
+        await supabaseAdmin.auth.admin.deleteUser(userId);
+        throw parentError;
       }
     }
 

@@ -14,14 +14,17 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [platformClosed, setPlatformClosed] = useState(false);
   const [closeMessage, setCloseMessage] = useState('');
+  const [userRole, setUserRole] = useState<string | null>(null);
+  
   const isLoginPage = pathname === '/login';
+  const isResetPasswordPage = pathname === '/reset-password';
+  const isPublicPage = isLoginPage || isResetPasswordPage;
 
   useEffect(() => {
     const checkAuth = async () => {
       const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
       const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
       
-      // If not configured, don't block the UI, let them see the dashboard warning
       if (!url || !key || url === 'YOUR_SUPABASE_URL' || key === 'YOUR_SUPABASE_ANON_KEY') {
         setIsChecking(false);
         return;
@@ -30,6 +33,42 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         
+        if (!session && !isPublicPage) {
+          router.push('/login');
+          return;
+        } else if (session && isLoginPage) {
+          router.push('/');
+          return;
+        }
+
+        let role = null;
+        if (session?.user) {
+          const { data: userData } = await supabase
+            .from('users')
+            .select('role')
+            .eq('id', session.user.id)
+            .single();
+          
+          role = userData?.role;
+          setUserRole(role);
+        }
+
+        // Role-based routing
+        if (session && !isPublicPage) {
+          if (role === 'student' && !pathname.startsWith('/dashboard/student')) {
+            router.push('/dashboard/student');
+          } else if (role === 'teacher' && !pathname.startsWith('/dashboard/teacher')) {
+            router.push('/dashboard/teacher');
+          } else if (role === 'parent' && !pathname.startsWith('/dashboard/parent')) {
+            router.push('/dashboard/parent');
+          } else if ((role === 'admin' || role === 'management') && pathname.startsWith('/dashboard/')) {
+            // Admins don't need to be in /dashboard/admin, they use the root pages
+            if (pathname === '/dashboard/admin') {
+              router.push('/');
+            }
+          }
+        }
+
         // Check platform settings
         const { data: settings } = await supabase
           .from('platform_settings')
@@ -48,32 +87,10 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             isOpen = false;
           }
 
-          if (!isOpen) {
-            // Check if user is admin
-            let isAdmin = false;
-            if (session?.user) {
-              const { data: userData } = await supabase
-                .from('users')
-                .select('role')
-                .eq('id', session.user.id)
-                .single();
-              
-              if (userData?.role === 'admin') {
-                isAdmin = true;
-              }
-            }
-
-            if (!isAdmin) {
-              setPlatformClosed(true);
-              setCloseMessage(settings.message || 'المنصة مغلقة حاليا للصيانة');
-            }
+          if (!isOpen && role !== 'admin') {
+            setPlatformClosed(true);
+            setCloseMessage(settings.message || 'المنصة مغلقة حاليا للصيانة');
           }
-        }
-
-        if (!session && !isLoginPage) {
-          router.push('/login');
-        } else if (session && isLoginPage) {
-          router.push('/');
         }
       } catch (error) {
         console.error('Auth check error:', error);
@@ -85,7 +102,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     checkAuth();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_OUT' && !isLoginPage) {
+      if (event === 'SIGNED_OUT' && !isPublicPage) {
         router.push('/login');
       } else if (event === 'SIGNED_IN' && isLoginPage) {
         router.push('/');
@@ -93,7 +110,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     });
 
     return () => subscription.unsubscribe();
-  }, [isLoginPage, router]);
+  }, [pathname, router, isPublicPage, isLoginPage]);
 
   if (isChecking) {
     return (
@@ -103,7 +120,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (platformClosed && !isLoginPage) {
+  if (platformClosed && !isPublicPage) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-slate-50 p-4 text-center" dir="rtl">
         <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-indigo-600 shadow-xl mb-8">
@@ -133,27 +150,32 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (isLoginPage) {
+  if (isPublicPage) {
     return <main className="flex-1 h-full">{children}</main>;
   }
+
+  // If user is not admin/management, don't show the admin sidebar
+  const showAdminSidebar = userRole === 'admin' || userRole === 'management';
 
   return (
     <div className="flex h-full">
       {/* Mobile sidebar backdrop */}
-      {isSidebarOpen && (
+      {isSidebarOpen && showAdminSidebar && (
         <div 
           className="fixed inset-0 z-40 bg-slate-900/80 lg:hidden"
           onClick={() => setIsSidebarOpen(false)}
         />
       )}
       
-      <div className={`fixed inset-y-0 right-0 z-50 w-64 transform transition-transform duration-300 ease-in-out lg:static lg:translate-x-0 print:hidden ${isSidebarOpen ? 'translate-x-0' : 'translate-x-full'}`}>
-        <Sidebar onClose={() => setIsSidebarOpen(false)} />
-      </div>
+      {showAdminSidebar && (
+        <div className={`fixed inset-y-0 right-0 z-50 w-64 transform transition-transform duration-300 ease-in-out lg:static lg:translate-x-0 print:hidden ${isSidebarOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+          <Sidebar onClose={() => setIsSidebarOpen(false)} />
+        </div>
+      )}
       
       <div className="flex flex-1 flex-col overflow-hidden print:overflow-visible w-full">
         <div className="print:hidden">
-          <Header onMenuClick={() => setIsSidebarOpen(true)} />
+          <Header onMenuClick={() => setIsSidebarOpen(true)} showMenuButton={showAdminSidebar} />
         </div>
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 print:p-0 print:overflow-visible">
           {children}

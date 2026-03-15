@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { AppLayout } from "@/components/app-layout";
 
 export const metadata: Metadata = {
   title: "Digital School Platform",
@@ -14,7 +15,9 @@ export default function RootLayout({
   return (
     <html lang="ar" dir="rtl">
       <body className="antialiased bg-stone-50 text-stone-900">
-        {children}
+        <AppLayout>
+          {children}
+        </AppLayout>
       </body>
     </html>
   );

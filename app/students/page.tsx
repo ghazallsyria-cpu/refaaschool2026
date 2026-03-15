@@ -16,20 +16,37 @@ export default function StudentsPage() {
     national_id: '',
     email: '',
     phone: '',
-    section_id: ''
+    section_id: '',
+    parent_id: ''
   });
   const [editForm, setEditForm] = useState({
     full_name: '',
     national_id: '',
     email: '',
-    phone: ''
+    phone: '',
+    parent_id: ''
   });
   const [sections, setSections] = useState<any[]>([]);
+  const [parents, setParents] = useState<any[]>([]);
 
   useEffect(() => {
     fetchStudents();
     fetchSections();
+    fetchParents();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const fetchParents = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('parents')
+        .select('id, users(full_name)');
+      if (error) throw error;
+      setParents(data || []);
+    } catch (error) {
+      console.error('Error fetching parents:', error);
+    }
+  };
 
   const fetchSections = async () => {
     try {
@@ -66,6 +83,7 @@ export default function StudentsPage() {
           phone: addForm.phone,
           role: 'student',
           section_id: addForm.section_id || null,
+          parent_id: addForm.parent_id || null,
         }),
       });
 
@@ -77,7 +95,7 @@ export default function StudentsPage() {
 
       showNotification('success', `تم إضافة الطالب بنجاح (كلمة المرور: ${data.password})`);
       setShowAddModal(false);
-      setAddForm({ full_name: '', national_id: '', email: '', phone: '', section_id: '' });
+      setAddForm({ full_name: '', national_id: '', email: '', phone: '', section_id: '', parent_id: '' });
       fetchStudents();
     } catch (error: any) {
       console.error('Error adding student:', error);
@@ -91,7 +109,8 @@ export default function StudentsPage() {
       full_name: student.users?.full_name || '',
       national_id: student.national_id || '',
       email: student.users?.email || '',
-      phone: student.users?.phone || ''
+      phone: student.users?.phone || '',
+      parent_id: student.parent_id || ''
     });
     setShowEditModal(true);
   };
@@ -114,7 +133,8 @@ export default function StudentsPage() {
       const { error: studentError } = await supabase
         .from('students')
         .update({
-          national_id: editForm.national_id
+          national_id: editForm.national_id,
+          parent_id: editForm.parent_id || null
         })
         .eq('id', editingStudent.id);
 
@@ -144,8 +164,10 @@ export default function StudentsPage() {
           id,
           national_id,
           gender,
+          parent_id,
           users (full_name, email, phone),
-          sections (name, classes (name))
+          sections (name, classes (name)),
+          parents (users (full_name))
         `);
 
       if (error) throw error;
@@ -242,6 +264,7 @@ export default function StudentsPage() {
                 <th scope="col" className="py-3.5 pr-4 pl-3 text-right text-sm font-semibold text-slate-900 sm:pr-6">اسم الطالب</th>
                 <th scope="col" className="px-3 py-3.5 text-right text-sm font-semibold text-slate-900">الرقم المدني</th>
                 <th scope="col" className="px-3 py-3.5 text-right text-sm font-semibold text-slate-900">الصف والشعبة</th>
+                <th scope="col" className="px-3 py-3.5 text-right text-sm font-semibold text-slate-900">ولي الأمر</th>
                 <th scope="col" className="px-3 py-3.5 text-right text-sm font-semibold text-slate-900">البريد الإلكتروني</th>
                 <th scope="col" className="px-3 py-3.5 text-right text-sm font-semibold text-slate-900">رقم الهاتف</th>
                 <th scope="col" className="relative py-3.5 pl-4 pr-3 sm:pl-6">
@@ -273,6 +296,9 @@ export default function StudentsPage() {
                     </td>
                     <td className="whitespace-nowrap px-3 py-4 text-sm text-slate-500">
                       {student.sections?.classes?.name} - {student.sections?.name}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-4 text-sm text-slate-500">
+                      {student.parents?.users?.full_name || '-'}
                     </td>
                     <td className="whitespace-nowrap px-3 py-4 text-sm text-slate-500">
                       {student.users?.email}
@@ -402,6 +428,21 @@ export default function StudentsPage() {
                         className="mt-2 block w-full rounded-md border-0 py-1.5 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6" 
                       />
                     </div>
+                    <div className="sm:col-span-2">
+                      <label className="block text-sm font-medium leading-6 text-slate-900">ولي الأمر</label>
+                      <select 
+                        value={editForm.parent_id}
+                        onChange={(e) => setEditForm({...editForm, parent_id: e.target.value})}
+                        className="mt-2 block w-full rounded-md border-0 py-1.5 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                      >
+                        <option value="">بدون ولي أمر</option>
+                        {parents.map(parent => (
+                          <option key={parent.id} value={parent.id}>
+                            {parent.users?.full_name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
                 </form>
               </div>
@@ -485,6 +526,21 @@ export default function StudentsPage() {
                         {sections.map(section => (
                           <option key={section.id} value={section.id}>
                             {section.classes?.name} - {section.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="sm:col-span-2">
+                      <label className="block text-sm font-medium leading-6 text-slate-900">ولي الأمر</label>
+                      <select 
+                        value={addForm.parent_id}
+                        onChange={(e) => setAddForm({...addForm, parent_id: e.target.value})}
+                        className="mt-2 block w-full rounded-md border-0 py-1.5 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                      >
+                        <option value="">بدون ولي أمر</option>
+                        {parents.map(parent => (
+                          <option key={parent.id} value={parent.id}>
+                            {parent.users?.full_name}
                           </option>
                         ))}
                       </select>

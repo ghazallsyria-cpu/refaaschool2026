@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 
-export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
+export function Header({ onMenuClick, showMenuButton = true }: { onMenuClick?: () => void, showMenuButton?: boolean }) {
   const [user, setUser] = useState<any>(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const router = useRouter();
@@ -32,7 +32,7 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
   return (
     <header className="flex h-16 shrink-0 items-center justify-between border-b border-slate-200 bg-white px-4 sm:px-6 shadow-sm">
       <div className="flex flex-1 items-center gap-4">
-        {onMenuClick && (
+        {onMenuClick && showMenuButton && (
           <button
             type="button"
             className="lg:hidden -ml-2 p-2 text-slate-500 hover:text-slate-700 rounded-md"

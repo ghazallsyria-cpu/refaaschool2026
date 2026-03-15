@@ -50,14 +50,17 @@ export default function StudentsPage() {
         return;
       }
 
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+
       const response = await fetch('/api/users/create', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
           email: addForm.email,
-          password: 'password123',
           full_name: addForm.full_name,
           national_id: addForm.national_id,
           phone: addForm.phone,
@@ -72,7 +75,7 @@ export default function StudentsPage() {
         throw new Error(data.error || 'فشل إنشاء حساب الطالب');
       }
 
-      showNotification('success', 'تم إضافة الطالب بنجاح (كلمة المرور الافتراضية: password123)');
+      showNotification('success', `تم إضافة الطالب بنجاح (كلمة المرور: ${data.password})`);
       setShowAddModal(false);
       setAddForm({ full_name: '', national_id: '', email: '', phone: '', section_id: '' });
       fetchStudents();
@@ -158,8 +161,14 @@ export default function StudentsPage() {
     if (!confirm('هل أنت متأكد من حذف هذا الطالب؟')) return;
     
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+
       const response = await fetch(`/api/users/delete?id=${id}`, {
         method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
       });
 
       const data = await response.json();

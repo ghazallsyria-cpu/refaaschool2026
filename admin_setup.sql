@@ -1,4 +1,6 @@
 -- 1. Create Platform Settings Table
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS must_reset_password BOOLEAN DEFAULT TRUE;
+
 CREATE TABLE IF NOT EXISTS public.platform_settings (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
     is_open BOOLEAN DEFAULT true,

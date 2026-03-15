@@ -27,7 +27,7 @@ export default function LoginPage() {
           .from('students')
           .select('id, users!inner(email)')
           .eq('national_id', civilId)
-          .single();
+          .maybeSingle();
           
         if (studentData && studentData.users) {
           authEmail = (studentData.users as any).email;
@@ -37,7 +37,7 @@ export default function LoginPage() {
             .from('teachers')
             .select('id, users!inner(email)')
             .eq('national_id', civilId)
-            .single();
+            .maybeSingle();
             
           if (teacherData && teacherData.users) {
             authEmail = (teacherData.users as any).email;
@@ -47,7 +47,7 @@ export default function LoginPage() {
               .from('parents')
               .select('id, users!inner(email)')
               .eq('national_id', civilId)
-              .single();
+              .maybeSingle();
               
             if (parentData && parentData.users) {
               authEmail = (parentData.users as any).email;
@@ -59,12 +59,25 @@ export default function LoginPage() {
         }
       }
 
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data: authData, error } = await supabase.auth.signInWithPassword({
         email: authEmail,
         password,
       });
 
       if (error) throw error;
+      
+      if (authData.user) {
+        const { data: userData, error: userError } = await supabase
+          .from('users')
+          .select('must_reset_password')
+          .eq('id', authData.user.id)
+          .single();
+
+        if (!userError && userData?.must_reset_password) {
+          router.push('/reset-password');
+          return;
+        }
+      }
       
       router.push('/');
       router.refresh();

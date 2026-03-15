@@ -78,6 +78,12 @@ export default function QuizBuilder() {
   const [subjects, setSubjects] = useState<{id: string, name: string}[]>([]);
   const [sections, setSections] = useState<{id: string, name: string}[]>([]);
   const [activeTab, setActiveTab] = useState('questions');
+  const [notification, setNotification] = useState<{type: 'success' | 'error', message: string} | null>(null);
+
+  const showNotification = (type: 'success' | 'error', message: string) => {
+    setNotification({ type, message });
+    setTimeout(() => setNotification(null), 5000);
+  };
 
   const addQuestion = useCallback((type: QuestionType) => {
     const newQuestion: Question = {
@@ -213,7 +219,7 @@ export default function QuizBuilder() {
 
   const handleSave = async () => {
     if (!exam.title || !exam.subject_id) {
-      alert('يرجى إدخال عنوان الاختبار والمادة');
+      showNotification('error', 'يرجى إدخال عنوان الاختبار والمادة');
       return;
     }
 
@@ -287,7 +293,7 @@ export default function QuizBuilder() {
       // If err is an object, try to stringify it, otherwise use message
       const errorMessage = (err && typeof err === 'object') ? JSON.stringify(err, Object.getOwnPropertyNames(err)) : String(err);
       console.error('Full error details:', errorMessage);
-      alert(`حدث خطأ أثناء حفظ الاختبار: ${err.message || errorMessage}`);
+      showNotification('error', `حدث خطأ أثناء حفظ الاختبار: ${err.message || errorMessage}`);
     } finally {
       setSaving(false);
     }
@@ -302,7 +308,19 @@ export default function QuizBuilder() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-20">
+    <div className="min-h-screen bg-slate-50 pb-20 relative">
+      {/* Notification Toast */}
+      {notification && (
+        <div className={`fixed top-4 left-1/2 transform -translate-x-1/2 z-50 px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 transition-all ${
+          notification.type === 'success' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-red-50 text-red-800 border border-red-200'
+        }`}>
+          <div className="font-medium">{notification.message}</div>
+          <button onClick={() => setNotification(null)} className="text-slate-400 hover:text-slate-600">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
       {/* Sticky Header */}
       <header className="sticky top-0 z-40 bg-white border-b border-slate-200 px-4 py-3 shadow-sm">
         <div className="max-w-5xl mx-auto flex items-center justify-between gap-4">

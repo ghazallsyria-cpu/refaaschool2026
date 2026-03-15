@@ -9,12 +9,13 @@ CREATE TYPE attendance_status AS ENUM ('present', 'absent', 'late', 'excused');
 
 -- 1. Users Table (Extends auth.users)
 CREATE TABLE public.users (
-    id UUID REFERENCES auth.users(id) PRIMARY KEY,
+    id UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
     email TEXT UNIQUE NOT NULL,
     full_name TEXT NOT NULL,
     role user_role NOT NULL DEFAULT 'student',
     phone TEXT,
     avatar_url TEXT,
+    must_reset_password BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
 );
@@ -49,7 +50,7 @@ CREATE TABLE public.subjects (
 
 -- 5. Parents Table (أولياء الأمور)
 CREATE TABLE public.parents (
-    id UUID REFERENCES public.users(id) PRIMARY KEY,
+    id UUID REFERENCES public.users(id) ON DELETE CASCADE PRIMARY KEY,
     national_id TEXT UNIQUE,
     address TEXT,
     job_title TEXT,
@@ -59,7 +60,7 @@ CREATE TABLE public.parents (
 
 -- 6. Students Table (الطلاب)
 CREATE TABLE public.students (
-    id UUID REFERENCES public.users(id) PRIMARY KEY,
+    id UUID REFERENCES public.users(id) ON DELETE CASCADE PRIMARY KEY,
     national_id TEXT UNIQUE NOT NULL,
     parent_id UUID REFERENCES public.parents(id) ON DELETE SET NULL,
     section_id UUID REFERENCES public.sections(id) ON DELETE SET NULL,
@@ -73,7 +74,7 @@ CREATE TABLE public.students (
 
 -- 7. Teachers Table (المعلمين)
 CREATE TABLE public.teachers (
-    id UUID REFERENCES public.users(id) PRIMARY KEY,
+    id UUID REFERENCES public.users(id) ON DELETE CASCADE PRIMARY KEY,
     national_id TEXT UNIQUE NOT NULL,
     specialization TEXT,
     hire_date DATE DEFAULT CURRENT_DATE,
@@ -276,6 +277,15 @@ ALTER TABLE public.question_options ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.exam_attempts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.student_answers ENABLE ROW LEVEL SECURITY;
 
+-- Helper function to get user role
+CREATE OR REPLACE FUNCTION public.get_user_role()
+RETURNS text
+LANGUAGE sql
+SECURITY DEFINER
+AS $$
+  SELECT role::text FROM public.users WHERE id = auth.uid();
+$$;
+
 -- Policies for Exams
 CREATE POLICY "Teachers can manage their own exams" ON public.exams
     FOR ALL USING (teacher_id = auth.uid() OR public.get_user_role() IN ('admin', 'management'));
@@ -303,6 +313,15 @@ CREATE POLICY "Students can manage own answers" ON public.student_answers
     FOR ALL USING (EXISTS (SELECT 1 FROM public.exam_attempts WHERE id = attempt_id AND student_id = auth.uid()));
 CREATE POLICY "Teachers can view answers of their exams" ON public.student_answers
     FOR SELECT USING (EXISTS (SELECT 1 FROM public.exam_attempts a JOIN public.exams e ON a.exam_id = e.id WHERE a.id = attempt_id AND e.teacher_id = auth.uid()) OR public.get_user_role() IN ('admin', 'management'));
+
+-- Helper function to update modified column
+CREATE OR REPLACE FUNCTION update_modified_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = now();
+    RETURN NEW;
+END;
+$$ language 'plpgsql';
 
 -- Trigger for updated_at on exams
 CREATE TRIGGER update_exams_modtime BEFORE UPDATE ON public.exams FOR EACH ROW EXECUTE PROCEDURE update_modified_column();

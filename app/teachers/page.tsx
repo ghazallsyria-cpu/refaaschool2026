@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Plus, Search, Filter, Edit, Trash2 } from 'lucide-react';
+import { Plus, Search, Filter, Edit, Trash2, X } from 'lucide-react';
 
 export default function TeachersPage() {
   const [teachers, setTeachers] = useState<any[]>([]);
@@ -27,21 +27,31 @@ export default function TeachersPage() {
     specialization: ''
   });
 
+  const [notification, setNotification] = useState<{type: 'success' | 'error', message: string} | null>(null);
+
+  const showNotification = (type: 'success' | 'error', message: string) => {
+    setNotification({ type, message });
+    setTimeout(() => setNotification(null), 5000);
+  };
+
   const handleAddSubmit = async () => {
     try {
       if (!addForm.full_name || !addForm.national_id || !addForm.email) {
-        alert('يرجى تعبئة الحقول الإلزامية');
+        showNotification('error', 'يرجى تعبئة الحقول الإلزامية');
         return;
       }
+
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
 
       const response = await fetch('/api/users/create', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
           email: addForm.email,
-          password: 'password123',
           full_name: addForm.full_name,
           national_id: addForm.national_id,
           phone: addForm.phone,
@@ -56,13 +66,13 @@ export default function TeachersPage() {
         throw new Error(data.error || 'فشل إنشاء حساب المعلم');
       }
 
-      alert('تم إضافة المعلم بنجاح (كلمة المرور الافتراضية: password123)');
+      showNotification('success', `تم إضافة المعلم بنجاح (كلمة المرور: ${data.password})`);
       setShowAddModal(false);
       setAddForm({ full_name: '', national_id: '', email: '', phone: '', specialization: '' });
       fetchTeachers();
     } catch (error: any) {
       console.error('Error adding teacher:', error);
-      alert(error.message || 'حدث خطأ أثناء إضافة المعلم');
+      showNotification('error', error.message || 'حدث خطأ أثناء إضافة المعلم');
     }
   };
 
@@ -103,12 +113,12 @@ export default function TeachersPage() {
 
       if (teacherError) throw teacherError;
 
-      alert('تم تحديث بيانات المعلم بنجاح');
+      showNotification('success', 'تم تحديث بيانات المعلم بنجاح');
       setShowEditModal(false);
       fetchTeachers();
     } catch (error: any) {
       console.error('Error updating teacher:', error);
-      alert(error.message || 'حدث خطأ أثناء تحديث بيانات المعلم');
+      showNotification('error', error.message || 'حدث خطأ أثناء تحديث بيانات المعلم');
     }
   };
 
@@ -139,8 +149,14 @@ export default function TeachersPage() {
     if (!confirm('هل أنت متأكد من حذف هذا المعلم؟')) return;
     
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+
       const response = await fetch(`/api/users/delete?id=${id}`, {
         method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
       });
 
       const data = await response.json();
@@ -149,11 +165,11 @@ export default function TeachersPage() {
         throw new Error(data.error || 'فشل حذف المعلم');
       }
       
-      alert('تم حذف المعلم بنجاح');
+      showNotification('success', 'تم حذف المعلم بنجاح');
       fetchTeachers();
     } catch (error: any) {
       console.error('Error deleting teacher:', error);
-      alert(error.message || 'حدث خطأ أثناء حذف المعلم');
+      showNotification('error', error.message || 'حدث خطأ أثناء حذف المعلم');
     }
   };
 
@@ -163,7 +179,19 @@ export default function TeachersPage() {
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
+      {/* Notification Toast */}
+      {notification && (
+        <div className={`fixed top-4 left-1/2 transform -translate-x-1/2 z-50 px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 transition-all ${
+          notification.type === 'success' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-red-50 text-red-800 border border-red-200'
+        }`}>
+          <div className="font-medium">{notification.message}</div>
+          <button onClick={() => setNotification(null)} className="text-slate-400 hover:text-slate-600">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">إدارة المعلمين</h1>

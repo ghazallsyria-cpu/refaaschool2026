@@ -7,7 +7,7 @@ import { supabase } from '@/lib/supabase';
 import { 
   Clock, ChevronLeft, ChevronRight, Send, 
   AlertCircle, CheckCircle2, Timer, 
-  ArrowRight, Info, BookOpen
+  ArrowRight, Info, BookOpen, X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/lib/utils';
@@ -42,6 +42,12 @@ export default function TakeQuiz() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isFinished, setIsFinished] = useState(false);
   const [attemptId, setAttemptId] = useState<string | null>(null);
+  const [notification, setNotification] = useState<{type: 'success' | 'error', message: string} | null>(null);
+
+  const showNotification = (type: 'success' | 'error', message: string) => {
+    setNotification({ type, message });
+    setTimeout(() => setNotification(null), 5000);
+  };
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -157,7 +163,7 @@ export default function TakeQuiz() {
       setIsFinished(true);
     } catch (err) {
       console.error('Error submitting quiz:', err);
-      alert('حدث خطأ أثناء إرسال الاختبار');
+      showNotification('error', 'حدث خطأ أثناء إرسال الاختبار');
     } finally {
       setIsSubmitting(false);
     }
@@ -223,7 +229,19 @@ export default function TakeQuiz() {
   const progress = ((currentQuestionIdx + 1) / questions.length) * 100;
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col">
+    <div className="min-h-screen bg-slate-50 flex flex-col relative">
+      {/* Notification Toast */}
+      {notification && (
+        <div className={`fixed top-4 left-1/2 transform -translate-x-1/2 z-50 px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 transition-all ${
+          notification.type === 'success' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-red-50 text-red-800 border border-red-200'
+        }`}>
+          <div className="font-medium">{notification.message}</div>
+          <button onClick={() => setNotification(null)} className="text-slate-400 hover:text-slate-600">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
       {/* Header */}
       <header className="bg-white border-b border-slate-200 px-4 py-4 sticky top-0 z-40">
         <div className="max-w-4xl mx-auto flex items-center justify-between gap-4">

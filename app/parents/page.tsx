@@ -31,7 +31,6 @@ export default function ParentsPage() {
 
   useEffect(() => {
     fetchParents();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const showNotification = (type: 'success' | 'error', message: string) => {

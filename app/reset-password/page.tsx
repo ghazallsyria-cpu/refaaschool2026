@@ -62,7 +62,6 @@ export default function ResetPasswordPage() {
       setSuccess(true);
       setTimeout(() => {
         router.push('/');
-        router.refresh();
       }, 2000);
     } catch (err: any) {
       setError(err.message || 'حدث خطأ أثناء تغيير كلمة المرور');

@@ -33,7 +33,6 @@ export default function StudentsPage() {
     fetchStudents();
     fetchSections();
     fetchParents();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchParents = async () => {

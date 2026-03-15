@@ -778,7 +778,7 @@ students.forEach(s => {
   const email = `${s.nationalId}@alrefaa.edu`;
   const sectionId = sectionMap[s.className + '||' + s.section];
   
-  sql += `INSERT INTO auth.users (id, instance_id, aud, role, email, encrypted_password, created_at, updated_at) VALUES ('${userId}', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', '${email}', crypt('12345', gen_salt('bf')), now(), now());\n`;
+  sql += `INSERT INTO auth.users (id, instance_id, aud, role, email, encrypted_password, created_at, updated_at) VALUES ('${userId}', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', '${email}', crypt('${s.nationalId}123', gen_salt('bf')), now(), now());\n`;
   
   sql += `INSERT INTO public.users (id, email, full_name, role) VALUES ('${userId}', '${email}', '${s.name}', 'student');\n`;
   

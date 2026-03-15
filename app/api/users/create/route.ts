@@ -35,8 +35,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Forbidden: Only admins can create users' }, { status: 403 });
     }
 
-    // Generate a random password if not provided
-    const generatedPassword = password || Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-8);
+    // Generate a default password based on national_id
+    const generatedPassword = password || `${national_id}123`;
 
     // 1. Create user in auth
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({

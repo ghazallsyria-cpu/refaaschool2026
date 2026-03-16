@@ -1,97 +1,71 @@
-export const runtime = 'nodejs';
+export const runtime = 'nodejs'
 
-import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
 
 export async function POST() {
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
-  if (!serviceRoleKey || !supabaseUrl) {
+  if (!supabaseUrl || !serviceRoleKey) {
     return NextResponse.json(
-      { error: 'إعدادات Supabase غير مكتملة على الخادم.' },
+      { error: 'Supabase environment variables are missing' },
       { status: 500 }
-    );
+    )
   }
 
-  const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
+  const supabase = createClient(supabaseUrl, serviceRoleKey)
 
   try {
-    const logs: string[] = [];
+    const logs: string[] = []
 
-    logs.push('بدء عملية تهيئة الطلاب...');
+    logs.push('بدء عملية تهيئة الطلاب')
 
-    const { data: students, error: studentsError } = await supabaseAdmin
+    const { data: students, error } = await supabase
       .from('students')
-      .select('national_id, users(full_name)');
+      .select('national_id')
 
-    if (studentsError) {
-      throw studentsError;
-    }
-
-    logs.push(`تم العثور على ${students?.length || 0} طالب`);
+    if (error) throw error
 
     for (const student of students || []) {
-      try {
-        const nationalId = student.national_id;
-        const email = `${nationalId}@alrefaa.edu`;
-        const name = student?.users?.full_name || 'طالب';
+      const email = `${student.national_id}@alrefaa.edu`
 
-        logs.push(`معالجة الطالب ${nationalId}`);
+      const { data: authUser, error: authError } =
+        await supabase.auth.admin.createUser({
+          email,
+          password: '123456',
+          email_confirm: true
+        })
 
-        const { data: authUser, error: authError } =
-          await supabaseAdmin.auth.admin.createUser({
-            email,
-            password: '123456',
-            email_confirm: true
-          });
-
-        if (authError) {
-          logs.push(`فشل إنشاء الحساب ${email}: ${authError.message}`);
-          continue;
-        }
-
-        const userId = authUser?.user?.id;
-
-        if (!userId) {
-          logs.push(`لم يتم الحصول على user id للحساب ${email}`);
-          continue;
-        }
-
-        const { error: linkError } = await supabaseAdmin
-          .from('users')
-          .update({ id: userId })
-          .eq('email', email);
-
-        if (linkError) {
-          logs.push(`فشل ربط الحساب ${email}: ${linkError.message}`);
-        } else {
-          logs.push(`تم إنشاء وربط الحساب للطالب ${name}`);
-        }
-
-      } catch (innerError: any) {
-        logs.push(
-          `خطأ أثناء معالجة الطالب ${
-            student?.national_id
-          }: ${innerError?.message || innerError}`
-        );
+      if (authError) {
+        logs.push(`فشل إنشاء ${email}: ${authError.message}`)
+        continue
       }
+
+      const userId = authUser?.user?.id
+
+      if (!userId) {
+        logs.push(`لم يتم الحصول على user id لـ ${email}`)
+        continue
+      }
+
+      await supabase
+        .from('users')
+        .update({ id: userId })
+        .eq('email', email)
+
+      logs.push(`تم إنشاء الحساب ${email}`)
     }
 
-    return NextResponse.json({
-      message: 'اكتملت العملية',
-      logs
-    });
+    return NextResponse.json({ logs })
 
-  } catch (error: any) {
-    console.error('SETUP STUDENTS ERROR:', error);
-
+  } catch (err: any) {
     return NextResponse.json(
       {
-        error: error?.message || 'حدث خطأ غير معروف',
-        details: error?.toString()
+        error: err?.message || 'Unknown error',
+        details: err?.toString()
       },
       { status: 500 }
-    );
+    )
   }
 }

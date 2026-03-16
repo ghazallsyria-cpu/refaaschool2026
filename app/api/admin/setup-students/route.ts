@@ -69,9 +69,18 @@ export async function POST() {
     return NextResponse.json({ message: 'اكتملت العملية.', logs: results });
   } catch (err: any) {
     console.error('Setup students error:', err);
+    
+    // Attempt to extract a meaningful error message
+    let errorMessage = 'حدث خطأ غير معروف أثناء التهيئة.';
+    if (typeof err === 'string') {
+      errorMessage = err;
+    } else if (err && typeof err === 'object') {
+      errorMessage = err.message || err.error || JSON.stringify(err);
+    }
+
     return NextResponse.json({ 
-      error: err.message || 'حدث خطأ غير معروف أثناء التهيئة.',
-      details: err.toString()
+      error: errorMessage,
+      details: err?.toString() || JSON.stringify(err)
     }, { status: 500 });
   }
 }

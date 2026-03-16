@@ -70,27 +70,32 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         }
 
         // Check platform settings
-        const { data: settings } = await supabase
-          .from('platform_settings')
-          .select('*')
-          .limit(1)
-          .single();
+        try {
+          const { data: settings, error: settingsError } = await supabase
+            .from('platform_settings')
+            .select('*')
+            .limit(1)
+            .maybeSingle();
 
-        if (settings) {
-          let isOpen = settings.is_open;
-          const now = new Date();
-          
-          if (settings.open_date && new Date(settings.open_date) > now) {
-            isOpen = false;
-          }
-          if (settings.close_date && new Date(settings.close_date) < now) {
-            isOpen = false;
-          }
+          if (!settingsError && settings) {
+            let isOpen = settings.is_open;
+            const now = new Date();
+            
+            if (settings.open_date && new Date(settings.open_date) > now) {
+              isOpen = false;
+            }
+            if (settings.close_date && new Date(settings.close_date) < now) {
+              isOpen = false;
+            }
 
-          if (!isOpen && role !== 'admin') {
-            setPlatformClosed(true);
-            setCloseMessage(settings.message || 'المنصة مغلقة حاليا للصيانة');
+            if (!isOpen && role !== 'admin') {
+              setPlatformClosed(true);
+              setCloseMessage(settings.message || 'المنصة مغلقة حاليا للصيانة');
+            }
           }
+        } catch (settingsErr) {
+          console.warn('Platform settings table might be missing:', settingsErr);
+          // If table is missing, assume platform is open
         }
       } catch (error) {
         console.error('Auth check error:', error);

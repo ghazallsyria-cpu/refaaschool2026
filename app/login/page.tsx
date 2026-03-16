@@ -22,58 +22,79 @@ export default function LoginPage() {
       
       // If the input is not an email, assume it's a Civil ID and look up the email
       if (!civilId.includes('@')) {
-        // First check students
-        const { data: studentData } = await supabase
-          .from('students')
-          .select('id, users!inner(email)')
+        // Check users table directly first (most efficient)
+        const { data: userData, error: userLookupError } = await supabase
+          .from('users')
+          .select('email')
           .eq('national_id', civilId)
           .maybeSingle();
-          
-        if (studentData && studentData.users) {
-          authEmail = (studentData.users as any).email;
+
+        if (userData?.email) {
+          authEmail = userData.email;
         } else {
-          // Check teachers
-          const { data: teacherData } = await supabase
-            .from('teachers')
+          // Fallback check in role tables if not in users table (legacy or partial data)
+          const { data: studentData } = await supabase
+            .from('students')
             .select('id, users!inner(email)')
             .eq('national_id', civilId)
             .maybeSingle();
             
-          if (teacherData && teacherData.users) {
-            authEmail = (teacherData.users as any).email;
+          if (studentData && studentData.users) {
+            authEmail = (studentData.users as any).email;
           } else {
-            // Check parents
-            const { data: parentData } = await supabase
-              .from('parents')
+            const { data: teacherData } = await supabase
+              .from('teachers')
               .select('id, users!inner(email)')
               .eq('national_id', civilId)
               .maybeSingle();
               
-            if (parentData && parentData.users) {
-              authEmail = (parentData.users as any).email;
+            if (teacherData && teacherData.users) {
+              authEmail = (teacherData.users as any).email;
             } else {
-              // Fallback for admins or others
-              authEmail = `${civilId}@alrefaa.edu`;
+              const { data: parentData } = await supabase
+                .from('parents')
+                .select('id, users!inner(email)')
+                .eq('national_id', civilId)
+                .maybeSingle();
+                
+              if (parentData && parentData.users) {
+                authEmail = (parentData.users as any).email;
+              } else {
+                // Final fallback
+                authEmail = `${civilId}@alrefaa.edu`;
+              }
             }
           }
         }
       }
 
-      const { data: authData, error } = await supabase.auth.signInWithPassword({
+      console.log('Attempting login with email:', authEmail);
+
+      const { data: authData, error: signInError } = await supabase.auth.signInWithPassword({
         email: authEmail,
         password,
       });
 
-      if (error) throw error;
+      if (signInError) throw signInError;
       
       if (authData.user) {
+        // Verify user exists in public.users table
         const { data: userData, error: userError } = await supabase
           .from('users')
-          .select('must_reset_password')
+          .select('role, must_reset_password')
           .eq('id', authData.user.id)
-          .single();
+          .maybeSingle();
 
-        if (!userError && userData?.must_reset_password) {
+        if (userError) {
+          console.error('User record lookup error:', userError);
+        }
+
+        if (!userData) {
+          // If auth succeeds but no record in public.users, this is a configuration error
+          throw new Error('تم تسجيل الدخول بنجاح، ولكن لم يتم العثور على بيانات المستخدم في قاعدة البيانات. يرجى التواصل مع المسؤول.');
+        }
+
+        if (userData.must_reset_password) {
           router.push('/reset-password');
           return;
         }
@@ -82,10 +103,32 @@ export default function LoginPage() {
       router.push('/');
       router.refresh();
     } catch (err: any) {
-      setError(err.message || 'حدث خطأ أثناء تسجيل الدخول');
+      console.error('Login error:', err);
+      setError(err.message || 'حدث خطأ أثناء تسجيل الدخول. تأكد من البيانات وحاول مرة أخرى.');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleDemoLogin = async (role: 'admin' | 'teacher' | 'student') => {
+    setLoading(true);
+    setError(null);
+    
+    const demoUsers = {
+      admin: { id: '123456789012', pass: 'admin123' },
+      teacher: { id: '290123456789', pass: 'teacher123' },
+      student: { id: '305123456789', pass: 'student123' }
+    };
+
+    const user = demoUsers[role];
+    setCivilId(user.id);
+    setPassword(user.pass);
+    
+    // We'll trigger the login manually after a short delay to show the UI update
+    setTimeout(() => {
+      const form = document.querySelector('form');
+      if (form) form.requestSubmit();
+    }, 100);
   };
 
   return (
@@ -177,23 +220,37 @@ export default function LoginPage() {
             >
               {loading ? 'جاري تسجيل الدخول...' : 'تسجيل الدخول'}
             </button>
-            <button
-              type="button"
-              onClick={() => router.push('/')}
-              className="mt-4 flex w-full justify-center rounded-md bg-white px-3 py-2.5 text-sm font-semibold leading-6 text-slate-900 shadow-sm ring-1 ring-inset ring-slate-300 hover:bg-slate-50"
-            >
-              دخول تجريبي (تخطي تسجيل الدخول)
-            </button>
           </div>
         </form>
 
-        <div className="mt-8 bg-blue-50 p-4 rounded-xl border border-blue-100 text-sm text-blue-800">
-          <h4 className="font-bold mb-2">بيانات تجريبية للدخول:</h4>
-          <ul className="space-y-1 list-disc list-inside">
-            <li><strong>مدير:</strong> 123456789012 (كلمة المرور: admin123)</li>
-            <li><strong>معلم:</strong> 290123456789 (كلمة المرور: teacher123)</li>
-            <li><strong>طالب:</strong> 305123456789 (كلمة المرور: student123)</li>
-          </ul>
+        <div className="mt-8 bg-white p-6 rounded-xl shadow-sm ring-1 ring-slate-200">
+          <h4 className="font-bold mb-4 text-slate-900 border-b pb-2">الدخول السريع (للتجربة):</h4>
+          <div className="grid grid-cols-1 gap-3">
+            <button
+              onClick={() => handleDemoLogin('admin')}
+              className="flex items-center justify-between p-3 rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors group"
+            >
+              <span className="text-sm font-medium text-slate-700">مدير النظام</span>
+              <span className="text-xs text-slate-400 group-hover:text-indigo-600">اضغط للدخول</span>
+            </button>
+            <button
+              onClick={() => handleDemoLogin('teacher')}
+              className="flex items-center justify-between p-3 rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors group"
+            >
+              <span className="text-sm font-medium text-slate-700">معلم</span>
+              <span className="text-xs text-slate-400 group-hover:text-indigo-600">اضغط للدخول</span>
+            </button>
+            <button
+              onClick={() => handleDemoLogin('student')}
+              className="flex items-center justify-between p-3 rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors group"
+            >
+              <span className="text-sm font-medium text-slate-700">طالب</span>
+              <span className="text-xs text-slate-400 group-hover:text-indigo-600">اضغط للدخول</span>
+            </button>
+          </div>
+          <p className="mt-4 text-[10px] text-slate-400 text-center">
+            * ملاحظة: يتطلب الدخول التجريبي وجود الحسابات مسبقاً في قاعدة البيانات.
+          </p>
         </div>
       </div>
     </div>

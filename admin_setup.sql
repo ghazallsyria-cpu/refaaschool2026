@@ -1,8 +1,9 @@
 -- 1. Create Platform Settings Table
 ALTER TABLE public.users ADD COLUMN IF NOT EXISTS must_reset_password BOOLEAN DEFAULT TRUE;
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS national_id TEXT UNIQUE;
 
 CREATE TABLE IF NOT EXISTS public.platform_settings (
-    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     is_open BOOLEAN DEFAULT true,
     open_date TIMESTAMP WITH TIME ZONE,
     close_date TIMESTAMP WITH TIME ZONE,

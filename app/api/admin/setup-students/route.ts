@@ -12,10 +12,10 @@ export async function POST() {
   const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
 
   try {
-    // 1. Fetch all students
+    // 1. Fetch all students with their names from users table
     const { data: students, error: studentsError } = await supabaseAdmin
       .from('students')
-      .select('national_id, name');
+      .select('national_id, users(full_name)');
 
     if (studentsError) throw studentsError;
 
@@ -24,6 +24,7 @@ export async function POST() {
     // 2. Loop and create users
     for (const student of students || []) {
       const email = `${student.national_id}@alrefaa.edu`;
+      const studentName = student.users?.full_name || 'طالب غير معروف';
 
       // Create auth user
       const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
@@ -34,9 +35,9 @@ export async function POST() {
 
       if (authError) {
         if (authError.message.includes('already registered')) {
-          results.push(`الطالب ${student.name}: الحساب موجود مسبقاً.`);
+          results.push(`الطالب ${studentName}: الحساب موجود مسبقاً.`);
         } else {
-          results.push(`الطالب ${student.name}: خطأ في إنشاء الحساب: ${authError.message}`);
+          results.push(`الطالب ${studentName}: خطأ في إنشاء الحساب: ${authError.message}`);
         }
         continue;
       }
@@ -48,9 +49,9 @@ export async function POST() {
         .eq('email', email);
 
       if (userError) {
-        results.push(`الطالب ${student.name}: خطأ في ربط الحساب: ${userError.message}`);
+        results.push(`الطالب ${studentName}: خطأ في ربط الحساب: ${userError.message}`);
       } else {
-        results.push(`الطالب ${student.name}: تم إنشاء الحساب وربطه بنجاح.`);
+        results.push(`الطالب ${studentName}: تم إنشاء الحساب وربطه بنجاح.`);
       }
     }
 

@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 
 export async function POST(request: Request) {
   try {
-    const { userId, newPassword } = await request.json();
+    let { userId, newPassword } = await request.json();
 
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -18,6 +18,22 @@ export async function POST(request: Request) {
         persistSession: false,
       },
     });
+
+    // If newPassword is not provided, generate one based on national_id
+    if (!newPassword) {
+      // Try to find national_id from students, teachers, or parents
+      const { data: studentData } = await supabaseAdmin.from('students').select('national_id').eq('id', userId).maybeSingle();
+      const { data: teacherData } = await supabaseAdmin.from('teachers').select('national_id').eq('id', userId).maybeSingle();
+      const { data: parentData } = await supabaseAdmin.from('parents').select('national_id').eq('id', userId).maybeSingle();
+      
+      const nationalId = studentData?.national_id || teacherData?.national_id || parentData?.national_id;
+      
+      if (nationalId) {
+        newPassword = `${nationalId}123`;
+      } else {
+        newPassword = 'User@123456'; // Fallback
+      }
+    }
 
     // Verify Admin
     const authHeader = request.headers.get('Authorization');
@@ -59,7 +75,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: `Database Error: ${userError.message}` }, { status: 500 });
     }
 
-    return NextResponse.json({ message: 'Password reset successfully' });
+    return NextResponse.json({ message: 'Password reset successfully', newPassword });
   } catch (error: any) {
     console.error('Error resetting password:', error);
     return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });

@@ -23,6 +23,9 @@ DROP POLICY IF EXISTS "safe_read_self" ON public.users;
 DROP POLICY IF EXISTS "safe_read_admin" ON public.users;
 DROP POLICY IF EXISTS "admin_all_access" ON public.users;
 DROP POLICY IF EXISTS "Users can view their own data" ON public.users;
+DROP POLICY IF EXISTS "users_read_policy" ON public.users;
+DROP POLICY IF EXISTS "users_update_policy" ON public.users;
+DROP POLICY IF EXISTS "users_admin_all" ON public.users;
 
 -- Re-enable RLS
 ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;

@@ -54,9 +54,11 @@ export default function TeachersPage() {
         body: JSON.stringify(resetPasswordForm)
       });
       
-      if (!response.ok) throw new Error('فشل تغيير كلمة المرور');
+      const data = await response.json();
       
-      showNotification('success', 'تم تغيير كلمة المرور بنجاح');
+      if (!response.ok) throw new Error(data.error || 'فشل تغيير كلمة المرور');
+      
+      showNotification('success', `تم تغيير كلمة المرور بنجاح. كلمة المرور الجديدة: ${data.newPassword || resetPasswordForm.newPassword}`);
       setShowPasswordResetModal(false);
     } catch (error: any) {
       console.error('Error resetting password:', error);

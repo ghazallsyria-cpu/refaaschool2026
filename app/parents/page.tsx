@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Plus, Search, MoreHorizontal, Edit, Trash2, X } from 'lucide-react';
+import { Plus, Search, MoreHorizontal, Edit, Trash2, X, Key } from 'lucide-react';
 
 export default function ParentsPage() {
   const [parents, setParents] = useState<any[]>([]);
@@ -11,6 +11,7 @@ export default function ParentsPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingParent, setEditingParent] = useState<any>(null);
+  const [resettingPassword, setResettingPassword] = useState(false);
   const [addForm, setAddForm] = useState({
     full_name: '',
     national_id: '',
@@ -32,6 +33,40 @@ export default function ParentsPage() {
   const showNotification = (type: 'success' | 'error', message: string) => {
     setNotification({ type, message });
     setTimeout(() => setNotification(null), 5000);
+  };
+
+  const handleResetPasswordClick = async (parent: any) => {
+    if (!confirm(`هل أنت متأكد من إعادة تعيين كلمة المرور لـ ${parent.users?.full_name}؟ سيتم تعيينها إلى الرقم المدني متبوعاً بـ 123.`)) {
+      return;
+    }
+
+    setResettingPassword(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+
+      const response = await fetch('/api/users/reset-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ userId: parent.id }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'فشل إعادة تعيين كلمة المرور');
+      }
+
+      showNotification('success', `تم إعادة تعيين كلمة المرور بنجاح. كلمة المرور الجديدة هي: ${data.newPassword}`);
+    } catch (error: any) {
+      console.error('Error resetting password:', error);
+      showNotification('error', error.message || 'حدث خطأ أثناء إعادة تعيين كلمة المرور');
+    } finally {
+      setResettingPassword(false);
+    }
   };
 
   const fetchParents = useCallback(async () => {
@@ -167,13 +202,11 @@ export default function ParentsPage() {
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
 
-      const response = await fetch('/api/users/delete', {
-        method: 'POST',
+      const response = await fetch(`/api/users/delete?id=${parentToDelete}`, {
+        method: 'DELETE',
         headers: {
-          'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ userId: parentToDelete }),
       });
 
       if (!response.ok) {
@@ -283,6 +316,14 @@ export default function ParentsPage() {
                         </td>
                         <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-left text-sm font-medium sm:pr-6">
                           <div className="flex items-center justify-end gap-2">
+                            <button 
+                              onClick={() => handleResetPasswordClick(parent)}
+                              className="text-slate-400 hover:text-indigo-600 p-1"
+                              title="إعادة تعيين كلمة المرور"
+                              disabled={resettingPassword}
+                            >
+                              <Key className="h-4 w-4" />
+                            </button>
                             <button 
                               onClick={() => handleEditClick(parent)}
                               className="text-indigo-600 hover:text-indigo-900 p-1"

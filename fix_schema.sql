@@ -1,45 +1,26 @@
--- 1. Ensure users table has national_id and must_reset_password
-DO $$
+-- 1. Update is_admin function to include 'management'
+CREATE OR REPLACE FUNCTION public.is_admin()
+RETURNS BOOLEAN AS $$
 BEGIN
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='national_id') THEN
-        ALTER TABLE public.users ADD COLUMN national_id TEXT UNIQUE;
-    END IF;
-    
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='must_reset_password') THEN
-        ALTER TABLE public.users ADD COLUMN must_reset_password BOOLEAN DEFAULT TRUE;
-    END IF;
+  RETURN EXISTS (
+    SELECT 1 FROM public.users
+    WHERE id = auth.uid() AND (role = 'admin' OR role = 'management')
+  );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 2. Re-apply policies to all tables for management/admin
+DO $$ 
+DECLARE 
+    tab RECORD;
+BEGIN 
+    FOR tab IN (SELECT tablename FROM pg_tables WHERE schemaname = 'public' 
+                AND tablename IN ('users', 'students', 'teachers', 'parents', 'classes', 'sections', 'subjects', 'attendance', 'exams', 'platform_settings')) 
+    LOOP 
+        EXECUTE format('DROP POLICY IF EXISTS "admin_all_access" ON public.%I', tab.tablename);
+        EXECUTE format('CREATE POLICY "admin_all_access" ON public.%I FOR ALL USING (public.is_admin())', tab.tablename);
+    END LOOP; 
 END $$;
-
--- 2. Create Platform Settings Table
-CREATE TABLE IF NOT EXISTS public.platform_settings (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    is_open BOOLEAN DEFAULT true,
-    open_date TIMESTAMP WITH TIME ZONE,
-    close_date TIMESTAMP WITH TIME ZONE,
-    message TEXT,
-    updated_by UUID REFERENCES public.users(id),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
-);
-
--- Enable RLS for platform_settings
-ALTER TABLE public.platform_settings ENABLE ROW LEVEL SECURITY;
-
--- Allow everyone to read platform_settings
-DROP POLICY IF EXISTS "Allow all to read platform_settings" ON public.platform_settings;
-CREATE POLICY "Allow all to read platform_settings" ON public.platform_settings FOR SELECT USING (true);
-
--- Allow only admins to update platform_settings
-DROP POLICY IF EXISTS "Allow admins to update platform_settings" ON public.platform_settings;
-CREATE POLICY "Allow admins to update platform_settings" ON public.platform_settings FOR ALL USING (
-    EXISTS (
-        SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'admin'
-    )
-);
-
--- Insert default settings if empty
-INSERT INTO public.platform_settings (is_open)
-SELECT true
-WHERE NOT EXISTS (SELECT 1 FROM public.platform_settings);
 
 -- 3. Bootstrap Admin User (If not exists)
 -- NOTE: This only creates the public.users record. 

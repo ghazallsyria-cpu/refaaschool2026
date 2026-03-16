@@ -345,18 +345,27 @@ export default function StudentsPage() {
                       {student.users?.phone || '-'}
                     </td>
                     <td className="relative whitespace-nowrap py-4 pl-4 pr-3 text-left text-sm font-medium sm:pl-6">
-                      <button 
-                        onClick={() => handleEditClick(student)}
-                        className="text-slate-400 hover:text-indigo-600 mx-2"
-                      >
-                        <Edit className="h-4 w-4" />
-                      </button>
-                      <button 
-                        onClick={() => handleDeleteClick(student.id)}
-                        className="text-slate-400 hover:text-red-600"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
+                      <div className="flex items-center justify-end gap-2">
+                        <button 
+                          onClick={() => handleResetPasswordClick(student)}
+                          className="text-slate-400 hover:text-indigo-600"
+                          title="إعادة تعيين كلمة المرور"
+                        >
+                          <Key className="h-4 w-4" />
+                        </button>
+                        <button 
+                          onClick={() => handleEditClick(student)}
+                          className="text-slate-400 hover:text-indigo-600"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </button>
+                        <button 
+                          onClick={() => handleDeleteClick(student.id)}
+                          className="text-slate-400 hover:text-red-600"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))

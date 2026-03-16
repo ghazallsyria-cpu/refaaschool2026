@@ -307,6 +307,13 @@ export default function TeachersPage() {
                     <td className="relative whitespace-nowrap py-4 pl-6 pr-4 text-left text-sm font-medium">
                       <div className="flex items-center justify-end gap-2">
                         <button 
+                          onClick={() => handleResetPasswordClick(teacher)}
+                          className="text-slate-400 hover:text-indigo-600"
+                          title="إعادة تعيين كلمة المرور"
+                        >
+                          <Key className="h-4 w-4" />
+                        </button>
+                        <button 
                           onClick={() => handleEditClick(teacher)}
                           className="text-indigo-600 hover:text-indigo-900"
                         >

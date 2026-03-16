@@ -32,22 +32,32 @@ export async function POST(request: Request) {
     }
 
     const { data: userData } = await supabaseAdmin.from('users').select('role').eq('id', user.id).single();
-    if (userData?.role !== 'admin') {
-      return NextResponse.json({ error: 'Forbidden: Only admins can reset passwords' }, { status: 403 });
+    console.log('Admin check - User role:', userData?.role);
+    
+    if (userData?.role !== 'admin' && userData?.role !== 'management') {
+      return NextResponse.json({ error: `Forbidden: Only admins can reset passwords. Your role: ${userData?.role}` }, { status: 403 });
     }
 
     // 1. Update password in auth
+    console.log('Updating auth password for user:', userId);
     const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(userId, {
       password: newPassword,
     });
-    if (authError) throw authError;
+    if (authError) {
+      console.error('Auth update error:', authError);
+      return NextResponse.json({ error: `Auth Error: ${authError.message}` }, { status: 500 });
+    }
 
     // 2. Update must_reset_password flag
+    console.log('Updating public.users flag for user:', userId);
     const { error: userError } = await supabaseAdmin
       .from('users')
       .update({ must_reset_password: true })
       .eq('id', userId);
-    if (userError) throw userError;
+    if (userError) {
+      console.error('Database update error:', userError);
+      return NextResponse.json({ error: `Database Error: ${userError.message}` }, { status: 500 });
+    }
 
     return NextResponse.json({ message: 'Password reset successfully' });
   } catch (error: any) {

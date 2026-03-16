@@ -20,6 +20,7 @@ export async function POST() {
     const logs: string[] = [];
     logs.push('بدء عملية تهيئة الطلاب...');
 
+    // جلب جميع الطلاب مع بيانات المستخدم المرتبطة
     const { data: students, error } = await supabase
       .from('students')
       .select('national_id, users(full_name)');
@@ -31,12 +32,13 @@ export async function POST() {
     for (const student of students || []) {
       try {
         const email = `${student.national_id}@alrefaa.edu`;
-        const name = student?.users?.full_name || 'طالب';
+        const name = student?.users?.[0]?.full_name || 'طالب';
 
+        // إنشاء حساب Supabase Auth لكل طالب
         const { data: authUser, error: authError } =
           await supabase.auth.admin.createUser({
             email,
-            password: '123456',
+            password: '123456', // كلمة السر الافتراضية
             email_confirm: true,
           });
 
@@ -51,6 +53,7 @@ export async function POST() {
           continue;
         }
 
+        // ربط الحساب بجدول users
         const { error: linkError } = await supabase
           .from('users')
           .update({ id: userId })

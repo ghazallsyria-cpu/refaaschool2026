@@ -21,7 +21,8 @@ export default function SetupStudentsPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error + (data.details ? ` (${data.details})` : ''));
+        console.error('API Error Response:', data);
+        throw new Error(data.error || JSON.stringify(data) || 'حدث خطأ غير معروف.');
       }
 
       addLog(data.message);

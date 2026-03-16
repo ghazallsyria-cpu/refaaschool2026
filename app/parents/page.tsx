@@ -29,6 +29,11 @@ export default function ParentsPage() {
   });
   const [notification, setNotification] = useState<{type: 'success' | 'error', message: string} | null>(null);
 
+  const showNotification = (type: 'success' | 'error', message: string) => {
+    setNotification({ type, message });
+    setTimeout(() => setNotification(null), 5000);
+  };
+
   const fetchParents = useCallback(async () => {
     setLoading(true);
     try {

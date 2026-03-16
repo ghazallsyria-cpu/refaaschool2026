@@ -29,6 +29,11 @@ export default function TeachersPage() {
 
   const [notification, setNotification] = useState<{type: 'success' | 'error', message: string} | null>(null);
 
+  const showNotification = (type: 'success' | 'error', message: string) => {
+    setNotification({ type, message });
+    setTimeout(() => setNotification(null), 5000);
+  };
+
   const [showPasswordResetModal, setShowPasswordResetModal] = useState(false);
   const [resetPasswordForm, setResetPasswordForm] = useState({ userId: '', newPassword: '' });
 

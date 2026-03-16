@@ -12,6 +12,7 @@ export async function POST() {
   const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
 
   try {
+    const results: string[] = [];
     // 1. Fetch all students with their names from users table
     results.push('جاري جلب الطلاب...');
     const { data: students, error: studentsError } = await supabaseAdmin

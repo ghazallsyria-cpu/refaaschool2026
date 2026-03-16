@@ -17,86 +17,79 @@ export async function POST() {
   const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
 
   try {
-    const results: string[] = [];
+    const logs: string[] = [];
 
-    // 1️⃣ جلب الطلاب
-    results.push('جاري جلب الطلاب...');
+    logs.push('بدء عملية تهيئة الطلاب...');
+
     const { data: students, error: studentsError } = await supabaseAdmin
       .from('students')
       .select('national_id, users(full_name)');
 
     if (studentsError) {
-      results.push(`خطأ في جلب الطلاب: ${studentsError.message}`);
       throw studentsError;
     }
 
-    results.push(`تم جلب ${students?.length || 0} طالب.`);
+    logs.push(`تم العثور على ${students?.length || 0} طالب`);
 
-    // 2️⃣ إنشاء الحسابات
-    for (const student of (students as any) || []) {
+    for (const student of students || []) {
       try {
-        results.push(`جاري معالجة الطالب: ${student.national_id}`);
+        const nationalId = student.national_id;
+        const email = `${nationalId}@alrefaa.edu`;
+        const name = student?.users?.full_name || 'طالب';
 
-        const email = `${student.national_id}@alrefaa.edu`;
-        const studentName = student?.users?.full_name || 'طالب غير معروف';
-
-        // إنشاء مستخدم في Auth
-        results.push(`جاري إنشاء حساب: ${email}`);
+        logs.push(`معالجة الطالب ${nationalId}`);
 
         const { data: authUser, error: authError } =
           await supabaseAdmin.auth.admin.createUser({
-            email: email,
+            email,
             password: '123456',
-            email_confirm: true,
+            email_confirm: true
           });
 
         if (authError) {
-          results.push(`فشل إنشاء الحساب ${email}: ${authError.message}`);
+          logs.push(`فشل إنشاء الحساب ${email}: ${authError.message}`);
           continue;
         }
 
         const userId = authUser?.user?.id;
 
         if (!userId) {
-          results.push(`لم يتم الحصول على user id للحساب ${email}`);
+          logs.push(`لم يتم الحصول على user id للحساب ${email}`);
           continue;
         }
 
-        results.push(`تم إنشاء الحساب بنجاح: ${userId}`);
-
-        // ربط الحساب بجدول users
-        const { error: userError } = await supabaseAdmin
+        const { error: linkError } = await supabaseAdmin
           .from('users')
           .update({ id: userId })
           .eq('email', email);
 
-        if (userError) {
-          results.push(`فشل ربط الحساب ${email}: ${userError.message}`);
+        if (linkError) {
+          logs.push(`فشل ربط الحساب ${email}: ${linkError.message}`);
         } else {
-          results.push(`الطالب ${studentName}: تم إنشاء الحساب وربطه بنجاح.`);
+          logs.push(`تم إنشاء وربط الحساب للطالب ${name}`);
         }
 
-      } catch (innerErr: any) {
-        results.push(
-          `خطأ أثناء معالجة الطالب ${student?.national_id}: ${
-            innerErr?.message || innerErr?.toString()
-          }`
+      } catch (innerError: any) {
+        logs.push(
+          `خطأ أثناء معالجة الطالب ${
+            student?.national_id
+          }: ${innerError?.message || innerError}`
         );
       }
     }
 
     return NextResponse.json({
-      message: 'اكتملت العملية.',
-      logs: results,
+      message: 'اكتملت العملية',
+      logs
     });
 
-  } catch (err: any) {
-    console.error('SETUP STUDENTS ERROR:', err);
+  } catch (error: any) {
+    console.error('SETUP STUDENTS ERROR:', error);
 
     return NextResponse.json(
       {
-        error: err?.message || 'حدث خطأ غير معروف',
-        details: err?.toString() || JSON.stringify(err),
+        error: error?.message || 'حدث خطأ غير معروف',
+        details: error?.toString()
       },
       { status: 500 }
     );

@@ -51,7 +51,7 @@ DO $$
 DECLARE
     t text;
 BEGIN
-    FOR t IN SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename IN ('students', 'teachers', 'parents', 'classes', 'subjects', 'exams', 'attendance', 'platform_settings', 'grades', 'schedule')
+    FOR t IN SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename IN ('students', 'teachers', 'parents', 'classes', 'sections', 'subjects', 'exams', 'attendance', 'platform_settings', 'grades', 'schedule')
     LOOP
         EXECUTE format('DROP POLICY IF EXISTS "admin_all_access" ON public.%I', t);
         EXECUTE format('CREATE POLICY "admin_all_access" ON public.%I FOR ALL USING (public.is_admin())', t);

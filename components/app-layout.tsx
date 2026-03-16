@@ -69,6 +69,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           }
         }
 
+        const isAdminByEmail = session?.user?.email === 'ghazallsyria@gmail.com';
+
         // Check platform settings
         try {
           const { data: settings, error: settingsError } = await supabase
@@ -88,7 +90,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               isOpen = false;
             }
 
-            if (!isOpen && role !== 'admin') {
+            if (!isOpen && role !== 'admin' && role !== 'management' && !isAdminByEmail) {
               setPlatformClosed(true);
               setCloseMessage(settings.message || 'المنصة مغلقة حاليا للصيانة');
             }

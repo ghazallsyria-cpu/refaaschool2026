@@ -38,7 +38,7 @@ export default function SettingsPage() {
           .eq('id', user.id)
           .single();
         
-        if (userData?.role === 'admin' || userData?.role === 'management') {
+        if (userData?.role === 'admin' || userData?.role === 'management' || user.email === 'ghazallsyria@gmail.com') {
           setIsAdmin(true);
         }
       }

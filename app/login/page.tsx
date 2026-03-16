@@ -90,8 +90,12 @@ export default function LoginPage() {
         }
 
         if (!userData) {
-          // If auth succeeds but no record in public.users, this is a configuration error
-          throw new Error('تم تسجيل الدخول بنجاح، ولكن لم يتم العثور على بيانات المستخدم في قاعدة البيانات. يرجى التواصل مع المسؤول.');
+          // If auth succeeds but no record in public.users, show the UID to help the user fix it
+          const uid = authData.user.id;
+          console.error('User UID not found in public.users:', uid);
+          throw new Error(`تم تسجيل الدخول في نظام المصادقة، ولكن لا يوجد سجل لك في جدول المستخدمين. 
+          المعرّف الخاص بك هو: ${uid}. 
+          يرجى استخدامه لتحديث جدول public.users في Supabase.`);
         }
 
         if (userData.must_reset_password) {

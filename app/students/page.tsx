@@ -1,216 +1,166 @@
-'use client';
+'use client'
 
-import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
-import { Plus, Search, Edit, Trash2, X, Key } from 'lucide-react';
+import { useState, useEffect } from 'react'
+import { supabase } from '@/lib/supabase'
+import { Plus, Search, Edit, Trash2, X, Key } from 'lucide-react'
 
 export default function StudentsPage() {
 
-  const [students, setStudents] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
+const [students,setStudents] = useState<any[]>([])
+const [loading,setLoading] = useState(true)
+const [searchTerm,setSearchTerm] = useState('')
 
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [showPasswordResetModal, setShowPasswordResetModal] = useState(false);
+const [sections,setSections] = useState<any[]>([])
+const [parents,setParents] = useState<any[]>([])
 
-  const [editingStudent, setEditingStudent] = useState<any>(null);
+const [showPasswordResetModal,setShowPasswordResetModal] = useState(false)
 
-  const [notification, setNotification] = useState<{
-    type: 'success' | 'error',
-    message: string
-  } | null>(null);
+const [resetPasswordForm,setResetPasswordForm] = useState({
+userId:'',
+newPassword:''
+})
 
-  const [resetPasswordForm, setResetPasswordForm] = useState({
-    userId: '',
-    newPassword: ''
-  });
+const [notification,setNotification] = useState<{
+type:'success'|'error'
+message:string
+}|null>(null)
 
-  const [addForm, setAddForm] = useState({
-    full_name: '',
-    national_id: '',
-    email: '',
-    phone: '',
-    section_id: '',
-    parent_id: ''
-  });
+useEffect(()=>{
+fetchStudents()
+fetchSections()
+fetchParents()
+},[])
 
-  const [editForm, setEditForm] = useState({
-    full_name: '',
-    national_id: '',
-    email: '',
-    phone: '',
-    parent_id: ''
-  });
+function showNotification(type:'success'|'error',message:string){
 
-  const [sections, setSections] = useState<any[]>([]);
-  const [parents, setParents] = useState<any[]>([]);
+setNotification({type,message})
 
-  useEffect(() => {
-    fetchStudents();
-    fetchSections();
-    fetchParents();
-  }, []);
+setTimeout(()=>{
+setNotification(null)
+},5000)
 
-  const showNotification = (type:'success'|'error', message:string) => {
-    setNotification({type,message});
-    setTimeout(()=>setNotification(null),5000);
-  };
+}
 
-  const fetchStudents = async () => {
+async function fetchStudents(){
 
-    setLoading(true);
+setLoading(true)
 
-    const { data, error } = await supabase
-      .from('students')
-      .select(`
-        id,
-        national_id,
-        parent_id,
-        users (full_name,email,phone),
-        sections (name,classes(name)),
-        parents (users(full_name))
-      `);
+const {data,error} = await supabase
+.from('students')
+.select(`
+id,
+national_id,
+parent_id,
+users(full_name,email,phone),
+sections(name,classes(name)),
+parents(users(full_name))
+`)
 
-    if (!error) setStudents(data || []);
+if(!error){
+setStudents(data || [])
+}
 
-    setLoading(false);
-  };
+setLoading(false)
 
-  const fetchSections = async () => {
+}
 
-    const { data } = await supabase
-      .from('sections')
-      .select('id,name,classes(name)');
+async function fetchSections(){
 
-    setSections(data || []);
-  };
+const {data} = await supabase
+.from('sections')
+.select('id,name,classes(name)')
 
-  const fetchParents = async () => {
+setSections(data || [])
 
-    const { data } = await supabase
-      .from('parents')
-      .select('id,users(full_name)');
+}
 
-    setParents(data || []);
-  };
+async function fetchParents(){
 
-  const handleDelete = async(id:string)=>{
+const {data} = await supabase
+.from('parents')
+.select('id,users(full_name)')
 
-    if(!confirm('هل أنت متأكد من حذف الطالب؟')) return;
+setParents(data || [])
 
-    const { data:{session} } = await supabase.auth.getSession();
+}
 
-    const res = await fetch(`/api/users/delete?id=${id}`,{
-      method:'DELETE',
-      headers:{Authorization:`Bearer ${session?.access_token}`}
-    });
+async function handleDelete(id:string){
 
-    if(res.ok){
-      showNotification('success','تم حذف الطالب');
-      fetchStudents();
-    }else{
-      showNotification('error','فشل حذف الطالب');
-    }
+if(!confirm('هل أنت متأكد من حذف الطالب؟')) return
 
-  };
+const {data:{session}} = await supabase.auth.getSession()
 
-  const handleEditClick = (student:any)=>{
+const res = await fetch(`/api/users/delete?id=${id}`,{
+method:'DELETE',
+headers:{
+Authorization:`Bearer ${session?.access_token}`
+}
+})
 
-    setEditingStudent(student);
+if(res.ok){
 
-    setEditForm({
-      full_name:student.users?.full_name || '',
-      national_id:student.national_id || '',
-      email:student.users?.email || '',
-      phone:student.users?.phone || '',
-      parent_id:student.parent_id || ''
-    });
+showNotification('success','تم حذف الطالب')
 
-    setShowEditModal(true);
-  };
+fetchStudents()
 
-  const handleEditSubmit = async()=>{
+}else{
 
-    const { error:userError } = await supabase
-      .from('users')
-      .update({
-        full_name:editForm.full_name,
-        email:editForm.email,
-        phone:editForm.phone
-      })
-      .eq('id',editingStudent.id);
+showNotification('error','فشل حذف الطالب')
 
-    if(userError){
-      showNotification('error','فشل التعديل');
-      return;
-    }
+}
 
-    const { error:studentError } = await supabase
-      .from('students')
-      .update({
-        national_id:editForm.national_id,
-        parent_id:editForm.parent_id || null
-      })
-      .eq('id',editingStudent.id);
+}
 
-    if(studentError){
-      showNotification('error','فشل التعديل');
-      return;
-    }
+function handleResetPasswordClick(student:any){
 
-    showNotification('success','تم التحديث');
+setResetPasswordForm({
+userId:student.id,
+newPassword:''
+})
 
-    setShowEditModal(false);
+setShowPasswordResetModal(true)
 
-    fetchStudents();
-  };
+}
 
-  const handleResetPasswordClick = (student:any)=>{
+async function handleResetPasswordSubmit(){
 
-    setResetPasswordForm({
-      userId:student.id,
-      newPassword:''
-    });
+const {data:{session}} = await supabase.auth.getSession()
 
-    setShowPasswordResetModal(true);
-  };
+const res = await fetch('/api/users/reset-password',{
+method:'POST',
+headers:{
+'Content-Type':'application/json',
+Authorization:`Bearer ${session?.access_token}`
+},
+body:JSON.stringify(resetPasswordForm)
+})
 
-  const handleResetPasswordSubmit = async()=>{
+if(res.ok){
 
-    const { data:{session} } = await supabase.auth.getSession();
+showNotification('success','تم تغيير كلمة المرور')
 
-    const res = await fetch('/api/users/reset-password',{
-      method:'POST',
-      headers:{
-        'Content-Type':'application/json',
-        'Authorization':`Bearer ${session?.access_token}`
-      },
-      body:JSON.stringify(resetPasswordForm)
-    });
+setShowPasswordResetModal(false)
 
-    if(res.ok){
-      showNotification('success','تم تغيير كلمة المرور');
-      setShowPasswordResetModal(false);
-    }else{
-      showNotification('error','فشل تغيير كلمة المرور');
-    }
-  };
+}else{
 
-  const filteredStudents = students.filter(s =>
-    s.users?.full_name?.includes(searchTerm) ||
-    s.national_id?.includes(searchTerm)
-  );
+showNotification('error','فشل تغيير كلمة المرور')
 
-  return (
+}
+
+}
+
+const filteredStudents = students.filter(s =>
+s.users?.full_name?.includes(searchTerm) ||
+s.national_id?.includes(searchTerm)
+)
+
+return (
 
 <div className="space-y-6 relative">
 
-{/* notification */}
-
 {notification && (
 
-<div className={`fixed top-4 left-1/2 -translate-x-1/2 px-4 py-3 rounded-lg shadow-lg z-50 flex items-center gap-3
+<div className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-3 rounded-lg shadow flex items-center gap-3
 ${notification.type==='success'
 ?'bg-emerald-50 text-emerald-800 border border-emerald-200'
 :'bg-red-50 text-red-800 border border-red-200'
@@ -223,18 +173,14 @@ ${notification.type==='success'
 </button>
 
 </div>
-)}
 
-{/* header */}
+)}
 
 <div className="flex justify-between items-center">
 
 <h1 className="text-2xl font-bold">إدارة الطلاب</h1>
 
-<button
-onClick={()=>setShowAddModal(true)}
-className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-md"
->
+<button className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-md">
 
 <Plus className="h-4 w-4"/>
 
@@ -244,8 +190,6 @@ className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-md
 
 </div>
 
-{/* search */}
-
 <div className="bg-white p-4 rounded-xl shadow">
 
 <div className="relative max-w-md">
@@ -254,7 +198,7 @@ className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-md
 
 <input
 type="text"
-placeholder="البحث..."
+placeholder="البحث بالاسم أو الرقم المدني"
 value={searchTerm}
 onChange={(e)=>setSearchTerm(e.target.value)}
 className="w-full border rounded-md pr-10 py-2"
@@ -263,8 +207,6 @@ className="w-full border rounded-md pr-10 py-2"
 </div>
 
 </div>
-
-{/* table */}
 
 <div className="bg-white rounded-xl shadow overflow-hidden">
 
@@ -291,7 +233,7 @@ className="w-full border rounded-md pr-10 py-2"
 <tr>
 
 <td colSpan={5} className="text-center p-6">
-جاري التحميل
+جاري تحميل البيانات
 </td>
 
 </tr>
@@ -299,6 +241,7 @@ className="w-full border rounded-md pr-10 py-2"
 )}
 
 {!loading && filteredStudents.map(student=>(
+
 <tr key={student.id} className="border-t">
 
 <td className="p-3">{student.users?.full_name}</td>
@@ -319,7 +262,7 @@ className="w-full border rounded-md pr-10 py-2"
 <Key className="h-4 w-4"/>
 </button>
 
-<button onClick={()=>handleEditClick(student)}>
+<button>
 <Edit className="h-4 w-4"/>
 </button>
 
@@ -330,6 +273,7 @@ className="w-full border rounded-md pr-10 py-2"
 </td>
 
 </tr>
+
 ))}
 
 </tbody>
@@ -338,15 +282,15 @@ className="w-full border rounded-md pr-10 py-2"
 
 </div>
 
-{/* Password Modal */}
-
 {showPasswordResetModal && (
 
 <div className="fixed inset-0 bg-black/50 flex items-center justify-center">
 
 <div className="bg-white p-6 rounded-xl w-96 space-y-4">
 
-<h2 className="font-bold text-lg">تغيير كلمة المرور</h2>
+<h2 className="font-bold text-lg">
+إعادة تعيين كلمة المرور
+</h2>
 
 <input
 type="password"
@@ -362,14 +306,18 @@ className="w-full border rounded-md p-2"
 onClick={()=>setShowPasswordResetModal(false)}
 className="px-3 py-2 border rounded-md"
 >
+
 إلغاء
+
 </button>
 
 <button
 onClick={handleResetPasswordSubmit}
 className="px-3 py-2 bg-indigo-600 text-white rounded-md"
 >
+
 حفظ
+
 </button>
 
 </div>
@@ -382,6 +330,6 @@ className="px-3 py-2 bg-indigo-600 text-white rounded-md"
 
 </div>
 
-  );
+)
 
 }

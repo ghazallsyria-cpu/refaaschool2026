@@ -22,7 +22,7 @@ export async function POST() {
     const results = [];
 
     // 2. Loop and create users
-    for (const student of students || []) {
+    for (const student of (students as any) || []) {
       const email = `${student.national_id}@alrefaa.edu`;
       const studentName = student.users?.full_name || 'طالب غير معروف';
 

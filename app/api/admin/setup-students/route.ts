@@ -58,6 +58,9 @@ export async function POST() {
     return NextResponse.json({ message: 'اكتملت العملية.', logs: results });
   } catch (err: any) {
     console.error('Setup students error:', err);
-    return NextResponse.json({ error: err.message || 'حدث خطأ غير معروف أثناء التهيئة.' }, { status: 500 });
+    return NextResponse.json({ 
+      error: err.message || 'حدث خطأ غير معروف أثناء التهيئة.',
+      details: err.toString()
+    }, { status: 500 });
   }
 }

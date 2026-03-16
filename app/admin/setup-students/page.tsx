@@ -21,7 +21,7 @@ export default function SetupStudentsPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'حدث خطأ أثناء التهيئة.');
+        throw new Error(data.error + (data.details ? ` (${data.details})` : ''));
       }
 
       addLog(data.message);

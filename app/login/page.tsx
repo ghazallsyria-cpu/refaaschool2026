@@ -22,47 +22,36 @@ export default function LoginPage() {
       
       // If the input is not an email, assume it's a Civil ID and look up the email
       if (!civilId.includes('@')) {
-        // Check users table directly first (most efficient)
-        const { data: userData, error: userLookupError } = await supabase
-          .from('users')
-          .select('email')
+        // Check in role tables
+        const { data: studentData } = await supabase
+          .from('students')
+          .select('id, users!inner(email)')
           .eq('national_id', civilId)
           .maybeSingle();
-
-        if (userData?.email) {
-          authEmail = userData.email;
+          
+        if (studentData && studentData.users) {
+          authEmail = (studentData.users as any).email;
         } else {
-          // Fallback check in role tables if not in users table (legacy or partial data)
-          const { data: studentData } = await supabase
-            .from('students')
+          const { data: teacherData } = await supabase
+            .from('teachers')
             .select('id, users!inner(email)')
             .eq('national_id', civilId)
             .maybeSingle();
             
-          if (studentData && studentData.users) {
-            authEmail = (studentData.users as any).email;
+          if (teacherData && teacherData.users) {
+            authEmail = (teacherData.users as any).email;
           } else {
-            const { data: teacherData } = await supabase
-              .from('teachers')
+            const { data: parentData } = await supabase
+              .from('parents')
               .select('id, users!inner(email)')
               .eq('national_id', civilId)
               .maybeSingle();
               
-            if (teacherData && teacherData.users) {
-              authEmail = (teacherData.users as any).email;
+            if (parentData && parentData.users) {
+              authEmail = (parentData.users as any).email;
             } else {
-              const { data: parentData } = await supabase
-                .from('parents')
-                .select('id, users!inner(email)')
-                .eq('national_id', civilId)
-                .maybeSingle();
-                
-              if (parentData && parentData.users) {
-                authEmail = (parentData.users as any).email;
-              } else {
-                // Final fallback
-                authEmail = `${civilId}@alrefaa.edu`;
-              }
+              // Final fallback
+              authEmail = `${civilId}@alrefaa.edu`;
             }
           }
         }

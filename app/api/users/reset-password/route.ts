@@ -62,9 +62,45 @@ export async function POST(request: Request) {
     const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(userId, {
       password: newPassword,
     });
+    
     if (authError) {
       console.error('Auth update error:', authError);
-      return NextResponse.json({ error: `Auth Error: ${authError.message}` }, { status: 500 });
+      
+      // If the user doesn't exist in auth.users (e.g., "Database error loading user" or "User not found")
+      if (authError.message.toLowerCase().includes('database error loading user') || authError.message.toLowerCase().includes('not found')) {
+        console.log('User not found in auth.users. Attempting to recreate...');
+        
+        // Get user details from public.users
+        const { data: targetUser } = await supabaseAdmin
+          .from('users')
+          .select('email, full_name')
+          .eq('id', userId)
+          .single();
+          
+        if (targetUser && targetUser.email) {
+          // Recreate the user in auth.users with the exact same ID
+          const { error: createError } = await supabaseAdmin.auth.admin.createUser({
+            id: userId,
+            email: targetUser.email,
+            password: newPassword,
+            email_confirm: true,
+            user_metadata: {
+              full_name: targetUser.full_name
+            }
+          });
+          
+          if (createError) {
+            console.error('Failed to recreate user in auth.users:', createError);
+            return NextResponse.json({ error: `فشل في إعادة إنشاء حساب المستخدم: ${createError.message}` }, { status: 500 });
+          }
+          
+          console.log('Successfully recreated user in auth.users');
+        } else {
+          return NextResponse.json({ error: `Auth Error: ${authError.message} (User email not found in public.users)` }, { status: 500 });
+        }
+      } else {
+        return NextResponse.json({ error: `Auth Error: ${authError.message}` }, { status: 500 });
+      }
     }
 
     // 2. Update must_reset_password flag

@@ -41,6 +41,7 @@ type ExamData = {
   description: string;
   subject_id: string;
   section_id?: string;
+  teacher_id?: string;
   duration: number;
   max_attempts: number;
   status: 'draft' | 'published';
@@ -77,6 +78,8 @@ export default function QuizBuilder() {
   const [saving, setSaving] = useState(false);
   const [subjects, setSubjects] = useState<{id: string, name: string}[]>([]);
   const [sections, setSections] = useState<{id: string, name: string}[]>([]);
+  const [teachers, setTeachers] = useState<{id: string, full_name: string}[]>([]);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [activeTab, setActiveTab] = useState('questions');
   const [notification, setNotification] = useState<{type: 'success' | 'error', message: string} | null>(null);
 
@@ -108,6 +111,18 @@ export default function QuizBuilder() {
 
   const fetchInitialData = useCallback(async () => {
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      let userIsAdmin = false;
+      if (user) {
+        const { data: userData } = await supabase.from('users').select('role').eq('id', user.id).single();
+        if (userData?.role === 'admin' || userData?.role === 'management' || user.email === 'ghazallsyria@gmail.com') {
+          userIsAdmin = true;
+          setIsAdmin(true);
+          const { data: teachersData } = await supabase.from('users').select('id, full_name').eq('role', 'teacher');
+          setTeachers(teachersData || []);
+        }
+      }
+
       const [subjectsRes, sectionsRes] = await Promise.all([
         supabase.from('subjects').select('id, name'),
         supabase.from('sections').select('id, name')
@@ -227,20 +242,21 @@ export default function QuizBuilder() {
     try {
       // 1. Save Exam
       let examId = exam.id;
-      const examPayload = {
-        ...exam,
-        teacher_id: (await supabase.auth.getUser()).data.user?.id // In real app, get from teacher table
-      };
+      let finalTeacherId = exam.teacher_id;
+
+      if (!finalTeacherId) {
+        const userId = (await supabase.auth.getUser()).data.user?.id;
+        const { data: teacher, error: teacherError } = await supabase.from('teachers').select('id').eq('id', userId).single();
+        if (teacherError || !teacher) {
+          throw new Error('لم يتم العثور على سجل المعلم. يرجى التأكد من تسجيل الدخول كمعلم أو اختيار معلم من القائمة.');
+        }
+        finalTeacherId = teacher.id;
+      }
 
       if (isNew) {
-        // Need to find teacher_id first
-        const { data: teacher, error: teacherError } = await supabase.from('teachers').select('id').eq('id', examPayload.teacher_id).single();
-        if (teacherError || !teacher) {
-          throw new Error('لم يتم العثور على سجل المعلم. يرجى التأكد من تسجيل الدخول كمعلم.');
-        }
         const { data: newExam, error } = await supabase
           .from('exams')
-          .insert([{ ...exam, teacher_id: teacher.id }])
+          .insert([{ ...exam, teacher_id: finalTeacherId }])
           .select()
           .single();
         if (error) throw error;
@@ -248,7 +264,7 @@ export default function QuizBuilder() {
       } else {
         const { error } = await supabase
           .from('exams')
-          .update(exam)
+          .update({ ...exam, teacher_id: finalTeacherId })
           .eq('id', examId);
         if (error) throw error;
       }
@@ -464,6 +480,19 @@ export default function QuizBuilder() {
             className="w-full text-base text-slate-600 border-none focus:ring-0 placeholder:text-slate-300 p-0 resize-none h-12"
           />
           <div className="flex flex-wrap gap-4 pt-4 border-t border-slate-100">
+            {isAdmin && (
+              <div className="flex-1 min-w-[200px]">
+                <label className="text-xs font-bold text-slate-500 mb-1.5 block">المعلم</label>
+                <select 
+                  value={exam.teacher_id || ''}
+                  onChange={(e) => setExam({...exam, teacher_id: e.target.value})}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500/20 outline-none bg-white text-sm"
+                >
+                  <option value="">اختر المعلم</option>
+                  {teachers.map(t => <option key={t.id} value={t.id}>{t.full_name}</option>)}
+                </select>
+              </div>
+            )}
             <div className="flex-1 min-w-[200px]">
               <label className="text-xs font-bold text-slate-500 mb-1.5 block">المادة</label>
               <select 

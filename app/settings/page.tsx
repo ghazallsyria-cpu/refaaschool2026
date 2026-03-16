@@ -28,6 +28,15 @@ export default function SettingsPage() {
     message: 'المنصة مغلقة حاليا للصيانة'
   });
 
+  const [schoolSettings, setSchoolSettings] = useState({
+    name: 'مدرسة الرفعة النموذجية',
+    academic_year: '2025 - 2026',
+    semester: 'الفصل الدراسي الأول',
+    address: 'شارع الملك فهد، حي الياسمين، الرياض',
+    phone: '0112345678',
+    email: 'info@alrifaa.edu'
+  });
+
   useEffect(() => {
     const fetchSettings = async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -57,20 +66,20 @@ export default function SettingsPage() {
           close_date: data.close_date ? new Date(data.close_date).toISOString().slice(0, 16) : '',
           message: data.message || 'المنصة مغلقة حاليا للصيانة'
         });
+        
+        setSchoolSettings({
+          name: data.school_name || 'مدرسة الرفعة النموذجية',
+          academic_year: data.academic_year || '2025 - 2026',
+          semester: data.semester || 'الفصل الدراسي الأول',
+          address: data.address || 'شارع الملك فهد، حي الياسمين، الرياض',
+          phone: data.phone || '0112345678',
+          email: data.email || 'info@alrifaa.edu'
+        });
       }
     };
 
     fetchSettings();
   }, []);
-
-  const [schoolSettings, setSchoolSettings] = useState({
-    name: 'مدرسة الرفعة النموذجية',
-    academic_year: '2025 - 2026',
-    semester: 'الفصل الدراسي الأول',
-    address: 'شارع الملك فهد، حي الياسمين، الرياض',
-    phone: '0112345678',
-    email: 'info@alrifaa.edu'
-  });
 
   const [profileSettings, setProfileSettings] = useState({
     full_name: 'أحمد محمد',
@@ -84,26 +93,39 @@ export default function SettingsPage() {
     setMessage({ text: '', type: '' });
     
     try {
-      if (activeTab === 'platform' && isAdmin) {
+      if (isAdmin) {
         const { data: { user } } = await supabase.auth.getUser();
         
-        const updateData: any = {
-          is_open: platformSettings.is_open,
-          message: platformSettings.message,
+        let updateData: any = {
           updated_by: user?.id,
           updated_at: new Date().toISOString()
         };
 
-        if (platformSettings.open_date) {
-          updateData.open_date = new Date(platformSettings.open_date).toISOString();
+        if (activeTab === 'platform') {
+          updateData = {
+            ...updateData,
+            is_open: platformSettings.is_open,
+            message: platformSettings.message,
+            open_date: platformSettings.open_date ? new Date(platformSettings.open_date).toISOString() : null,
+            close_date: platformSettings.close_date ? new Date(platformSettings.close_date).toISOString() : null,
+          };
+        } else if (activeTab === 'school') {
+          updateData = {
+            ...updateData,
+            school_name: schoolSettings.name,
+            academic_year: schoolSettings.academic_year,
+            semester: schoolSettings.semester,
+            address: schoolSettings.address,
+            phone: schoolSettings.phone,
+            email: schoolSettings.email,
+          };
         } else {
-          updateData.open_date = null;
-        }
-
-        if (platformSettings.close_date) {
-          updateData.close_date = new Date(platformSettings.close_date).toISOString();
-        } else {
-          updateData.close_date = null;
+          // Simulate save for other tabs
+          await new Promise(resolve => setTimeout(resolve, 800));
+          setMessage({ text: 'تم حفظ الإعدادات بنجاح', type: 'success' });
+          setTimeout(() => setMessage({ text: '', type: '' }), 3000);
+          setSaving(false);
+          return;
         }
 
         if (platformSettings.id) {

@@ -367,8 +367,8 @@ CREATE POLICY "Allow all on documents" ON public.documents FOR ALL USING (true);
         
         generatedSql += `-- المعلم: ${t.name}\n`;
         // Insert into auth.users
-        generatedSql += `INSERT INTO auth.users (id, instance_id, aud, role, email, encrypted_password, created_at, updated_at) 
-VALUES ('${userId}', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', '${email}', crypt('password123', gen_salt('bf')), now(), now());\n`;
+        generatedSql += `INSERT INTO auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at) 
+VALUES ('${userId}', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', '${email}', crypt('password123', gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}', '{"full_name":"${t.name}"}', now(), now());\n`;
 
         generatedSql += `INSERT INTO public.users (id, email, full_name, role) VALUES ('${userId}', '${email}', '${t.name}', 'teacher');\n`;
         

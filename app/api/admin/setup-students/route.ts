@@ -68,18 +68,14 @@ export async function POST() {
 
     return NextResponse.json({ message: 'اكتملت العملية.', logs: results });
   } catch (err: any) {
-
-  console.error("FULL ERROR OBJECT:", err)
-  console.error("ERROR MESSAGE:", err?.message)
-  console.error("ERROR STACK:", err?.stack)
+  console.error(err)
 
   return NextResponse.json({
-    error: err?.message || "Unknown error",
-    full: JSON.stringify(err, Object.getOwnPropertyNames(err))
+    error: err?.message || 'حدث خطأ غير معروف',
+    details: err?.toString() || JSON.stringify(err)
   }, { status: 500 })
-
 }
-
+}
     return NextResponse.json({ 
       error: errorMessage,
       details: err?.toString() || JSON.stringify(err)

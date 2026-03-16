@@ -10,26 +10,50 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Missing credentials' }, { status: 500 });
     }
 
-    // We need to use postgres connection to query auth schema directly, 
-    // but supabaseAdmin with service_role can query auth schema if we specify it.
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey);
-
-    const { data: createData, error: createError } = await supabaseAdmin.auth.admin.createUser({
-      email: 'test_user_12345@example.com',
-      password: 'password123',
-      email_confirm: true
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
     });
 
-    let deleteError = null;
-    if (createData.user) {
-      const { error } = await supabaseAdmin.auth.admin.deleteUser(createData.user.id);
-      deleteError = error;
+    // 1. Get all users from public.users
+    const { data: publicUsers, error: puError } = await supabaseAdmin.from('users').select('id');
+    
+    if (puError) {
+      return NextResponse.json({ error: 'Error listing public users', details: puError }, { status: 500 });
     }
-
-    return NextResponse.json({ 
-      createData,
-      createError,
-      deleteError
+    
+    let successCount = 0;
+    let errorCount = 0;
+    const errors = [];
+    
+    // 2. Update password for all users to 123456
+    for (const pu of publicUsers) {
+      const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(pu.id, {
+        password: '123456'
+      });
+      
+      if (updateError) {
+        errorCount++;
+        errors.push({ id: pu.id, error: updateError });
+      } else {
+        successCount++;
+      }
+    }
+    
+    // 3. Set must_reset_password to true for all users in public.users
+    const { error: resetError } = await supabaseAdmin
+      .from('users')
+      .update({ must_reset_password: true })
+      .neq('id', '00000000-0000-0000-0000-000000000000'); // Update all
+      
+    return NextResponse.json({
+      message: 'Password update complete',
+      successCount,
+      errorCount,
+      errors,
+      resetError
     });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });

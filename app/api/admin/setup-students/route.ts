@@ -27,52 +27,52 @@ export async function POST() {
 
     // 2. Loop and create users
     for (const student of (students as any) || []) {
-      results.push(`جاري معالجة الطالب: ${student.national_id}`);
-      const email = `${student.national_id}@alrefaa.edu`;
-      const studentName = student.users?.full_name || 'طالب غير معروف';
+      try {
+        results.push(`جاري معالجة الطالب: ${student.national_id}`);
+        const email = `${student.national_id}@alrefaa.edu`;
+        const studentName = student.users?.full_name || 'طالب غير معروف';
 
-      // Create auth user
-      results.push(`جاري إنشاء حساب لـ: ${email}`);
-      const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
-        email: email,
-        password: '123456',
-        email_confirm: true,
-      });
+        // Create auth user
+        results.push(`جاري إنشاء حساب لـ: ${email}`);
+        const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
+          email: email,
+          password: '123456',
+          email_confirm: true,
+        });
 
-      if (authError) {
-        results.push(`خطأ في إنشاء الحساب لـ ${email}: ${authError.message}`);
-        if (authError.message.includes('already registered')) {
-          results.push(`الطالب ${studentName}: الحساب موجود مسبقاً.`);
-        } else {
-          results.push(`الطالب ${studentName}: خطأ في إنشاء الحساب: ${authError.message}`);
+        if (authError) {
+          results.push(`خطأ في إنشاء الحساب لـ ${email}: ${authError.message}`);
+          continue;
         }
-        continue;
-      }
-      
-      results.push(`تم إنشاء الحساب: ${authUser.user.id}`);
+        
+        results.push(`تم إنشاء الحساب: ${authUser.user.id}`);
 
-      // Link to public.users
-      results.push(`جاري ربط المستخدم ${authUser.user.id} بالبريد ${email}`);
-      const { error: userError } = await supabaseAdmin
-        .from('users')
-        .update({ id: authUser.user.id })
-        .eq('email', email);
+        // Link to public.users
+        results.push(`جاري ربط المستخدم ${authUser.user.id} بالبريد ${email}`);
+        const { error: userError } = await supabaseAdmin
+          .from('users')
+          .update({ id: authUser.user.id })
+          .eq('email', email);
 
-      if (userError) {
-        results.push(`خطأ في ربط الحساب لـ ${email}: ${userError.message}`);
-        results.push(`الطالب ${studentName}: خطأ في ربط الحساب: ${userError.message}`);
-      } else {
-        results.push(`الطالب ${studentName}: تم إنشاء الحساب وربطه بنجاح.`);
+        if (userError) {
+          results.push(`خطأ في ربط الحساب لـ ${email}: ${userError.message}`);
+        } else {
+          results.push(`الطالب ${studentName}: تم إنشاء الحساب وربطه بنجاح.`);
+        }
+      } catch (innerErr: any) {
+        results.push(`خطأ غير متوقع أثناء معالجة الطالب ${student.national_id}: ${innerErr.message || innerErr.toString()}`);
       }
     }
 
     return NextResponse.json({ message: 'اكتملت العملية.', logs: results });
   } catch (err: any) {
-    console.error('Setup students error (full object):', JSON.stringify(err, Object.getOwnPropertyNames(err)));
+    console.error('Setup students error (full object):', err);
     
     // Attempt to extract a meaningful error message
     let errorMessage = 'حدث خطأ غير معروف أثناء التهيئة.';
-    if (typeof err === 'string') {
+    if (err instanceof Error) {
+      errorMessage = err.message;
+    } else if (typeof err === 'string') {
       errorMessage = err;
     } else if (err && typeof err === 'object') {
       errorMessage = err.message || err.error || JSON.stringify(err);

@@ -152,9 +152,17 @@ export default function ParentsPage() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!window.confirm('هل أنت متأكد من حذف ولي الأمر هذا؟ سيتم حذف جميع البيانات المرتبطة به.')) return;
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [parentToDelete, setParentToDelete] = useState<string | null>(null);
 
+  const handleDeleteClick = (id: string) => {
+    setParentToDelete(id);
+    setShowDeleteModal(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!parentToDelete) return;
+    
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
@@ -165,7 +173,7 @@ export default function ParentsPage() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ userId: id }),
+        body: JSON.stringify({ userId: parentToDelete }),
       });
 
       if (!response.ok) {
@@ -174,6 +182,8 @@ export default function ParentsPage() {
       }
 
       showNotification('success', 'تم حذف ولي الأمر بنجاح');
+      setShowDeleteModal(false);
+      setParentToDelete(null);
       fetchParents();
     } catch (error: any) {
       console.error('Error deleting parent:', error);
@@ -281,7 +291,7 @@ export default function ParentsPage() {
                               <Edit className="h-4 w-4" />
                             </button>
                             <button 
-                              onClick={() => handleDelete(parent.id)}
+                              onClick={() => handleDeleteClick(parent.id)}
                               className="text-red-600 hover:text-red-900 p-1"
                               title="حذف"
                             >
@@ -460,6 +470,47 @@ export default function ParentsPage() {
                   className="rounded-md border border-transparent bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
                 >
                   حفظ التعديلات
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+            <div className="fixed inset-0 bg-slate-500 bg-opacity-75 transition-opacity" onClick={() => setShowDeleteModal(false)}></div>
+            <div className="relative transform overflow-hidden rounded-2xl bg-white text-right shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg">
+              <div className="bg-white px-4 pb-4 pt-5 sm:p-6 sm:pb-4">
+                <div className="sm:flex sm:items-start sm:flex-row-reverse">
+                  <div className="mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10">
+                    <Trash2 className="h-6 w-6 text-red-600" aria-hidden="true" />
+                  </div>
+                  <div className="mt-3 text-center sm:mr-4 sm:mt-0 sm:text-right">
+                    <h3 className="text-xl font-bold leading-6 text-slate-900">حذف ولي الأمر</h3>
+                    <div className="mt-2">
+                      <p className="text-sm text-slate-500">
+                        هل أنت متأكد من حذف ولي الأمر هذا؟ سيتم حذف جميع البيانات المرتبطة به نهائياً. لا يمكن التراجع عن هذا الإجراء.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-slate-50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6 gap-3">
+                <button
+                  type="button"
+                  className="inline-flex w-full justify-center rounded-xl bg-red-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-red-500 sm:w-auto"
+                  onClick={confirmDelete}
+                >
+                  تأكيد الحذف
+                </button>
+                <button
+                  type="button"
+                  className="mt-3 inline-flex w-full justify-center rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-slate-900 shadow-sm ring-1 ring-inset ring-slate-300 hover:bg-slate-50 sm:mt-0 sm:w-auto"
+                  onClick={() => setShowDeleteModal(false)}
+                >
+                  إلغاء
                 </button>
               </div>
             </div>

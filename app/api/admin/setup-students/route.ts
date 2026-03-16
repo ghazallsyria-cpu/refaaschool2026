@@ -68,7 +68,7 @@ export async function POST() {
 
     return NextResponse.json({ message: 'اكتملت العملية.', logs: results });
   } catch (err: any) {
-    console.error('Setup students error:', err);
+    console.error('Setup students error (full object):', JSON.stringify(err, Object.getOwnPropertyNames(err)));
     
     // Attempt to extract a meaningful error message
     let errorMessage = 'حدث خطأ غير معروف أثناء التهيئة.';

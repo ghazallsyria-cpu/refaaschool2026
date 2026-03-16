@@ -86,16 +86,16 @@ export default function LoginPage() {
           .maybeSingle();
 
         if (userError) {
-          console.error('User record lookup error:', userError);
+          console.error('Database lookup error:', userError);
+          throw new Error(`خطأ في الاتصال بقاعدة البيانات: ${userError.message}`);
         }
 
         if (!userData) {
-          // If auth succeeds but no record in public.users, show the UID to help the user fix it
           const uid = authData.user.id;
           console.error('User UID not found in public.users:', uid);
-          throw new Error(`تم تسجيل الدخول في نظام المصادقة، ولكن لا يوجد سجل لك في جدول المستخدمين. 
-          المعرّف الخاص بك هو: ${uid}. 
-          يرجى استخدامه لتحديث جدول public.users في Supabase.`);
+          // Check if RLS might be the issue by logging the full response
+          throw new Error(`تم تسجيل الدخول، ولكن لم نجد بياناتك في جدول public.users. 
+          تأكد من تشغيل استعلام SQL لتحديث المعرّف: ${uid}`);
         }
 
         if (userData.must_reset_password) {

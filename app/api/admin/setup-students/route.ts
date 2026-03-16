@@ -68,17 +68,17 @@ export async function POST() {
 
     return NextResponse.json({ message: 'اكتملت العملية.', logs: results });
   } catch (err: any) {
-    console.error('Setup students error (full object):', err);
-    
-    // Attempt to extract a meaningful error message
-    let errorMessage = 'حدث خطأ غير معروف أثناء التهيئة.';
-    if (err instanceof Error) {
-      errorMessage = err.message;
-    } else if (typeof err === 'string') {
-      errorMessage = err;
-    } else if (err && typeof err === 'object') {
-      errorMessage = err.message || err.error || JSON.stringify(err);
-    }
+
+  console.error("FULL ERROR OBJECT:", err)
+  console.error("ERROR MESSAGE:", err?.message)
+  console.error("ERROR STACK:", err?.stack)
+
+  return NextResponse.json({
+    error: err?.message || "Unknown error",
+    full: JSON.stringify(err, Object.getOwnPropertyNames(err))
+  }, { status: 500 })
+
+}
 
     return NextResponse.json({ 
       error: errorMessage,

@@ -25,11 +25,6 @@ type:'success'|'error'
 message:string
 }|null>(null)
 
-useEffect(()=>{
-fetchStudents()
-fetchSections()
-fetchParents()
-},[])
 
 function showNotification(type:'success'|'error',message:string){
 
@@ -40,6 +35,7 @@ setNotification(null)
 },5000)
 
 }
+
 
 async function fetchStudents(){
 
@@ -64,6 +60,7 @@ setLoading(false)
 
 }
 
+
 async function fetchSections(){
 
 const {data} = await supabase
@@ -74,6 +71,7 @@ setSections(data || [])
 
 }
 
+
 async function fetchParents(){
 
 const {data} = await supabase
@@ -83,6 +81,7 @@ const {data} = await supabase
 setParents(data || [])
 
 }
+
 
 async function handleDelete(id:string){
 
@@ -111,6 +110,7 @@ showNotification('error','فشل حذف الطالب')
 
 }
 
+
 function handleResetPasswordClick(student:any){
 
 setResetPasswordForm({
@@ -121,6 +121,7 @@ newPassword:''
 setShowPasswordResetModal(true)
 
 }
+
 
 async function handleResetPasswordSubmit(){
 
@@ -149,10 +150,21 @@ showNotification('error','فشل تغيير كلمة المرور')
 
 }
 
+
+useEffect(()=>{
+
+fetchStudents()
+fetchSections()
+fetchParents()
+
+},[])
+
+
 const filteredStudents = students.filter(s =>
 s.users?.full_name?.includes(searchTerm) ||
 s.national_id?.includes(searchTerm)
 )
+
 
 return (
 

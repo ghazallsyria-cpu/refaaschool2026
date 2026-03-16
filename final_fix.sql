@@ -1,63 +1,49 @@
--- 1. Ensure the admin user has the correct role
-UPDATE public.users 
-SET role = 'admin', must_reset_password = false 
-WHERE email = 'ghazallsyria@gmail.com' OR id = 'ea8752a5-c5cf-4c92-ad07-3ab09b222503';
+-- السكربت النهائي لإصلاح مشكلة 500 Internal Server Error في Supabase
+-- يرجى تشغيل هذا الكود في Supabase SQL Editor
 
--- 2. Update is_admin function to be robust and include management
-CREATE OR REPLACE FUNCTION public.is_admin()
-RETURNS boolean AS $$
-DECLARE
-  user_role text;
-BEGIN
-  SELECT role INTO user_role
-  FROM public.users
-  WHERE id = auth.uid();
-  
-  RETURN user_role IN ('admin', 'management');
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+-- 1. إصلاح الحقول التي لا تقبل قيمة فارغة (NULL) في الإصدارات الحديثة من Supabase
+UPDATE auth.users
+SET 
+  is_anonymous = COALESCE(is_anonymous, false),
+  is_super_admin = COALESCE(is_super_admin, false),
+  is_sso_user = COALESCE(is_sso_user, false),
+  email_confirmed_at = COALESCE(email_confirmed_at, now()),
+  phone = NULLIF(phone, ''),
+  aud = COALESCE(aud, 'authenticated'),
+  role = COALESCE(role, 'authenticated'),
+  raw_app_meta_data = COALESCE(raw_app_meta_data, '{"provider":"email","providers":["email"]}'::jsonb),
+  raw_user_meta_data = COALESCE(raw_user_meta_data, '{"full_name":"user"}'::jsonb);
 
--- 3. Fix RLS policies to avoid recursion and allow full access for admins
--- First, drop existing problematic policies on users table
-DROP POLICY IF EXISTS "safe_read_self" ON public.users;
-DROP POLICY IF EXISTS "safe_read_admin" ON public.users;
-DROP POLICY IF EXISTS "admin_all_access" ON public.users;
-DROP POLICY IF EXISTS "Users can view their own data" ON public.users;
-DROP POLICY IF EXISTS "users_read_policy" ON public.users;
-DROP POLICY IF EXISTS "users_update_policy" ON public.users;
-DROP POLICY IF EXISTS "users_admin_all" ON public.users;
-
--- Re-enable RLS
-ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
-
--- Create clean policies for users table
-CREATE POLICY "users_read_policy" ON public.users
-FOR SELECT USING (
-  auth.uid() = id OR is_admin()
+-- 2. التأكد من أن الهويات (identities) صحيحة ومطابقة لما يتوقعه Supabase
+-- حذف الهويات الخاطئة التي تم إنشاؤها مسبقاً (إن وجدت)
+DELETE FROM auth.identities 
+WHERE provider = 'email' 
+AND id IN (
+  SELECT i.id FROM auth.identities i
+  JOIN auth.users u ON u.id = i.user_id
+  WHERE i.provider_id != u.id::text
 );
 
-CREATE POLICY "users_update_policy" ON public.users
-FOR UPDATE USING (
-  auth.uid() = id OR is_admin()
-) WITH CHECK (
-  auth.uid() = id OR is_admin()
-);
-
-CREATE POLICY "users_admin_all" ON public.users
-FOR ALL USING (is_admin());
-
--- 4. Apply admin_all_access to all other relevant tables
-DO $$
-DECLARE
-    t text;
-BEGIN
-    FOR t IN SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename IN ('students', 'teachers', 'parents', 'classes', 'sections', 'subjects', 'exams', 'attendance', 'platform_settings', 'grades', 'schedule')
-    LOOP
-        EXECUTE format('DROP POLICY IF EXISTS "admin_all_access" ON public.%I', t);
-        EXECUTE format('CREATE POLICY "admin_all_access" ON public.%I FOR ALL USING (public.is_admin())', t);
-    END LOOP;
-END $$;
-
--- 5. Ensure platform_settings is accessible
-DROP POLICY IF EXISTS "Public read access" ON public.platform_settings;
-CREATE POLICY "Public read access" ON public.platform_settings FOR SELECT USING (true);
+-- 3. إعادة إنشاء الهويات المفقودة بالشكل الصحيح 100%
+INSERT INTO auth.identities (
+    id, 
+    user_id, 
+    identity_data, 
+    provider, 
+    provider_id, 
+    last_sign_in_at, 
+    created_at, 
+    updated_at
+)
+SELECT 
+    gen_random_uuid(), 
+    id, 
+    jsonb_build_object('sub', id::text, 'email', email, 'email_verified', true), 
+    'email', 
+    id::text, 
+    now(), 
+    now(), 
+    now()
+FROM auth.users
+WHERE id NOT IN (SELECT user_id FROM auth.identities WHERE provider = 'email')
+AND email IS NOT NULL;

@@ -9,7 +9,10 @@ export async function POST(request: Request) {
     const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
     if (!supabaseUrl || !supabaseServiceRoleKey) {
-      return NextResponse.json({ error: 'Missing Supabase credentials' }, { status: 500 });
+      console.error('Missing Supabase credentials: URL or Service Role Key');
+      return NextResponse.json({ 
+        error: 'إعدادات النظام غير مكتملة: يرجى إضافة SUPABASE_SERVICE_ROLE_KEY في إعدادات المنصة (Settings -> Secrets)' 
+      }, { status: 500 });
     }
 
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey, {

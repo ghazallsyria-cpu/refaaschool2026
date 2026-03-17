@@ -39,30 +39,47 @@ export async function POST() {
     // 2. Loop and create users
     for (const student of (students as any) || []) {
       try {
-        results.push(`جاري معالجة الطالب: ${student.national_id}`);
-        const email = `${student.national_id}@alrefaa.edu`;
+        const nationalId = student.national_id?.toString().trim();
+        results.push(`جاري معالجة الطالب: ${nationalId}`);
+        const email = `${nationalId}@alrefaa.edu`;
         const studentName = student.users?.full_name || 'طالب غير معروف';
 
-        // Create auth user
-        results.push(`جاري إنشاء حساب لـ: ${email}`);
-        const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
-          email: email,
-          password: '123456',
-          email_confirm: true,
-        });
-
-        if (authError) {
-          results.push(`خطأ في إنشاء الحساب لـ ${email}: ${authError.message}`);
-          continue;
-        }
+        // Check if user already exists in Auth
+        results.push(`التحقق من وجود حساب مسبق لـ: ${email}`);
+        const { data: existingUsers, error: listError } = await supabaseAdmin.auth.admin.listUsers();
         
-        results.push(`تم إنشاء الحساب: ${authUser.user.id}`);
+        if (listError) {
+          results.push(`خطأ في التحقق من الحسابات الموجودة: ${listError.message}`);
+          // If we can't list users, we might still try to create, but let's be careful
+        }
+
+        const existingUser = existingUsers?.users.find(u => u.email === email);
+        let userId = existingUser?.id;
+
+        if (!userId) {
+          // Create auth user
+          results.push(`جاري إنشاء حساب جديد لـ: ${email}`);
+          const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
+            email: email,
+            password: '123456',
+            email_confirm: true,
+          });
+
+          if (authError) {
+            results.push(`خطأ في إنشاء الحساب لـ ${email}: ${authError.message}`);
+            continue;
+          }
+          userId = authUser.user.id;
+          results.push(`تم إنشاء الحساب بنجاح: ${userId}`);
+        } else {
+          results.push(`الحساب موجود مسبقاً: ${userId}`);
+        }
 
         // Link to public.users
-        results.push(`جاري ربط المستخدم ${authUser.user.id} بالبريد ${email}`);
+        results.push(`جاري تحديث بيانات المستخدم في جدول users...`);
         const { error: userError } = await supabaseAdmin
           .from('users')
-          .update({ id: authUser.user.id })
+          .update({ id: userId })
           .eq('email', email);
 
         if (userError) {
@@ -71,7 +88,7 @@ export async function POST() {
           results.push(`الطالب ${studentName}: تم إنشاء الحساب وربطه بنجاح.`);
         }
       } catch (innerErr: any) {
-        results.push(`خطأ غير متوقع أثناء معالجة الطالب ${student.national_id}: ${innerErr.message || innerErr.toString()}`);
+        results.push(`خطأ غير متوقع أثناء معالجة الطالب: ${innerErr.message || innerErr.toString()}`);
       }
     }
 

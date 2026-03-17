@@ -36,32 +36,16 @@ export async function POST() {
       throw studentsError;
     }
 
-    // 2. Fetch ALL auth users once to avoid repeated calls in the loop
-    results.push('جاري جلب قائمة الحسابات الموجودة مسبقاً من Auth...');
-    let allAuthUsers: any[] = [];
-    try {
-      const { data: { users }, error: listError } = await supabaseAdmin.auth.admin.listUsers({
-        perPage: 1000 // Get as many as possible
-      });
-      if (listError) {
-        results.push(`تنبيه: فشل جلب قائمة الحسابات (${listError.message}).`);
-        throw listError;
-      } else {
-        allAuthUsers = users;
-        results.push(`تم العثور على ${allAuthUsers.length} حساب في Auth.`);
-      }
-    } catch (e: any) {
-      results.push(`خطأ تقني أثناء جلب قائمة الحسابات: ${e.message}`);
-      throw e;
-    }
-
-    // Filter unprocessed students
+    // 2. Filter unprocessed students
     const unprocessedStudents = (students || []).filter(student => {
       const nationalId = student.national_id?.toString().trim();
       if (!nationalId) return false;
+      const email = `${nationalId}@alrefaa.edu`;
       
-      // If the student's ID exists in Auth, they are already processed
-      if (allAuthUsers.find(u => u.id === student.id)) return false;
+      // If the student's current user email is already correct, they are processed
+      const usersData = student.users as any;
+      const currentEmail = usersData?.email || (Array.isArray(usersData) ? usersData[0]?.email : null);
+      if (currentEmail === email) return false;
       
       // Otherwise, they need an auth account
       return true;
@@ -81,9 +65,14 @@ export async function POST() {
         
         results.push(`--- معالجة: ${studentName} (${nationalId}) ---`);
 
-        // Check if user already exists in our pre-fetched list
-        const existingUser = allAuthUsers.find(u => u.email === email);
-        let userId = existingUser?.id;
+        // Check if user already exists in public.users by email
+        const { data: existingPublicUser } = await supabaseAdmin
+          .from('users')
+          .select('id')
+          .eq('email', email)
+          .maybeSingle();
+
+        let userId = existingPublicUser?.id;
 
         if (!userId) {
           // 1. Find existing public.users row (it might be the current student ID)
@@ -112,10 +101,20 @@ export async function POST() {
             if (oldId) {
               await supabaseAdmin.from('users').update({ email }).eq('id', oldId);
             }
-            continue;
+            // If the error was that the user already exists, try to fetch it again
+            if (authError.message.includes('already registered')) {
+              const { data: retryUser } = await supabaseAdmin.from('users').select('id').eq('email', email).maybeSingle();
+              if (retryUser) {
+                userId = retryUser.id;
+                results.push(`ℹ️ تم العثور على الحساب الموجود مسبقاً: ${userId}`);
+              }
+            } else {
+              continue;
+            }
+          } else {
+            userId = authUser.user.id;
+            results.push(`✅ تم إنشاء الحساب: ${userId}`);
           }
-          userId = authUser.user.id;
-          results.push(`✅ تم إنشاء الحساب: ${userId}`);
           
           // 4. Update the students table to point to the new ID
           if (userId) {

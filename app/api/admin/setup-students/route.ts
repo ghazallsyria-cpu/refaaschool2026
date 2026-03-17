@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
+export const maxDuration = 60; // Increase timeout to 60 seconds
+
 export async function POST() {
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -42,29 +44,30 @@ export async function POST() {
         perPage: 1000 // Get as many as possible
       });
       if (listError) {
-        results.push(`تنبيه: فشل جلب قائمة الحسابات (${listError.message}). سيتم المحاولة بشكل فردي.`);
+        results.push(`تنبيه: فشل جلب قائمة الحسابات (${listError.message}).`);
+        throw listError;
       } else {
         allAuthUsers = users;
         results.push(`تم العثور على ${allAuthUsers.length} حساب في Auth.`);
       }
     } catch (e: any) {
       results.push(`خطأ تقني أثناء جلب قائمة الحسابات: ${e.message}`);
+      throw e;
     }
 
     // Filter unprocessed students
     const unprocessedStudents = (students || []).filter(student => {
       const nationalId = student.national_id?.toString().trim();
       if (!nationalId) return false;
-      const email = `${nationalId}@alrefaa.edu`;
       
-      // If the email exists in Auth, they are processed
-      if (allAuthUsers.find(u => u.email === email)) return false;
+      // If the student's ID exists in Auth, they are already processed
+      if (allAuthUsers.find(u => u.id === student.id)) return false;
       
       // Otherwise, they need an auth account
       return true;
     });
 
-    const batchToProcess = unprocessedStudents.slice(0, 20);
+    const batchToProcess = unprocessedStudents.slice(0, 5);
     results.push(`يوجد ${unprocessedStudents.length} طالب غير مهيأ. سيتم معالجة ${batchToProcess.length} طالب في هذه الدفعة.`);
 
     // 3. Loop and create users
@@ -73,6 +76,7 @@ export async function POST() {
         const nationalId = student.national_id?.toString().trim();
         const email = `${nationalId}@alrefaa.edu`;
         const studentName = student.users?.full_name || 'طالب غير معروف';
+        const currentStudentId = student.id;
         
         results.push(`--- معالجة: ${studentName} (${nationalId}) ---`);
 
@@ -81,28 +85,10 @@ export async function POST() {
         let userId = existingUser?.id;
 
         if (!userId) {
-          // If not in list, try a direct check just in case (or if list failed)
-          if (allAuthUsers.length === 0) {
-            try {
-              const { data: { users }, error: singleCheckError } = await supabaseAdmin.auth.admin.listUsers();
-              const found = users.find(u => u.email === email);
-              if (found) userId = found.id;
-            } catch (e) {}
-          }
-        }
+          // 1. Find existing public.users row (it might be the current student ID)
+          const oldId = currentStudentId;
 
-        if (!userId) {
-          // FIX FOR TRIGGER ERROR:
-          // 1. Find existing public.users row
-          const { data: existingPublicUser } = await supabaseAdmin
-            .from('users')
-            .select('id')
-            .eq('email', email)
-            .maybeSingle();
-
-          const oldId = existingPublicUser?.id;
-
-          // 2. If exists, temporarily change its email to avoid unique constraint violation in trigger
+          // 2. Temporarily change its email to avoid unique constraint violation in trigger
           if (oldId) {
             await supabaseAdmin
               .from('users')
@@ -130,16 +116,16 @@ export async function POST() {
           userId = authUser.user.id;
           results.push(`✅ تم إنشاء الحساب: ${userId}`);
           
-          // 4. If we had an old user, update the students table to point to the new ID, then delete old user
-          if (oldId && oldId !== userId) {
+          // 4. Update the students table to point to the new ID
+          if (userId) {
             const { error: updateStudentError } = await supabaseAdmin
               .from('students')
               .update({ id: userId })
-              .eq('id', oldId);
+              .eq('national_id', nationalId);
 
             if (updateStudentError) {
               results.push(`⚠️ خطأ في تحديث معرف الطالب: ${updateStudentError.message}`);
-            } else {
+            } else if (oldId && oldId !== userId) {
               // Now safe to delete the old user row
               await supabaseAdmin.from('users').delete().eq('id', oldId);
               results.push(`✨ تم تحديث المعرفات بنجاح.`);
@@ -150,16 +136,25 @@ export async function POST() {
           await new Promise(resolve => setTimeout(resolve, 50));
         } else {
           results.push(`ℹ️ الحساب موجود مسبقاً: ${userId}`);
-          // Link to public.users just in case
-          const { error: userError } = await supabaseAdmin
-            .from('users')
-            .update({ id: userId })
-            .eq('email', email);
+          
+          // Update the students table to point to the existing auth user ID
+          if (userId !== currentStudentId) {
+            const { error: updateStudentError } = await supabaseAdmin
+              .from('students')
+              .update({ id: userId })
+              .eq('national_id', nationalId);
 
-          if (userError) {
-            results.push(`⚠️ خطأ في ربط الحساب بجدول users: ${userError.message}`);
+            if (updateStudentError) {
+              results.push(`⚠️ خطأ في تحديث معرف الطالب: ${updateStudentError.message}`);
+            } else {
+              // Delete the old dummy user row if it exists and is different
+              if (currentStudentId && currentStudentId !== userId) {
+                await supabaseAdmin.from('users').delete().eq('id', currentStudentId);
+              }
+              results.push(`✨ تم ربط الطالب بالحساب الموجود بنجاح.`);
+            }
           } else {
-            results.push(`✨ تم الربط بنجاح.`);
+            results.push(`✨ الطالب مربوط بالحساب بشكل صحيح.`);
           }
         }
       } catch (innerErr: any) {

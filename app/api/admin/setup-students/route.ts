@@ -27,14 +27,12 @@ export async function POST() {
 
     const { data: students, error: studentsError } = await supabaseAdmin
       .from('students')
-      .select('national_id, users(full_name)')
-      .limit(50); // Limit to 50 for now to avoid timeout
+      .select('id, national_id, users(full_name, email)');
 
     if (studentsError) {
       results.push(`خطأ في جلب الطلاب: ${studentsError.message}`);
       throw studentsError;
     }
-    results.push(`سيتم معالجة أول ${students?.length || 0} طالب في هذه الدفعة.`);
 
     // 2. Fetch ALL auth users once to avoid repeated calls in the loop
     results.push('جاري جلب قائمة الحسابات الموجودة مسبقاً من Auth...');
@@ -53,8 +51,24 @@ export async function POST() {
       results.push(`خطأ تقني أثناء جلب قائمة الحسابات: ${e.message}`);
     }
 
+    // Filter unprocessed students
+    const unprocessedStudents = (students || []).filter(student => {
+      const nationalId = student.national_id?.toString().trim();
+      if (!nationalId) return false;
+      const email = `${nationalId}@alrefaa.edu`;
+      
+      // If the email exists in Auth, they are processed
+      if (allAuthUsers.find(u => u.email === email)) return false;
+      
+      // Otherwise, they need an auth account
+      return true;
+    });
+
+    const batchToProcess = unprocessedStudents.slice(0, 20);
+    results.push(`يوجد ${unprocessedStudents.length} طالب غير مهيأ. سيتم معالجة ${batchToProcess.length} طالب في هذه الدفعة.`);
+
     // 3. Loop and create users
-    for (const student of (students as any) || []) {
+    for (const student of batchToProcess) {
       try {
         const nationalId = student.national_id?.toString().trim();
         const email = `${nationalId}@alrefaa.edu`;
@@ -133,7 +147,7 @@ export async function POST() {
           }
           
           // Add a small delay to prevent hitting Auth rate limits/DB locks
-          await new Promise(resolve => setTimeout(resolve, 300));
+          await new Promise(resolve => setTimeout(resolve, 50));
         } else {
           results.push(`ℹ️ الحساب موجود مسبقاً: ${userId}`);
           // Link to public.users just in case

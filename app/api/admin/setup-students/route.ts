@@ -1,19 +1,12 @@
-import { NextApiRequest, NextApiResponse } from 'next';
+// app/api/admin/setup-students/route.ts
 import { createClient } from '@supabase/supabase-js';
+import { NextRequest, NextResponse } from 'next/server';
 
-export const runtime = 'nodejs';
+export const runtime = 'edge'; // ⚠️ هذا مهم
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
-
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!supabaseUrl || !serviceRoleKey) {
-    return res.status(500).json({ error: 'Supabase environment variables are missing' });
-  }
+export async function POST(req: NextRequest) {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
   const supabase = createClient(supabaseUrl, serviceRoleKey);
 
@@ -26,7 +19,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       .select('national_id, users(full_name)');
 
     if (error) throw error;
-
     logs.push(`تم العثور على ${students?.length || 0} طالب`);
 
     for (const student of students || []) {
@@ -63,19 +55,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           logs.push(`تم إنشاء وربط الحساب للطالب ${name}`);
         }
       } catch (innerErr: any) {
-        logs.push(
-          `خطأ أثناء معالجة الطالب ${student?.national_id}: ${
-            innerErr?.message || innerErr
-          }`
-        );
+        logs.push(`خطأ أثناء معالجة الطالب ${student?.national_id}: ${innerErr?.message || innerErr}`);
       }
     }
 
-    return res.status(200).json({ logs });
+    return NextResponse.json({ logs });
   } catch (err: any) {
-    return res.status(500).json({
+    return NextResponse.json({
       error: err?.message || 'حدث خطأ غير معروف',
       details: err?.toString(),
-    });
+    }, { status: 500 });
   }
 }

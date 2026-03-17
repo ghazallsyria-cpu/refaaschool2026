@@ -44,25 +44,26 @@ export async function POST() {
         const email = `${nationalId}@alrefaa.edu`;
         const studentName = student.users?.full_name || 'طالب غير معروف';
 
-        // Check if user already exists in Auth using getUserByEmail (more efficient than listUsers)
+        // Check if user already exists in Auth using listUsers (since getUserByEmail is not available in this SDK version)
         results.push(`التحقق من وجود حساب مسبق لـ: ${email}`);
         
         let userId: string | undefined;
         
         try {
-          const { data: userData, error: getError } = await supabaseAdmin.auth.admin.getUserByEmail(email);
-          if (getError) {
-            if (getError.message.includes('User not found') || getError.status === 404) {
-              results.push(`الحساب غير موجود، سيتم إنشاؤه.`);
+          const { data: { users }, error: listError } = await supabaseAdmin.auth.admin.listUsers();
+          if (listError) {
+            results.push(`تنبيه أثناء التحقق من الحسابات: ${listError.message}`);
+          } else {
+            const existingUser = users.find(u => u.email === email);
+            if (existingUser) {
+              userId = existingUser.id;
+              results.push(`الحساب موجود مسبقاً في Auth: ${userId}`);
             } else {
-              results.push(`تنبيه أثناء التحقق من الحساب: ${getError.message}`);
+              results.push(`الحساب غير موجود، سيتم إنشاؤه.`);
             }
-          } else if (userData?.user) {
-            userId = userData.user.id;
-            results.push(`الحساب موجود مسبقاً في Auth: ${userId}`);
           }
         } catch (e: any) {
-          results.push(`خطأ تقني أثناء محاولة جلب الحساب: ${e.message || e.toString()}`);
+          results.push(`خطأ تقني أثناء محاولة جلب الحسابات: ${e.message || e.toString()}`);
         }
 
         if (!userId) {

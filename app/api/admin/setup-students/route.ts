@@ -36,39 +36,50 @@ export async function POST() {
     }
     results.push(`سيتم معالجة أول ${students?.length || 0} طالب في هذه الدفعة.`);
 
-    // 2. Loop and create users
+    // 2. Fetch ALL auth users once to avoid repeated calls in the loop
+    results.push('جاري جلب قائمة الحسابات الموجودة مسبقاً من Auth...');
+    let allAuthUsers: any[] = [];
+    try {
+      const { data: { users }, error: listError } = await supabaseAdmin.auth.admin.listUsers({
+        perPage: 1000 // Get as many as possible
+      });
+      if (listError) {
+        results.push(`تنبيه: فشل جلب قائمة الحسابات (${listError.message}). سيتم المحاولة بشكل فردي.`);
+      } else {
+        allAuthUsers = users;
+        results.push(`تم العثور على ${allAuthUsers.length} حساب في Auth.`);
+      }
+    } catch (e: any) {
+      results.push(`خطأ تقني أثناء جلب قائمة الحسابات: ${e.message}`);
+    }
+
+    // 3. Loop and create users
     for (const student of (students as any) || []) {
       try {
         const nationalId = student.national_id?.toString().trim();
-        results.push(`جاري معالجة الطالب: ${nationalId}`);
         const email = `${nationalId}@alrefaa.edu`;
         const studentName = student.users?.full_name || 'طالب غير معروف';
+        
+        results.push(`--- معالجة: ${studentName} (${nationalId}) ---`);
 
-        // Check if user already exists in Auth using listUsers (since getUserByEmail is not available in this SDK version)
-        results.push(`التحقق من وجود حساب مسبق لـ: ${email}`);
-        
-        let userId: string | undefined;
-        
-        try {
-          const { data: { users }, error: listError } = await supabaseAdmin.auth.admin.listUsers();
-          if (listError) {
-            results.push(`تنبيه أثناء التحقق من الحسابات: ${listError.message}`);
-          } else {
-            const existingUser = users.find(u => u.email === email);
-            if (existingUser) {
-              userId = existingUser.id;
-              results.push(`الحساب موجود مسبقاً في Auth: ${userId}`);
-            } else {
-              results.push(`الحساب غير موجود، سيتم إنشاؤه.`);
-            }
+        // Check if user already exists in our pre-fetched list
+        const existingUser = allAuthUsers.find(u => u.email === email);
+        let userId = existingUser?.id;
+
+        if (!userId) {
+          // If not in list, try a direct check just in case (or if list failed)
+          if (allAuthUsers.length === 0) {
+            try {
+              const { data: { users }, error: singleCheckError } = await supabaseAdmin.auth.admin.listUsers();
+              const found = users.find(u => u.email === email);
+              if (found) userId = found.id;
+            } catch (e) {}
           }
-        } catch (e: any) {
-          results.push(`خطأ تقني أثناء محاولة جلب الحسابات: ${e.message || e.toString()}`);
         }
 
         if (!userId) {
           // Create auth user
-          results.push(`جاري محاولة إنشاء حساب جديد لـ: ${email}`);
+          results.push(`جاري إنشاء حساب جديد...`);
           const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
             email: email,
             password: '123456',
@@ -77,28 +88,31 @@ export async function POST() {
           });
 
           if (authError) {
-            results.push(`فشل إنشاء الحساب في Auth لـ ${email}: ${authError.message}`);
-            // If it's a database error checking email, it might mean the Auth service is struggling
+            results.push(`❌ فشل إنشاء الحساب: ${authError.message}`);
             continue;
           }
           userId = authUser.user.id;
-          results.push(`تم إنشاء الحساب بنجاح في Auth: ${userId}`);
+          results.push(`✅ تم إنشاء الحساب: ${userId}`);
+          
+          // Add a small delay to prevent hitting Auth rate limits/DB locks
+          await new Promise(resolve => setTimeout(resolve, 300));
+        } else {
+          results.push(`ℹ️ الحساب موجود مسبقاً: ${userId}`);
         }
 
         // Link to public.users
-        results.push(`جاري تحديث بيانات المستخدم في جدول users...`);
         const { error: userError } = await supabaseAdmin
           .from('users')
           .update({ id: userId })
           .eq('email', email);
 
         if (userError) {
-          results.push(`خطأ في ربط الحساب لـ ${email}: ${userError.message}`);
+          results.push(`⚠️ خطأ في ربط الحساب بجدول users: ${userError.message}`);
         } else {
-          results.push(`الطالب ${studentName}: تم إنشاء الحساب وربطه بنجاح.`);
+          results.push(`✨ تم الربط بنجاح.`);
         }
       } catch (innerErr: any) {
-        results.push(`خطأ غير متوقع أثناء معالجة الطالب: ${innerErr.message || innerErr.toString()}`);
+        results.push(`💥 خطأ غير متوقع: ${innerErr.message || innerErr.toString()}`);
       }
     }
 

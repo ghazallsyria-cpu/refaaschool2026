@@ -13,8 +13,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="ar" dir="rtl">
-      <body className="antialiased bg-stone-50 text-stone-900">
+    <html lang="ar" dir="rtl" suppressHydrationWarning>
+      <body className="antialiased bg-stone-50 text-stone-900" suppressHydrationWarning>
         <AppLayout>
           {children}
         </AppLayout>

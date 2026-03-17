@@ -78,7 +78,25 @@ export async function POST() {
         }
 
         if (!userId) {
-          // Create auth user
+          // FIX FOR TRIGGER ERROR:
+          // 1. Find existing public.users row
+          const { data: existingPublicUser } = await supabaseAdmin
+            .from('users')
+            .select('id')
+            .eq('email', email)
+            .maybeSingle();
+
+          const oldId = existingPublicUser?.id;
+
+          // 2. If exists, temporarily change its email to avoid unique constraint violation in trigger
+          if (oldId) {
+            await supabaseAdmin
+              .from('users')
+              .update({ email: `temp_${Date.now()}_${email}` })
+              .eq('id', oldId);
+          }
+
+          // 3. Create auth user
           results.push(`جاري إنشاء حساب جديد...`);
           const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
             email: email,
@@ -89,27 +107,46 @@ export async function POST() {
 
           if (authError) {
             results.push(`❌ فشل إنشاء الحساب: ${authError.message}`);
+            // Revert the email change if creation failed
+            if (oldId) {
+              await supabaseAdmin.from('users').update({ email }).eq('id', oldId);
+            }
             continue;
           }
           userId = authUser.user.id;
           results.push(`✅ تم إنشاء الحساب: ${userId}`);
           
+          // 4. If we had an old user, update the students table to point to the new ID, then delete old user
+          if (oldId && oldId !== userId) {
+            const { error: updateStudentError } = await supabaseAdmin
+              .from('students')
+              .update({ id: userId })
+              .eq('id', oldId);
+
+            if (updateStudentError) {
+              results.push(`⚠️ خطأ في تحديث معرف الطالب: ${updateStudentError.message}`);
+            } else {
+              // Now safe to delete the old user row
+              await supabaseAdmin.from('users').delete().eq('id', oldId);
+              results.push(`✨ تم تحديث المعرفات بنجاح.`);
+            }
+          }
+          
           // Add a small delay to prevent hitting Auth rate limits/DB locks
           await new Promise(resolve => setTimeout(resolve, 300));
         } else {
           results.push(`ℹ️ الحساب موجود مسبقاً: ${userId}`);
-        }
+          // Link to public.users just in case
+          const { error: userError } = await supabaseAdmin
+            .from('users')
+            .update({ id: userId })
+            .eq('email', email);
 
-        // Link to public.users
-        const { error: userError } = await supabaseAdmin
-          .from('users')
-          .update({ id: userId })
-          .eq('email', email);
-
-        if (userError) {
-          results.push(`⚠️ خطأ في ربط الحساب بجدول users: ${userError.message}`);
-        } else {
-          results.push(`✨ تم الربط بنجاح.`);
+          if (userError) {
+            results.push(`⚠️ خطأ في ربط الحساب بجدول users: ${userError.message}`);
+          } else {
+            results.push(`✨ تم الربط بنجاح.`);
+          }
         }
       } catch (innerErr: any) {
         results.push(`💥 خطأ غير متوقع: ${innerErr.message || innerErr.toString()}`);

@@ -31,10 +31,12 @@ export async function POST() {
 
     for (const student of students || []) {
       try {
-        const email = `${student.national_id}@alrefaa.edu`;
+        // تنظيف national_id ليصبح صالح كبريد
+        const cleanId = String(student.national_id).replace(/[^a-zA-Z0-9]/g, '');
+        const email = `${cleanId}@alrefaa.edu`;
         const name = student?.users?.[0]?.full_name || 'طالب';
 
-        // إنشاء حساب Supabase Auth لكل طالب
+        // إنشاء حساب Supabase Auth
         const { data: authUser, error: authError } =
           await supabase.auth.admin.createUser({
             email,

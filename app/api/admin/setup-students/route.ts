@@ -1,69 +1,87 @@
-// app/api/admin/setup-students/route.ts
+import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { NextRequest, NextResponse } from 'next/server';
 
-export const runtime = 'edge'; // ⚠️ هذا مهم
+export async function POST() {
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 
-export async function POST(req: NextRequest) {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+  if (!serviceRoleKey || !supabaseUrl) {
+    return NextResponse.json({ error: 'إعدادات Supabase غير مكتملة على الخادم.' }, { status: 500 });
+  }
 
-  const supabase = createClient(supabaseUrl, serviceRoleKey);
+  const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
 
   try {
-    const logs: string[] = [];
-    logs.push('بدء عملية تهيئة الطلاب...');
-
-    const { data: students, error } = await supabase
+    const results: string[] = [];
+    // 1. Fetch all students with their names from users table
+    results.push('جاري جلب الطلاب...');
+    const { data: students, error: studentsError } = await supabaseAdmin
       .from('students')
       .select('national_id, users(full_name)');
 
-    if (error) throw error;
-    logs.push(`تم العثور على ${students?.length || 0} طالب`);
+    if (studentsError) {
+      results.push(`خطأ في جلب الطلاب: ${studentsError.message}`);
+      throw studentsError;
+    }
+    results.push(`تم جلب ${students?.length || 0} طالب.`);
 
-    for (const student of students || []) {
+    // 2. Loop and create users
+    for (const student of (students as any) || []) {
       try {
-        const cleanId = String(student.national_id).replace(/[^a-zA-Z0-9]/g, '');
-        const email = `${cleanId}@alrefaa.edu`;
-        const name = student?.users?.[0]?.full_name || 'طالب';
+        results.push(`جاري معالجة الطالب: ${student.national_id}`);
+        const email = `${student.national_id}@alrefaa.edu`;
+        const studentName = student.users?.full_name || 'طالب غير معروف';
 
-        const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
-          email,
+        // Create auth user
+        results.push(`جاري إنشاء حساب لـ: ${email}`);
+        const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
+          email: email,
           password: '123456',
           email_confirm: true,
         });
 
         if (authError) {
-          logs.push(`فشل إنشاء الحساب ${email}: ${authError.message}`);
+          results.push(`خطأ في إنشاء الحساب لـ ${email}: ${authError.message}`);
           continue;
         }
+        
+        results.push(`تم إنشاء الحساب: ${authUser.user.id}`);
 
-        const userId = authUser?.user?.id;
-        if (!userId) {
-          logs.push(`لم يتم الحصول على user id لـ ${email}`);
-          continue;
-        }
-
-        const { error: linkError } = await supabase
+        // Link to public.users
+        results.push(`جاري ربط المستخدم ${authUser.user.id} بالبريد ${email}`);
+        const { error: userError } = await supabaseAdmin
           .from('users')
-          .update({ id: userId })
+          .update({ id: authUser.user.id })
           .eq('email', email);
 
-        if (linkError) {
-          logs.push(`فشل ربط الحساب ${email}: ${linkError.message}`);
+        if (userError) {
+          results.push(`خطأ في ربط الحساب لـ ${email}: ${userError.message}`);
         } else {
-          logs.push(`تم إنشاء وربط الحساب للطالب ${name}`);
+          results.push(`الطالب ${studentName}: تم إنشاء الحساب وربطه بنجاح.`);
         }
       } catch (innerErr: any) {
-        logs.push(`خطأ أثناء معالجة الطالب ${student?.national_id}: ${innerErr?.message || innerErr}`);
+        results.push(`خطأ غير متوقع أثناء معالجة الطالب ${student.national_id}: ${innerErr.message || innerErr.toString()}`);
       }
     }
 
-    return NextResponse.json({ logs });
+    return NextResponse.json({ message: 'اكتملت العملية.', logs: results });
   } catch (err: any) {
-    return NextResponse.json({
-      error: err?.message || 'حدث خطأ غير معروف',
-      details: err?.toString(),
+    console.error('Setup students error (full object):', err);
+    
+    // Attempt to extract a meaningful error message
+    let errorMessage = 'حدث خطأ غير معروف أثناء التهيئة.';
+    if (err instanceof Error) {
+      errorMessage = err.message;
+    } else if (typeof err === 'string') {
+      errorMessage = err;
+    } else if (err && typeof err === 'object') {
+      errorMessage = err.message || err.error || JSON.stringify(err);
+    }
+
+    return NextResponse.json({ 
+      error: errorMessage,
+      details: err?.toString() || JSON.stringify(err),
+      logs: results // Include logs here
     }, { status: 500 });
   }
 }

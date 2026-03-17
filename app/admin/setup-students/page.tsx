@@ -18,11 +18,21 @@ export default function SetupStudentsPage() {
         method: 'POST',
       });
 
-      const data = await response.json();
+      let data;
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        data = await response.json();
+      } else {
+        const text = await response.text();
+        console.error('Non-JSON response:', text);
+        throw new Error(`استجابة غير متوقعة من الخادم (${response.status}): ${text.substring(0, 100)}...`);
+      }
 
       if (!response.ok) {
         console.error('API Error Response:', data);
-        throw new Error(data.error || JSON.stringify(data) || 'حدث خطأ غير معروف.');
+        const error = new Error(data.error || JSON.stringify(data) || 'حدث خطأ غير معروف.');
+        (error as any).logs = data.logs;
+        throw error;
       }
 
       addLog(data.message);
@@ -30,6 +40,9 @@ export default function SetupStudentsPage() {
       addLog('اكتملت العملية بنجاح.');
     } catch (err: any) {
       addLog(`خطأ عام: ${err.message}`);
+      if (err.logs && Array.isArray(err.logs)) {
+        err.logs.forEach((log: string) => addLog(log));
+      }
     } finally {
       setLoading(false);
     }

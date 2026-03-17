@@ -44,35 +44,44 @@ export async function POST() {
         const email = `${nationalId}@alrefaa.edu`;
         const studentName = student.users?.full_name || 'طالب غير معروف';
 
-        // Check if user already exists in Auth
+        // Check if user already exists in Auth using getUserByEmail (more efficient than listUsers)
         results.push(`التحقق من وجود حساب مسبق لـ: ${email}`);
-        const { data: existingUsers, error: listError } = await supabaseAdmin.auth.admin.listUsers();
         
-        if (listError) {
-          results.push(`خطأ في التحقق من الحسابات الموجودة: ${listError.message}`);
-          // If we can't list users, we might still try to create, but let's be careful
+        let userId: string | undefined;
+        
+        try {
+          const { data: userData, error: getError } = await supabaseAdmin.auth.admin.getUserByEmail(email);
+          if (getError) {
+            if (getError.message.includes('User not found') || getError.status === 404) {
+              results.push(`الحساب غير موجود، سيتم إنشاؤه.`);
+            } else {
+              results.push(`تنبيه أثناء التحقق من الحساب: ${getError.message}`);
+            }
+          } else if (userData?.user) {
+            userId = userData.user.id;
+            results.push(`الحساب موجود مسبقاً في Auth: ${userId}`);
+          }
+        } catch (e: any) {
+          results.push(`خطأ تقني أثناء محاولة جلب الحساب: ${e.message || e.toString()}`);
         }
-
-        const existingUser = existingUsers?.users.find(u => u.email === email);
-        let userId = existingUser?.id;
 
         if (!userId) {
           // Create auth user
-          results.push(`جاري إنشاء حساب جديد لـ: ${email}`);
+          results.push(`جاري محاولة إنشاء حساب جديد لـ: ${email}`);
           const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
             email: email,
             password: '123456',
             email_confirm: true,
+            user_metadata: { full_name: studentName }
           });
 
           if (authError) {
-            results.push(`خطأ في إنشاء الحساب لـ ${email}: ${authError.message}`);
+            results.push(`فشل إنشاء الحساب في Auth لـ ${email}: ${authError.message}`);
+            // If it's a database error checking email, it might mean the Auth service is struggling
             continue;
           }
           userId = authUser.user.id;
-          results.push(`تم إنشاء الحساب بنجاح: ${userId}`);
-        } else {
-          results.push(`الحساب موجود مسبقاً: ${userId}`);
+          results.push(`تم إنشاء الحساب بنجاح في Auth: ${userId}`);
         }
 
         // Link to public.users

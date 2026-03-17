@@ -14,16 +14,27 @@ export async function POST() {
 
   try {
     // 1. Fetch all students with their names from users table
-    results.push('جاري جلب الطلاب...');
+    results.push('جاري جلب الطلاب من قاعدة البيانات...');
+    const { count, error: countError } = await supabaseAdmin
+      .from('students')
+      .select('*', { count: 'exact', head: true });
+
+    if (countError) {
+      results.push(`خطأ في عد الطلاب: ${countError.message}`);
+      throw countError;
+    }
+    results.push(`إجمالي عدد الطلاب الموجودين: ${count}`);
+
     const { data: students, error: studentsError } = await supabaseAdmin
       .from('students')
-      .select('national_id, users(full_name)');
+      .select('national_id, users(full_name)')
+      .limit(50); // Limit to 50 for now to avoid timeout
 
     if (studentsError) {
       results.push(`خطأ في جلب الطلاب: ${studentsError.message}`);
       throw studentsError;
     }
-    results.push(`تم جلب ${students?.length || 0} طالب.`);
+    results.push(`سيتم معالجة أول ${students?.length || 0} طالب في هذه الدفعة.`);
 
     // 2. Loop and create users
     for (const student of (students as any) || []) {

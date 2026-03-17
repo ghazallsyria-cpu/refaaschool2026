@@ -3,15 +3,16 @@ export const runtime = 'nodejs';
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-export async function POST() {
+export default async function handler(req: any, res: any) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!supabaseUrl || !serviceRoleKey) {
-    return NextResponse.json(
-      { error: 'Supabase environment variables are missing' },
-      { status: 500 }
-    );
+    return res.status(500).json({ error: 'Supabase environment variables are missing' });
   }
 
   const supabase = createClient(supabaseUrl, serviceRoleKey);
@@ -20,7 +21,7 @@ export async function POST() {
     const logs: string[] = [];
     logs.push('بدء عملية تهيئة الطلاب...');
 
-    // جلب جميع الطلاب مع بيانات المستخدم المرتبطة
+    // جلب الطلاب مع بيانات المستخدمين المرتبطة
     const { data: students, error } = await supabase
       .from('students')
       .select('national_id, users(full_name)');
@@ -34,15 +35,16 @@ export async function POST() {
         // تنظيف national_id ليصبح صالح كبريد
         const cleanId = String(student.national_id).replace(/[^a-zA-Z0-9]/g, '');
         const email = `${cleanId}@alrefaa.edu`;
+
+        // استخدام الاسم من جدول users
         const name = student?.users?.[0]?.full_name || 'طالب';
 
         // إنشاء حساب Supabase Auth
-        const { data: authUser, error: authError } =
-          await supabase.auth.admin.createUser({
-            email,
-            password: '123456', // كلمة السر الافتراضية
-            email_confirm: true,
-          });
+        const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
+          email,
+          password: '123456',
+          email_confirm: true,
+        });
 
         if (authError) {
           logs.push(`فشل إنشاء الحساب ${email}: ${authError.message}`);
@@ -55,7 +57,7 @@ export async function POST() {
           continue;
         }
 
-        // ربط الحساب بجدول users
+        // ربط الحساب بجدول users (لم يتم تغيير أي شيء يتعلق بالجدول)
         const { error: linkError } = await supabase
           .from('users')
           .update({ id: userId })
@@ -75,14 +77,11 @@ export async function POST() {
       }
     }
 
-    return NextResponse.json({ logs });
+    return res.status(200).json({ logs });
   } catch (err: any) {
-    return NextResponse.json(
-      {
-        error: err?.message || 'حدث خطأ غير معروف',
-        details: err?.toString(),
-      },
-      { status: 500 }
-    );
+    return res.status(500).json({
+      error: err?.message || 'حدث خطأ غير معروف',
+      details: err?.toString(),
+    });
   }
 }

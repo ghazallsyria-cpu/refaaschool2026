@@ -75,7 +75,8 @@ export async function POST() {
       try {
         const nationalId = student.national_id?.toString().trim();
         const email = `${nationalId}@alrefaa.edu`;
-        const studentName = student.users?.full_name || 'طالب غير معروف';
+        const usersData = student.users as any;
+        const studentName = usersData?.full_name || (Array.isArray(usersData) ? usersData[0]?.full_name : null) || 'طالب غير معروف';
         const currentStudentId = student.id;
         
         results.push(`--- معالجة: ${studentName} (${nationalId}) ---`);

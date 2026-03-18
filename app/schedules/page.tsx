@@ -92,7 +92,7 @@ export default function SchedulesPage() {
         supabase.from('sections').select('id, name, classes(name)').order('name'),
         supabase.from('subjects').select('id, name').order('name'),
         supabase.from('teachers').select('id, users(full_name)'),
-        supabase.from('teacher_sections').select('teacher_id, section_id')
+        supabase.from('teacher_sections').select('teacher_id, section_id, subject_id')
       ]);
 
       if (sectionsRes.data) setSections((sectionsRes.data as unknown) as Section[]);
@@ -416,7 +416,14 @@ export default function SchedulesPage() {
                   onChange={(e) => setCurrentCell({...currentCell, subjectId: e.target.value})}
                 >
                   <option value="">اختر المادة</option>
-                  {subjects.map(s => (
+                  {subjects
+                    .filter(s => {
+                      if (currentCell.teacherId) {
+                        return teacherAssignments.some(a => a.subject_id === s.id && a.teacher_id === currentCell.teacherId && a.section_id === selectedSectionId);
+                      }
+                      return teacherAssignments.some(a => a.subject_id === s.id && a.section_id === selectedSectionId);
+                    })
+                    .map(s => (
                     <option key={s.id} value={s.id}>{s.name}</option>
                   ))}
                 </select>
@@ -432,7 +439,12 @@ export default function SchedulesPage() {
                 >
                   <option value="">اختر المعلم</option>
                   {teachers
-                    .filter(t => teacherAssignments.some(a => a.teacher_id === t.id && a.section_id === selectedSectionId))
+                    .filter(t => {
+                      if (currentCell.subjectId) {
+                        return teacherAssignments.some(a => a.teacher_id === t.id && a.subject_id === currentCell.subjectId && a.section_id === selectedSectionId);
+                      }
+                      return teacherAssignments.some(a => a.teacher_id === t.id && a.section_id === selectedSectionId);
+                    })
                     .map(t => (
                     <option key={t.id} value={t.id}>{t.users?.full_name}</option>
                   ))}

@@ -198,7 +198,7 @@ export default function TeachersPage() {
     const [sRes, subRes, tsRes] = await Promise.all([
       supabase.from('sections').select('id, name, classes(name)'),
       supabase.from('subjects').select('id, name'),
-      supabase.from('teacher_sections').select('id, section_id, subject_id').eq('teacher_id', teacher.id)
+      supabase.from('teacher_sections').select('teacher_id, section_id, subject_id').eq('teacher_id', teacher.id)
     ]);
     if (sRes.data) setSections(sRes.data);
     if (subRes.data) setSubjects(subRes.data);
@@ -209,8 +209,11 @@ export default function TeachersPage() {
   const toggleAssignment = async (sectionId: string, subjectId: string) => {
     const existing = teacherSections.find(ts => ts.section_id === sectionId && ts.subject_id === subjectId);
     if (existing) {
-      await supabase.from('teacher_sections').delete().eq('id', existing.id);
-      setTeacherSections(teacherSections.filter(ts => ts.id !== existing.id));
+      await supabase.from('teacher_sections').delete()
+        .eq('teacher_id', selectedTeacher.id)
+        .eq('section_id', sectionId)
+        .eq('subject_id', subjectId);
+      setTeacherSections(teacherSections.filter(ts => !(ts.section_id === sectionId && ts.subject_id === subjectId)));
       showNotification('success', 'تم إزالة التعيين بنجاح');
     } else {
       const { data, error } = await supabase.from('teacher_sections').insert({

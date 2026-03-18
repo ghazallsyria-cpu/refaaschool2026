@@ -20,7 +20,7 @@ export default function TeacherAssignmentsPage() {
       supabase.from('teachers').select('id, users(full_name)'),
       supabase.from('sections').select('id, name, classes(name)'),
       supabase.from('subjects').select('id, name'),
-      supabase.from('teacher_sections').select('id, teacher_id, section_id, subject_id, teacher:teachers(users(full_name)), section:sections(name), subject:subjects(name)')
+      supabase.from('teacher_sections').select('teacher_id, section_id, subject_id, teacher:teachers(users(full_name)), section:sections(name, classes(name)), subject:subjects(name)')
     ]);
 
     if (tRes.data) setTeachers(tRes.data);
@@ -53,7 +53,7 @@ export default function TeacherAssignmentsPage() {
     const validAssignments = newAssignments.filter(a => a.teacher_id && a.section_id && a.subject_id);
     if (validAssignments.length === 0) return;
 
-    const { error } = await supabase.from('teacher_sections').insert(validAssignments);
+    const { error } = await supabase.from('teacher_sections').upsert(validAssignments, { ignoreDuplicates: true });
     if (!error) {
       setNewAssignments([]);
       fetchData();
@@ -63,8 +63,11 @@ export default function TeacherAssignmentsPage() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    await supabase.from('teacher_sections').delete().eq('id', id);
+  const handleDelete = async (teacher_id: string, section_id: string, subject_id: string) => {
+    await supabase.from('teacher_sections').delete()
+      .eq('teacher_id', teacher_id)
+      .eq('section_id', section_id)
+      .eq('subject_id', subject_id);
     fetchData();
   };
 
@@ -204,8 +207,8 @@ export default function TeacherAssignmentsPage() {
                       </thead>
                       <tbody className="divide-y divide-slate-50">
                         {teacherAssignments.map(a => (
-                          <tr key={a.id} className="group/row hover:bg-slate-50/50 transition-colors">
-                            <td className="px-6 py-4 font-bold text-slate-700">{a.section?.name}</td>
+                          <tr key={`${a.teacher_id}-${a.section_id}-${a.subject_id}`} className="group/row hover:bg-slate-50/50 transition-colors">
+                            <td className="px-6 py-4 font-bold text-slate-700">{a.section?.classes?.name} - {a.section?.name}</td>
                             <td className="px-6 py-4">
                               <span className="inline-flex items-center px-3 py-1 rounded-lg bg-indigo-50 text-indigo-700 font-bold text-xs">
                                 {a.subject?.name}
@@ -213,7 +216,7 @@ export default function TeacherAssignmentsPage() {
                             </td>
                             <td className="px-6 py-4">
                               <button 
-                                onClick={() => handleDelete(a.id)} 
+                                onClick={() => handleDelete(a.teacher_id, a.section_id, a.subject_id)} 
                                 className="p-2 text-slate-300 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all opacity-0 group-hover/row:opacity-100"
                                 title="حذف التعيين"
                               >

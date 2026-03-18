@@ -79,7 +79,7 @@ export default function SchedulePage() {
     try {
       // 1. التحقق من وجود تضارب
       const { data: conflicts, error: conflictError } = await supabase
-        .from('schedule')
+        .from('schedules')
         .select('id')
         .eq('day_of_week', selectedSlot.day)
         .eq('period', selectedSlot.period)
@@ -93,7 +93,7 @@ export default function SchedulePage() {
       }
 
       // 2. الإضافة إذا لم يوجد تضارب
-      const { error } = await supabase.from('schedule').insert({
+      const { error } = await supabase.from('schedules').insert({
         teacher_id: formData.teacher_id,
         section_id: formData.section_id,
         subject_id: formData.subject_id,
@@ -114,7 +114,7 @@ export default function SchedulePage() {
   const handleDeleteSchedule = async (id: string) => {
     if (!confirm('هل أنت متأكد من حذف هذه الحصة؟')) return;
     try {
-      const { error } = await supabase.from('schedule').delete().eq('id', id);
+      const { error } = await supabase.from('schedules').delete().eq('id', id);
       if (error) throw error;
       fetchSchedule();
     } catch (err) {
@@ -126,7 +126,7 @@ export default function SchedulePage() {
   const fetchSchedule = useCallback(async () => {
     setLoading(true);
     try {
-      let query = supabase.from('schedule').select(`
+      let query = supabase.from('schedules').select(`
         id, day_of_week, period,
         teachers(id, users(full_name), zoom_link),
         sections(id, name, classes(name)),

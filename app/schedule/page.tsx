@@ -89,17 +89,39 @@ export default function SchedulePage() {
     
     try {
       // 1. التحقق من وجود تضارب
-      const { data: conflicts, error: conflictError } = await supabase
+      // تضارب للمعلم
+      const { data: teacherConflict, error: tError } = await supabase
         .from('schedules')
-        .select('id')
+        .select('id, sections(name, classes(name)), subjects(name)')
         .eq('day_of_week', selectedSlot.day)
         .eq('period', selectedSlot.period)
-        .or(`teacher_id.eq.${formData.teacher_id},section_id.eq.${formData.section_id}`);
+        .eq('teacher_id', formData.teacher_id)
+        .maybeSingle();
 
-      if (conflictError) throw conflictError;
+      if (tError) throw tError;
 
-      if (conflicts && conflicts.length > 0) {
-        alert('لا يمكن إضافة الحصة: يوجد تضارب (المعلم أو الفصل مشغول في هذا الوقت).');
+      // تضارب للفصل
+      const { data: sectionConflict, error: sError } = await supabase
+        .from('schedules')
+        .select('id, teachers(users(full_name)), subjects(name)')
+        .eq('day_of_week', selectedSlot.day)
+        .eq('period', selectedSlot.period)
+        .eq('section_id', formData.section_id)
+        .maybeSingle();
+
+      if (sError) throw sError;
+
+      if (teacherConflict) {
+        const section = Array.isArray(teacherConflict.sections) ? teacherConflict.sections[0] : teacherConflict.sections;
+        const subject = Array.isArray(teacherConflict.subjects) ? teacherConflict.subjects[0] : teacherConflict.subjects;
+        alert(`تضارب: المعلم لديه حصة (${subject?.name}) مع فصل (${section?.classes?.name} - ${section?.name}) في هذا الوقت.`);
+        return;
+      }
+
+      if (sectionConflict) {
+        const teacher = Array.isArray(sectionConflict.teachers) ? sectionConflict.teachers[0] : sectionConflict.teachers;
+        const subject = Array.isArray(sectionConflict.subjects) ? sectionConflict.subjects[0] : sectionConflict.subjects;
+        alert(`تضارب: هذا الفصل لديه حصة (${subject?.name}) مع المعلم (${teacher?.users?.full_name}) في هذا الوقت.`);
         return;
       }
 

@@ -31,7 +31,7 @@ export default function SchedulePage() {
       }
 
       const [teachersRes, sectionsRes, subjectsRes] = await Promise.all([
-        supabase.from('teachers').select('id, users(full_name)'),
+        supabase.from('teachers').select('id, specialization, users(full_name)'),
         supabase.from('sections').select('id, name, classes(name)'),
         supabase.from('subjects').select('id, name')
       ]);
@@ -241,7 +241,7 @@ export default function SchedulePage() {
                   <option value="">اختر المعلم</option>
                   {Object.entries(groupedTeachers).map(([spec, teachersInSpec]) => (
                     <optgroup key={spec} label={spec}>
-                      {teachersInSpec.map(t => <option key={t.id} value={t.id}>{t.users?.full_name}</option>)}
+                      {(teachersInSpec as any[]).map(t => <option key={t.id} value={t.id}>{t.users?.full_name}</option>)}
                     </optgroup>
                   ))}
                 </select>

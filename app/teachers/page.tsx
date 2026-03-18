@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Plus, Search, Filter, Edit, Trash2, X, Key, BookOpen, AlertCircle, Users, GraduationCap, Briefcase } from 'lucide-react';
+import { Plus, Search, Filter, Edit, Trash2, X, Key, BookOpen, AlertCircle, Users, GraduationCap, Briefcase, Save } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function TeachersPage() {
@@ -192,9 +192,14 @@ export default function TeachersPage() {
   const [sections, setSections] = useState<any[]>([]);
   const [subjects, setSubjects] = useState<any[]>([]);
   const [teacherSections, setTeacherSections] = useState<any[]>([]);
+  const [bulkAssignData, setBulkAssignData] = useState<{ section_ids: string[], subject_ids: string[] }>({
+    section_ids: [],
+    subject_ids: []
+  });
 
   const handleAssignmentClick = async (teacher: any) => {
     setSelectedTeacher(teacher);
+    setBulkAssignData({ section_ids: [], subject_ids: [] });
     const [sRes, subRes, tsRes] = await Promise.all([
       supabase.from('sections').select('id, name, classes(name)'),
       supabase.from('subjects').select('id, name'),
@@ -204,6 +209,49 @@ export default function TeachersPage() {
     if (subRes.data) setSubjects(subRes.data);
     if (tsRes.data) setTeacherSections(tsRes.data);
     setShowAssignmentModal(true);
+  };
+
+  const handleBulkAssign = async () => {
+    if (bulkAssignData.section_ids.length === 0 || bulkAssignData.subject_ids.length === 0) {
+      showNotification('error', 'يرجى اختيار فصل واحد ومادة واحدة على الأقل');
+      return;
+    }
+
+    const newAssignments: any[] = [];
+    bulkAssignData.section_ids.forEach(sid => {
+      bulkAssignData.subject_ids.forEach(subid => {
+        newAssignments.push({
+          teacher_id: selectedTeacher.id,
+          section_id: sid,
+          subject_id: subid
+        });
+      });
+    });
+
+    const { data, error } = await supabase.from('teacher_sections').upsert(newAssignments, { ignoreDuplicates: true }).select();
+    if (!error) {
+      // Refresh teacher sections
+      const { data: refreshed } = await supabase.from('teacher_sections').select('teacher_id, section_id, subject_id').eq('teacher_id', selectedTeacher.id);
+      if (refreshed) setTeacherSections(refreshed);
+      setBulkAssignData({ section_ids: [], subject_ids: [] });
+      showNotification('success', 'تم تنفيذ التعيين المتعدد بنجاح');
+    } else {
+      showNotification('error', 'فشل التعيين المتعدد');
+    }
+  };
+
+  const toggleBulkSection = (id: string) => {
+    setBulkAssignData(prev => ({
+      ...prev,
+      section_ids: prev.section_ids.includes(id) ? prev.section_ids.filter(sid => sid !== id) : [...prev.section_ids, id]
+    }));
+  };
+
+  const toggleBulkSubject = (id: string) => {
+    setBulkAssignData(prev => ({
+      ...prev,
+      subject_ids: prev.subject_ids.includes(id) ? prev.subject_ids.filter(sid => sid !== id) : [...prev.subject_ids, id]
+    }));
   };
 
   const toggleAssignment = async (sectionId: string, subjectId: string) => {
@@ -840,7 +888,76 @@ export default function TeachersPage() {
                   </button>
                 </div>
                 
-                <div className="space-y-6 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
+                <div className="space-y-6 max-h-[70vh] overflow-y-auto pr-2 custom-scrollbar">
+                  {/* Bulk Assignment Section */}
+                  <div className="bg-amber-50 rounded-4xl p-8 border-2 border-amber-200 shadow-xl shadow-amber-50 mb-8 space-y-6">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-1">
+                        <h4 className="text-xl font-black text-amber-900 tracking-tight">التعيين المتعدد الذكي</h4>
+                        <p className="text-amber-700 font-medium text-xs">حدد المواد والفصول ثم اضغط تعيين للكل</p>
+                      </div>
+                      <div className="h-12 w-12 rounded-2xl bg-white shadow-sm flex items-center justify-center text-amber-600">
+                        <Plus className="h-6 w-6" />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-3">
+                        <label className="text-xs font-black text-amber-800 uppercase tracking-widest">المواد الدراسية</label>
+                        <div className="flex flex-wrap gap-2">
+                          {subjects.map(subject => (
+                            <button
+                              key={subject.id}
+                              onClick={() => toggleBulkSubject(subject.id)}
+                              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                                bulkAssignData.subject_ids.includes(subject.id)
+                                ? 'bg-amber-500 text-white shadow-lg shadow-amber-200'
+                                : 'bg-white text-amber-700 border border-amber-100 hover:border-amber-300'
+                              }`}
+                            >
+                              {subject.name}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="space-y-3">
+                        <label className="text-xs font-black text-amber-800 uppercase tracking-widest">الفصول الدراسية</label>
+                        <div className="flex flex-wrap gap-2">
+                          {sections.map(section => (
+                            <button
+                              key={section.id}
+                              onClick={() => toggleBulkSection(section.id)}
+                              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                                bulkAssignData.section_ids.includes(section.id)
+                                ? 'bg-amber-500 text-white shadow-lg shadow-amber-200'
+                                : 'bg-white text-amber-700 border border-amber-100 hover:border-amber-300'
+                              }`}
+                            >
+                              {section.classes?.name} - {section.name}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={handleBulkAssign}
+                      className="w-full py-4 bg-amber-600 text-white rounded-2xl font-black text-sm shadow-xl shadow-amber-200 hover:bg-amber-700 transition-all active:scale-95 flex items-center justify-center gap-3"
+                    >
+                      <Save className="h-5 w-5" />
+                      تنفيذ التعيين المتعدد المختار
+                    </button>
+                  </div>
+
+                  <div className="relative py-4">
+                    <div className="absolute inset-0 flex items-center" aria-hidden="true">
+                      <div className="w-full border-t border-slate-200"></div>
+                    </div>
+                    <div className="relative flex justify-center">
+                      <span className="bg-white px-4 text-xs font-black text-slate-400 uppercase tracking-widest">أو التعيين الفردي المباشر</span>
+                    </div>
+                  </div>
+
                   {sections.map(section => (
                     <div key={section.id} className="bg-slate-50 rounded-3xl p-6 border border-slate-100">
                       <h4 className="font-bold text-slate-800 mb-4 flex items-center gap-2">

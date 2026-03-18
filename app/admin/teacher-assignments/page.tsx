@@ -13,6 +13,12 @@ export default function TeacherAssignmentsPage() {
   const [loading, setLoading] = useState(true);
 
   const [newAssignments, setNewAssignments] = useState<{ teacher_id: string; section_id: string; subject_id: string }[]>([]);
+  const [bulkMode, setBulkMode] = useState(false);
+  const [bulkData, setBulkData] = useState<{ teacher_id: string; subject_id: string; section_ids: string[] }>({
+    teacher_id: '',
+    subject_id: '',
+    section_ids: []
+  });
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -36,7 +42,14 @@ export default function TeacherAssignmentsPage() {
   }, [fetchData]);
 
   const addRow = () => {
+    setBulkMode(false);
     setNewAssignments([...newAssignments, { teacher_id: '', section_id: '', subject_id: '' }]);
+  };
+
+  const toggleBulkMode = () => {
+    setBulkMode(!bulkMode);
+    setNewAssignments([]);
+    setBulkData({ teacher_id: '', subject_id: '', section_ids: [] });
   };
 
   const updateRow = (index: number, field: string, value: string) => {
@@ -50,17 +63,45 @@ export default function TeacherAssignmentsPage() {
   };
 
   const handleSaveAll = async () => {
-    const validAssignments = newAssignments.filter(a => a.teacher_id && a.section_id && a.subject_id);
+    let validAssignments: any[] = [];
+    
+    if (bulkMode) {
+      if (!bulkData.teacher_id || !bulkData.subject_id || bulkData.section_ids.length === 0) {
+        alert('يرجى اختيار المعلم والمادة وفصل واحد على الأقل');
+        return;
+      }
+      validAssignments = bulkData.section_ids.map(sid => ({
+        teacher_id: bulkData.teacher_id,
+        subject_id: bulkData.subject_id,
+        section_id: sid
+      }));
+    } else {
+      validAssignments = newAssignments.filter(a => a.teacher_id && a.section_id && a.subject_id);
+    }
+
     if (validAssignments.length === 0) return;
 
     const { error } = await supabase.from('teacher_sections').upsert(validAssignments, { ignoreDuplicates: true });
     if (!error) {
       setNewAssignments([]);
+      setBulkMode(false);
+      setBulkData({ teacher_id: '', subject_id: '', section_ids: [] });
       fetchData();
       alert('تم حفظ التعيينات بنجاح');
     } else {
       alert('فشل حفظ التعيينات: ' + error.message);
     }
+  };
+
+  const toggleSectionInBulk = (sectionId: string) => {
+    setBulkData(prev => {
+      const exists = prev.section_ids.includes(sectionId);
+      if (exists) {
+        return { ...prev, section_ids: prev.section_ids.filter(id => id !== sectionId) };
+      } else {
+        return { ...prev, section_ids: [...prev.section_ids, sectionId] };
+      }
+    });
   };
 
   const handleDelete = async (teacher_id: string, section_id: string, subject_id: string) => {
@@ -87,20 +128,106 @@ export default function TeacherAssignmentsPage() {
           </div>
         </div>
         
-        <button 
-          onClick={addRow} 
-          className="inline-flex items-center justify-center gap-3 rounded-2xl bg-indigo-600 px-8 py-4 text-sm font-black text-white shadow-xl shadow-indigo-200 hover:bg-indigo-700 hover:shadow-indigo-300 transition-all active:scale-95 self-start md:self-end"
-        >
-          <Plus className="h-5 w-5" />
-          إضافة تعيين جديد
-        </button>
+        <div className="flex gap-4">
+          <button 
+            onClick={toggleBulkMode} 
+            className={`inline-flex items-center justify-center gap-3 rounded-2xl px-8 py-4 text-sm font-black transition-all active:scale-95 ${bulkMode ? 'bg-amber-500 text-white shadow-xl shadow-amber-100' : 'bg-white text-slate-700 ring-1 ring-slate-200 shadow-sm hover:bg-slate-50'}`}
+          >
+            <Users className="h-5 w-5" />
+            {bulkMode ? 'إلغاء التعيين المتعدد' : 'التعيين المتعدد (ذكي)'}
+          </button>
+          <button 
+            onClick={addRow} 
+            className="inline-flex items-center justify-center gap-3 rounded-2xl bg-indigo-600 px-8 py-4 text-sm font-black text-white shadow-xl shadow-indigo-200 hover:bg-indigo-700 hover:shadow-indigo-300 transition-all active:scale-95"
+          >
+            <Plus className="h-5 w-5" />
+            إضافة تعيين فردي
+          </button>
+        </div>
       </div>
       
-      {newAssignments.length > 0 && (
+      {bulkMode && (
+        <div className="glass-card p-8 md:p-10 rounded-4xl shadow-2xl shadow-amber-100/50 space-y-8 border-t-8 border-amber-500 animate-in fade-in slide-in-from-top-4 duration-500">
+          <div className="flex items-center justify-between">
+            <div className="space-y-1">
+              <h2 className="text-2xl font-black text-slate-900 tracking-tight">نظام التعيين المتعدد الذكي</h2>
+              <p className="text-slate-500 font-medium text-sm">اختر المعلم والمادة، ثم حدد كافة الفصول التي يدرسها بضغطة واحدة</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <label className="text-sm font-black text-slate-700 mr-1">المعلم</label>
+                <select 
+                  className="w-full rounded-2xl border-0 py-4 px-5 text-slate-900 bg-white shadow-sm ring-1 ring-inset ring-slate-200 focus:ring-2 focus:ring-inset focus:ring-amber-500 sm:text-sm transition-all" 
+                  value={bulkData.teacher_id} 
+                  onChange={e => setBulkData({ ...bulkData, teacher_id: e.target.value })}
+                >
+                  <option value="">اختر المعلم</option>
+                  {teachers.map(t => <option key={t.id} value={t.id}>{t.users?.full_name}</option>)}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-black text-slate-700 mr-1">المادة العلمية</label>
+                <select 
+                  className="w-full rounded-2xl border-0 py-4 px-5 text-slate-900 bg-white shadow-sm ring-1 ring-inset ring-slate-200 focus:ring-2 focus:ring-inset focus:ring-amber-500 sm:text-sm transition-all" 
+                  value={bulkData.subject_id} 
+                  onChange={e => setBulkData({ ...bulkData, subject_id: e.target.value })}
+                >
+                  <option value="">اختر المادة</option>
+                  {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <label className="text-sm font-black text-slate-700 mr-1 block">تحديد الفصول الدراسية ({bulkData.section_ids.length})</label>
+              <div className="grid grid-cols-2 gap-3 max-h-[300px] overflow-y-auto p-4 bg-slate-50 rounded-3xl border border-slate-100">
+                {sections.map(section => {
+                  const isSelected = bulkData.section_ids.includes(section.id);
+                  return (
+                    <button
+                      key={section.id}
+                      onClick={() => toggleSectionInBulk(section.id)}
+                      className={`flex flex-col items-start p-4 rounded-2xl border-2 transition-all text-right ${isSelected ? 'bg-amber-50 border-amber-500 shadow-md' : 'bg-white border-transparent hover:border-slate-200 shadow-sm'}`}
+                    >
+                      <span className={`text-[10px] font-black uppercase tracking-tighter ${isSelected ? 'text-amber-600' : 'text-slate-400'}`}>
+                        {section.classes?.name}
+                      </span>
+                      <span className={`text-sm font-bold ${isSelected ? 'text-amber-900' : 'text-slate-700'}`}>
+                        {section.name}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+          
+          <div className="flex flex-col sm:flex-row-reverse justify-start gap-4 pt-6 border-t border-slate-100">
+            <button 
+              onClick={handleSaveAll} 
+              className="inline-flex items-center justify-center gap-3 rounded-2xl bg-amber-500 px-10 py-4 text-sm font-black text-white shadow-xl shadow-amber-200 hover:bg-amber-600 transition-all active:scale-95"
+            >
+              <Save className="h-5 w-5" />
+              تأكيد وحفظ التعيينات المتعددة
+            </button>
+            <button 
+              onClick={toggleBulkMode} 
+              className="inline-flex items-center justify-center rounded-2xl bg-white px-8 py-4 text-sm font-black text-slate-700 shadow-sm ring-1 ring-inset ring-slate-200 hover:bg-slate-50 transition-all"
+            >
+              إلغاء
+            </button>
+          </div>
+        </div>
+      )}
+
+      {newAssignments.length > 0 && !bulkMode && (
         <div className="glass-card p-8 md:p-10 rounded-4xl shadow-2xl shadow-indigo-100/50 space-y-8 border-t-8 border-indigo-600 animate-in fade-in slide-in-from-top-4 duration-500">
           <div className="flex items-center justify-between">
             <div className="space-y-1">
-              <h2 className="text-2xl font-black text-slate-900 tracking-tight">إضافة تعيينات جديدة</h2>
+              <h2 className="text-2xl font-black text-slate-900 tracking-tight">إضافة تعيينات فردية</h2>
               <p className="text-slate-500 font-medium text-sm">قم بتعبئة البيانات أدناه لحفظ التعيينات الجديدة في النظام</p>
             </div>
             <button 

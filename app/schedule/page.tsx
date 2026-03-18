@@ -49,9 +49,28 @@ export default function SchedulePage() {
   }, [fetchFilters]);
 
   const handleAddSchedule = async () => {
-    if (!formData.teacher_id || !formData.section_id || !formData.subject_id || !selectedSlot) return;
+    if (!formData.teacher_id || !formData.section_id || !formData.subject_id || !selectedSlot) {
+      alert('يرجى تعبئة جميع الحقول');
+      return;
+    }
     
     try {
+      // 1. التحقق من وجود تضارب
+      const { data: conflicts, error: conflictError } = await supabase
+        .from('schedule')
+        .select('id')
+        .eq('day_of_week', selectedSlot.day)
+        .eq('period', selectedSlot.period)
+        .or(`teacher_id.eq.${formData.teacher_id},section_id.eq.${formData.section_id}`);
+
+      if (conflictError) throw conflictError;
+
+      if (conflicts && conflicts.length > 0) {
+        alert('لا يمكن إضافة الحصة: يوجد تضارب (المعلم أو الفصل مشغول في هذا الوقت).');
+        return;
+      }
+
+      // 2. الإضافة إذا لم يوجد تضارب
       const { error } = await supabase.from('schedule').insert({
         teacher_id: formData.teacher_id,
         section_id: formData.section_id,
@@ -60,8 +79,10 @@ export default function SchedulePage() {
         period: selectedSlot.period
       });
       if (error) throw error;
+      
       setIsModalOpen(false);
-      fetchSchedule();
+      setFormData({ teacher_id: '', section_id: '', subject_id: '' });
+      fetchSchedule(); // تحديث الجدول
     } catch (err) {
       console.error(err);
       alert('حدث خطأ أثناء إضافة الحصة');
@@ -188,24 +209,44 @@ export default function SchedulePage() {
       </div>
 
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50">
-          <div className="bg-white rounded-xl p-6 w-full max-w-md space-y-4">
-            <h2 className="text-lg font-bold">إضافة حصة جديدة</h2>
-            <select className="w-full p-2 border rounded" onChange={(e) => setFormData({...formData, teacher_id: e.target.value})}>
-              <option value="">اختر المعلم</option>
-              {teachers.map(t => <option key={t.id} value={t.id}>{t.users?.full_name}</option>)}
-            </select>
-            <select className="w-full p-2 border rounded" onChange={(e) => setFormData({...formData, section_id: e.target.value})}>
-              <option value="">اختر الفصل</option>
-              {sections.map(s => <option key={s.id} value={s.id}>{s.classes?.name} - {s.name}</option>)}
-            </select>
-            <select className="w-full p-2 border rounded" onChange={(e) => setFormData({...formData, subject_id: e.target.value})}>
-              <option value="">اختر المادة</option>
-              {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>
-            <div className="flex gap-2 justify-end">
-              <button className="px-4 py-2 bg-slate-200 rounded" onClick={() => setIsModalOpen(false)}>إلغاء</button>
-              <button className="px-4 py-2 bg-indigo-600 text-white rounded" onClick={handleAddSchedule}>حفظ</button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl p-8 w-full max-w-lg shadow-2xl space-y-6">
+            <div className="flex justify-between items-center">
+              <h2 className="text-xl font-bold text-slate-900">إضافة حصة جديدة</h2>
+              <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600">
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">المعلم</label>
+                <select className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500" onChange={(e) => setFormData({...formData, teacher_id: e.target.value})}>
+                  <option value="">اختر المعلم</option>
+                  {teachers.map(t => <option key={t.id} value={t.id}>{t.users?.full_name}</option>)}
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">الفصل</label>
+                <select className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500" onChange={(e) => setFormData({...formData, section_id: e.target.value})}>
+                  <option value="">اختر الفصل</option>
+                  {sections.map(s => <option key={s.id} value={s.id}>{s.classes?.name} - {s.name}</option>)}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">المادة</label>
+                <select className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500" onChange={(e) => setFormData({...formData, subject_id: e.target.value})}>
+                  <option value="">اختر المادة</option>
+                  {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+              </div>
+            </div>
+
+            <div className="flex gap-3 justify-end pt-4">
+              <button className="px-6 py-2.5 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 font-medium" onClick={() => setIsModalOpen(false)}>إلغاء</button>
+              <button className="px-6 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium shadow-sm" onClick={handleAddSchedule}>حفظ الحصة</button>
             </div>
           </div>
         </div>

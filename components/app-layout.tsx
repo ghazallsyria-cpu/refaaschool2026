@@ -16,6 +16,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const [platformClosed, setPlatformClosed] = useState(false);
   const [closeMessage, setCloseMessage] = useState('');
   const [userRole, setUserRole] = useState<string | null>(null);
+  const [isAdminByEmail, setIsAdminByEmail] = useState(false);
   
   const isLoginPage = pathname === '/login';
   const isResetPasswordPage = pathname === '/reset-password';
@@ -44,6 +45,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
         let role = null;
         if (session?.user) {
+          const isSuperAdmin = session.user.email === 'ghazallsyria@gmail.com';
+          setIsAdminByEmail(isSuperAdmin);
           const { data: userData } = await supabase
             .from('users')
             .select('role')
@@ -51,6 +54,24 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             .single();
           
           role = userData?.role;
+          
+          // تأكيد دور المدير في قاعدة البيانات إذا كان البريد الإلكتروني يطابق المدير الرئيسي
+          if (isSuperAdmin && role !== 'admin') {
+            try {
+              await supabase
+                .from('users')
+                .upsert({ 
+                  id: session.user.id, 
+                  email: session.user.email, 
+                  full_name: 'المدير العام',
+                  role: 'admin' 
+                });
+              role = 'admin';
+            } catch (err) {
+              console.error('Error auto-updating admin role:', err);
+            }
+          }
+          
           setUserRole(role);
         }
 
@@ -170,7 +191,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   }
 
   // If user is not admin/management, don't show the admin sidebar
-  const showAdminSidebar = userRole === 'admin' || userRole === 'management';
+  const showAdminSidebar = userRole === 'admin' || userRole === 'management' || isAdminByEmail;
 
   return (
     <div className="flex h-full">

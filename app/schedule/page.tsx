@@ -20,14 +20,22 @@ export default function SchedulePage() {
   const [selectedSlot, setSelectedSlot] = useState<{day: number, period: number} | null>(null);
   const [formData, setFormData] = useState({ teacher_id: '', section_id: '', subject_id: '' });
 
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [userRole, setUserRole] = useState<string | null>(null);
+
   const fetchFilters = useCallback(async () => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      console.log('Session:', session);
-      if (session) {
-        const { data: profile, error } = await supabase.from('users').select('role').eq('id', session.user.id).single();
-        console.log('Profile:', profile, 'Error:', error);
-        setIsAdmin(profile?.role === 'admin');
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setUserEmail(user.email || null);
+        const { data: profile } = await supabase.from('users').select('role').eq('id', user.id).single();
+        setUserRole(profile?.role || null);
+        
+        // التحقق من الدور أو البريد الإلكتروني للمدير الرئيسي
+        const isSystemAdmin = profile?.role === 'admin' || profile?.role === 'management' || user.email === 'ghazallsyria@gmail.com';
+        setIsAdmin(isSystemAdmin);
+      } else {
+        setIsAdmin(false);
       }
 
       const [teachersRes, sectionsRes, subjectsRes] = await Promise.all([
@@ -151,7 +159,11 @@ export default function SchedulePage() {
       {/* Debug Info */}
       {!isAdmin && (
         <div className="bg-yellow-100 p-4 rounded-lg text-sm text-yellow-800">
-          Debug: isAdmin = {String(isAdmin)}. إذا كنت مديراً ولا تظهر خيارات الإدارة، يرجى التأكد من دورك في قاعدة البيانات.
+          <p className="font-bold">Debug Info:</p>
+          <p>isAdmin: {String(isAdmin)}</p>
+          <p>Email: {userEmail || 'غير مسجل'}</p>
+          <p>Role: {userRole || 'بدون دور'}</p>
+          <p>إذا كنت مديراً ولا تظهر خيارات الإدارة، يرجى التأكد من دورك في قاعدة البيانات أو التواصل مع المطور.</p>
         </div>
       )}
 

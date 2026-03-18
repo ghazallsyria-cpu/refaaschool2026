@@ -20,7 +20,9 @@ export default function LoginPage() {
     try {
       let authEmail = civilId;
       
+      // If the input is not an email, assume it's a Civil ID and look up the email
       if (!civilId.includes('@')) {
+        // Check in role tables
         const { data: studentData } = await supabase
           .from('students')
           .select('id, users!inner(email)')
@@ -48,6 +50,7 @@ export default function LoginPage() {
             if (parentData && parentData.users) {
               authEmail = (parentData.users as any).email;
             } else {
+              // Final fallback
               authEmail = `${civilId}@alrefaa.edu`;
             }
           }
@@ -64,6 +67,7 @@ export default function LoginPage() {
       if (signInError) throw signInError;
       
       if (authData.user) {
+        // Verify user exists in public.users table
         const { data: userData, error: userError } = await supabase
           .from('users')
           .select('role, must_reset_password')
@@ -78,6 +82,7 @@ export default function LoginPage() {
         if (!userData) {
           const uid = authData.user.id;
           console.error('User UID not found in public.users:', uid);
+          // Check if RLS might be the issue by logging the full response
           throw new Error(`تم تسجيل الدخول، ولكن لم نجد بياناتك في جدول public.users. 
           تأكد من تشغيل استعلام SQL لتحديث المعرّف: ${uid}`);
         }
@@ -112,6 +117,7 @@ export default function LoginPage() {
     setCivilId(user.id);
     setPassword(user.pass);
     
+    // We'll trigger the login manually after a short delay to show the UI update
     setTimeout(() => {
       const form = document.querySelector('form');
       if (form) form.requestSubmit();
@@ -146,7 +152,58 @@ export default function LoginPage() {
             </div>
           )}
 
-          {/* inputs unchanged */}
+          <div>
+            <label htmlFor="civilId" className="block text-sm font-medium leading-6 text-slate-900">
+              الرقم المدني
+            </label>
+            <div className="mt-2 relative">
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                <User className="h-5 w-5 text-slate-400" aria-hidden="true" />
+              </div>
+              <input
+                id="civilId"
+                name="civilId"
+                type="text"
+                autoComplete="username"
+                required
+                value={civilId}
+                onChange={(e) => setCivilId(e.target.value)}
+                className="block w-full rounded-md border-0 py-2.5 pr-10 text-slate-900 shadow-sm ring-1 ring-inset ring-slate-300 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                placeholder="أدخل الرقم المدني المكون من 12 رقم"
+                dir="ltr"
+                style={{ textAlign: 'right' }}
+              />
+            </div>
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between">
+              <label htmlFor="password" className="block text-sm font-medium leading-6 text-slate-900">
+                كلمة المرور
+              </label>
+              <div className="text-sm">
+                <a href="#" className="font-semibold text-indigo-600 hover:text-indigo-500">
+                  نسيت كلمة المرور؟
+                </a>
+              </div>
+            </div>
+            <div className="mt-2 relative">
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
+                <Lock className="h-5 w-5 text-slate-400" aria-hidden="true" />
+              </div>
+              <input
+                id="password"
+                name="password"
+                type="password"
+                autoComplete="current-password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="block w-full rounded-md border-0 py-2.5 pr-10 text-slate-900 shadow-sm ring-1 ring-inset ring-slate-300 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                placeholder="••••••••"
+              />
+            </div>
+          </div>
 
           <div>
             <button
@@ -159,27 +216,6 @@ export default function LoginPage() {
           </div>
         </form>
       </div>
-
-      {/* Premium Footer */}
-      <div className="mt-12 flex justify-center">
-        <div className="relative group">
-          
-          {/* Glow effect */}
-          <div className="absolute -inset-1 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-500 rounded-xl blur opacity-40 group-hover:opacity-70 transition duration-500"></div>
-          
-          {/* Content */}
-          <div className="relative px-8 py-5 bg-slate-900 rounded-xl text-center shadow-2xl">
-            <p className="text-sm font-bold bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent animate-pulse">
-              برمجة وتنفيذ الأستاذ إيهاب جمال غزال
-            </p>
-            <p className="text-xs text-slate-400 mt-2 tracking-wide">
-              © جميع الحقوق محفوظة
-            </p>
-          </div>
-
-        </div>
-      </div>
-
     </div>
   );
 }

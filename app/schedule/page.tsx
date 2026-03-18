@@ -23,8 +23,10 @@ export default function SchedulePage() {
   const fetchFilters = useCallback(async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
+      console.log('Session:', session);
       if (session) {
-        const { data: profile } = await supabase.from('users').select('role').eq('id', session.user.id).single();
+        const { data: profile, error } = await supabase.from('users').select('role').eq('id', session.user.id).single();
+        console.log('Profile:', profile, 'Error:', error);
         setIsAdmin(profile?.role === 'admin');
       }
 
@@ -106,7 +108,7 @@ export default function SchedulePage() {
     try {
       let query = supabase.from('schedule').select(`
         id, day_of_week, period,
-        teachers(id, users(full_name)),
+        teachers(id, users(full_name), zoom_link),
         sections(id, name, classes(name)),
         subjects(id, name)
       `);
@@ -293,11 +295,13 @@ export default function SchedulePage() {
                     {PERIODS.map(period => {
                       const slot = scheduleData.find(s => s.day_of_week === dayIndex && s.period === period);
                       return (
-                        <div key={`${day}-${period}`} className={`p-3 border border-slate-200 rounded-lg bg-white min-h-[100px] flex flex-col items-center justify-center text-center print:border-black print:min-h-[80px] ${isAdmin ? 'cursor-pointer hover:bg-slate-50' : ''}`}
+                        <div key={`${day}-${period}`} className={`p-3 border border-slate-200 rounded-lg bg-white min-h-[100px] flex flex-col items-center justify-center text-center print:border-black print:min-h-[80px] ${isAdmin ? 'cursor-pointer hover:bg-slate-50' : ''} ${slot?.teachers?.zoom_link ? 'cursor-pointer hover:bg-indigo-50' : ''}`}
                           onClick={() => {
                             if (isAdmin) {
                               setSelectedSlot({day: dayIndex, period: period});
                               setIsModalOpen(true);
+                            } else if (slot?.teachers?.zoom_link) {
+                              window.open(slot.teachers.zoom_link, '_blank');
                             }
                           }}
                         >
@@ -312,6 +316,9 @@ export default function SchedulePage() {
                                 <span className="text-sm text-slate-600 mt-1 print:text-black">
                                   {slot.teachers?.users?.full_name}
                                 </span>
+                              )}
+                              {slot.teachers?.zoom_link && (
+                                <span className="text-xs text-indigo-500 mt-1">رابط زوم</span>
                               )}
                               {isAdmin && (
                                 <button className="mt-2 text-red-500 text-xs" onClick={(e) => { e.stopPropagation(); handleDeleteSchedule(slot.id); }}>حذف</button>

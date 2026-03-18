@@ -8,6 +8,7 @@ export default function TeachersPage() {
   const [teachers, setTeachers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [activeTab, setActiveTab] = useState('الكل');
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -17,14 +18,16 @@ export default function TeachersPage() {
     national_id: '',
     email: '',
     phone: '',
-    specialization: ''
+    specialization: '',
+    zoom_link: ''
   });
   const [editForm, setEditForm] = useState({
     full_name: '',
     national_id: '',
     email: '',
     phone: '',
-    specialization: ''
+    specialization: '',
+    zoom_link: ''
   });
 
   const [notification, setNotification] = useState<{type: 'success' | 'error', message: string} | null>(null);
@@ -89,6 +92,7 @@ export default function TeachersPage() {
           phone: addForm.phone,
           role: 'teacher',
           specialization: addForm.specialization,
+          zoom_link: addForm.zoom_link,
         }),
       });
 
@@ -100,7 +104,7 @@ export default function TeachersPage() {
 
       showNotification('success', `تم إضافة المعلم بنجاح (كلمة المرور: ${data.password})`);
       setShowAddModal(false);
-      setAddForm({ full_name: '', national_id: '', email: '', phone: '', specialization: '' });
+      setAddForm({ full_name: '', national_id: '', email: '', phone: '', specialization: '', zoom_link: '' });
       fetchTeachers();
     } catch (error: any) {
       console.error('Error adding teacher:', error);
@@ -115,7 +119,8 @@ export default function TeachersPage() {
       national_id: teacher.national_id || '',
       email: teacher.users?.email || '',
       phone: teacher.users?.phone || '',
-      specialization: teacher.specialization || ''
+      specialization: teacher.specialization || '',
+      zoom_link: teacher.zoom_link || ''
     });
     setShowEditModal(true);
   };
@@ -139,7 +144,8 @@ export default function TeachersPage() {
         .from('teachers')
         .update({
           national_id: editForm.national_id,
-          specialization: editForm.specialization
+          specialization: editForm.specialization,
+          zoom_link: editForm.zoom_link
         })
         .eq('id', editingTeacher.id);
 
@@ -253,12 +259,13 @@ export default function TeachersPage() {
     }
   };
 
-  const filteredTeachers = teachers.filter(teacher => 
-    teacher.users?.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    teacher.national_id?.includes(searchQuery)
-  );
+  const specializations = ['الكل', ...Array.from(new Set(teachers.map(t => t.specialization).filter(Boolean))) as string[]];
 
-  const specializations = Array.from(new Set(teachers.map(t => t.specialization).filter(Boolean))) as string[];
+  const filteredTeachers = teachers.filter(teacher => 
+    (activeTab === 'الكل' || teacher.specialization === activeTab) &&
+    (teacher.users?.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    teacher.national_id?.includes(searchQuery))
+  );
 
   const groupedTeachers = filteredTeachers.reduce((acc, teacher) => {
     const spec = teacher.specialization || 'غير محدد';
@@ -307,6 +314,17 @@ export default function TeachersPage() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
+        </div>
+        <div className="flex gap-2 overflow-x-auto pb-2 sm:pb-0">
+          {specializations.map(spec => (
+            <button
+              key={spec}
+              onClick={() => setActiveTab(spec)}
+              className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap ${activeTab === spec ? 'bg-indigo-600 text-white' : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'}`}
+            >
+              {spec}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -518,6 +536,15 @@ export default function TeachersPage() {
                         <option value="أخرى">أخرى</option>
                       </select>
                     </div>
+                    <div className="sm:col-span-2">
+                      <label className="block text-sm font-medium leading-6 text-slate-900">رابط زوم</label>
+                      <input 
+                        type="url" 
+                        value={editForm.zoom_link}
+                        onChange={(e) => setEditForm({...editForm, zoom_link: e.target.value})}
+                        className="mt-2 block w-full rounded-md border-0 py-1.5 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6" 
+                      />
+                    </div>
                   </div>
                 </form>
               </div>
@@ -602,6 +629,15 @@ export default function TeachersPage() {
                         ))}
                         <option value="أخرى">أخرى</option>
                       </select>
+                    </div>
+                    <div className="sm:col-span-2">
+                      <label className="block text-sm font-medium leading-6 text-slate-900">رابط زوم</label>
+                      <input 
+                        type="url" 
+                        value={addForm.zoom_link}
+                        onChange={(e) => setAddForm({...addForm, zoom_link: e.target.value})}
+                        className="mt-2 block w-full rounded-md border-0 py-1.5 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6" 
+                      />
                     </div>
                   </div>
                 </form>

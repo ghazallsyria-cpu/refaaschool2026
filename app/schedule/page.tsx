@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Printer, User, Users, Info } from 'lucide-react';
+import { Printer, User, Users, Info, X } from 'lucide-react';
 
 const DAYS = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
 const PERIODS = [1, 2, 3, 4, 5];

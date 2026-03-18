@@ -11,7 +11,7 @@ export function Footer() {
         <div className="flex flex-col items-center gap-4">
           <div className="flex items-center gap-2 text-slate-900 font-bold text-lg">
             <Code className="h-5 w-5 text-indigo-600" />
-            <span>برمجة وتطوير : الاستاذ ايهاب جمال فزال</span>
+            <span>برمجة وتنفيذ : الاستاذ ايهاب جمال غزال</span>
           </div>
           <div className="flex items-center gap-2 text-slate-700 font-medium">
             <ShieldCheck className="h-5 w-5 text-emerald-600" />

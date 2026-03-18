@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Plus, Trash2, Save, ArrowRight, Users } from 'lucide-react';
+import { Plus, Trash2, Save, ArrowRight, Users, Edit2, X } from 'lucide-react';
 import Link from 'next/link';
 
 export default function TeacherAssignmentsPage() {
@@ -19,6 +19,9 @@ export default function TeacherAssignmentsPage() {
     subject_id: '',
     section_ids: []
   });
+
+  const [editingAssignment, setEditingAssignment] = useState<any>(null);
+  const [editForm, setEditForm] = useState({ section_id: '', subject_id: '' });
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -105,11 +108,57 @@ export default function TeacherAssignmentsPage() {
   };
 
   const handleDelete = async (teacher_id: string, section_id: string, subject_id: string) => {
+    if (!confirm('هل أنت متأكد من حذف هذا التعيين؟')) return;
     await supabase.from('teacher_sections').delete()
       .eq('teacher_id', teacher_id)
       .eq('section_id', section_id)
       .eq('subject_id', subject_id);
     fetchData();
+  };
+
+  const openEditModal = (assignment: any) => {
+    setEditingAssignment(assignment);
+    setEditForm({
+      section_id: assignment.section_id,
+      subject_id: assignment.subject_id
+    });
+  };
+
+  const handleUpdate = async () => {
+    if (!editingAssignment) return;
+
+    // Check if the new assignment already exists (to avoid PK conflict)
+    if (editForm.section_id !== editingAssignment.section_id || editForm.subject_id !== editingAssignment.subject_id) {
+      const exists = assignments.some(a => 
+        a.teacher_id === editingAssignment.teacher_id && 
+        a.section_id === editForm.section_id && 
+        a.subject_id === editForm.subject_id
+      );
+      if (exists) {
+        alert('هذا التعيين موجود بالفعل لهذا المعلم');
+        return;
+      }
+    }
+
+    const { error } = await supabase
+      .from('teacher_sections')
+      .update({ 
+        section_id: editForm.section_id, 
+        subject_id: editForm.subject_id 
+      })
+      .match({ 
+        teacher_id: editingAssignment.teacher_id, 
+        section_id: editingAssignment.section_id, 
+        subject_id: editingAssignment.subject_id 
+      });
+
+    if (!error) {
+      setEditingAssignment(null);
+      fetchData();
+      alert('تم تحديث التعيين بنجاح');
+    } else {
+      alert('فشل التحديث: ' + error.message);
+    }
   };
 
   return (
@@ -341,7 +390,14 @@ export default function TeacherAssignmentsPage() {
                                 {a.subject?.name}
                               </span>
                             </td>
-                            <td className="px-6 py-4">
+                            <td className="px-6 py-4 flex items-center gap-2">
+                              <button 
+                                onClick={() => openEditModal(a)} 
+                                className="p-2 text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all opacity-0 group-hover/row:opacity-100"
+                                title="تعديل التعيين"
+                              >
+                                <Edit2 className="h-4 w-4" />
+                              </button>
                               <button 
                                 onClick={() => handleDelete(a.teacher_id, a.section_id, a.subject_id)} 
                                 className="p-2 text-slate-300 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all opacity-0 group-hover/row:opacity-100"
@@ -370,6 +426,62 @@ export default function TeacherAssignmentsPage() {
           );
         })}
       </div>
+
+      {/* Edit Assignment Modal */}
+      {editingAssignment && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-white rounded-4xl p-8 w-full max-w-lg shadow-2xl space-y-8 border-t-8 border-indigo-600">
+            <div className="flex justify-between items-center">
+              <div className="space-y-1">
+                <h2 className="text-2xl font-black text-slate-900 tracking-tight">تعديل التعيين</h2>
+                <p className="text-slate-500 font-medium text-sm">تعديل الفصل أو المادة للمعلم: {editingAssignment.teacher?.users?.full_name}</p>
+              </div>
+              <button onClick={() => setEditingAssignment(null)} className="p-2 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-50 transition-all">
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+            
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <label className="text-sm font-black text-slate-700 mr-1">الفصل الدراسي</label>
+                <select 
+                  className="w-full rounded-2xl border-0 py-4 px-5 text-slate-900 bg-slate-50 ring-1 ring-inset ring-slate-200 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm transition-all" 
+                  value={editForm.section_id} 
+                  onChange={e => setEditForm({ ...editForm, section_id: e.target.value })}
+                >
+                  {sections.map(s => <option key={s.id} value={s.id}>{s.classes?.name} - {s.name}</option>)}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-black text-slate-700 mr-1">المادة العلمية</label>
+                <select 
+                  className="w-full rounded-2xl border-0 py-4 px-5 text-slate-900 bg-slate-50 ring-1 ring-inset ring-slate-200 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm transition-all" 
+                  value={editForm.subject_id} 
+                  onChange={e => setEditForm({ ...editForm, subject_id: e.target.value })}
+                >
+                  {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+              </div>
+            </div>
+
+            <div className="flex gap-4 pt-4">
+              <button 
+                onClick={handleUpdate} 
+                className="flex-1 inline-flex items-center justify-center gap-3 rounded-2xl bg-indigo-600 px-8 py-4 text-sm font-black text-white shadow-xl shadow-indigo-200 hover:bg-indigo-700 transition-all active:scale-95"
+              >
+                <Save className="h-5 w-5" />
+                حفظ التعديلات
+              </button>
+              <button 
+                onClick={() => setEditingAssignment(null)} 
+                className="flex-1 inline-flex items-center justify-center rounded-2xl bg-white px-8 py-4 text-sm font-black text-slate-700 shadow-sm ring-1 ring-inset ring-slate-200 hover:bg-slate-50 transition-all"
+              >
+                إلغاء
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

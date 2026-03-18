@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Plus, Search, Filter, Edit, Trash2, X, Key } from 'lucide-react';
+import { Plus, Search, Filter, Edit, Trash2, X, Key, BookOpen } from 'lucide-react';
 
 export default function TeachersPage() {
   const [teachers, setTeachers] = useState<any[]>([]);

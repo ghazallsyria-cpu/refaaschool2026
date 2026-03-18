@@ -165,7 +165,8 @@ export default function TeachersPage() {
         .from('teachers')
         .select(`
           *,
-          users (full_name, email, phone)
+          users (full_name, email, phone),
+          teacher_sections (count)
         `);
 
       if (error) throw error;
@@ -257,6 +258,15 @@ export default function TeachersPage() {
     teacher.national_id?.includes(searchQuery)
   );
 
+  const specializations = Array.from(new Set(teachers.map(t => t.specialization).filter(Boolean))) as string[];
+
+  const groupedTeachers = filteredTeachers.reduce((acc, teacher) => {
+    const spec = teacher.specialization || 'غير محدد';
+    if (!acc[spec]) acc[spec] = [];
+    acc[spec].push(teacher);
+    return acc;
+  }, {} as Record<string, any[]>);
+
   return (
     <div className="space-y-6 relative">
       {/* Notification Toast */}
@@ -309,6 +319,7 @@ export default function TeachersPage() {
                 <th scope="col" className="py-3.5 pl-4 pr-6 text-right text-sm font-semibold text-slate-900">اسم المعلم</th>
                 <th scope="col" className="px-3 py-3.5 text-right text-sm font-semibold text-slate-900">الرقم المدني</th>
                 <th scope="col" className="px-3 py-3.5 text-right text-sm font-semibold text-slate-900">التخصص</th>
+                <th scope="col" className="px-3 py-3.5 text-right text-sm font-semibold text-slate-900">التعيينات</th>
                 <th scope="col" className="px-3 py-3.5 text-right text-sm font-semibold text-slate-900">رقم الهاتف</th>
                 <th scope="col" className="relative py-3.5 pl-6 pr-4">
                   <span className="sr-only">إجراءات</span>
@@ -339,6 +350,11 @@ export default function TeachersPage() {
                     </td>
                     <td className="whitespace-nowrap px-3 py-4 text-sm text-slate-500">
                       {teacher.specialization || 'غير محدد'}
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-4 text-sm text-slate-500">
+                      <span className="inline-flex items-center rounded-full bg-indigo-50 px-2 py-1 text-xs font-medium text-indigo-700 ring-1 ring-inset ring-indigo-700/10">
+                        {teacher.teacher_sections?.length || 0}
+                      </span>
                     </td>
                     <td className="whitespace-nowrap px-3 py-4 text-sm text-slate-500">
                       {teacher.users?.phone || 'غير محدد'}
@@ -490,12 +506,17 @@ export default function TeachersPage() {
                     </div>
                     <div className="sm:col-span-2">
                       <label className="block text-sm font-medium leading-6 text-slate-900">التخصص</label>
-                      <input 
-                        type="text" 
+                      <select 
                         value={editForm.specialization}
                         onChange={(e) => setEditForm({...editForm, specialization: e.target.value})}
                         className="mt-2 block w-full rounded-md border-0 py-1.5 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6" 
-                      />
+                      >
+                        <option value="">اختر التخصص</option>
+                        {specializations.map(spec => (
+                          <option key={spec} value={spec}>{spec}</option>
+                        ))}
+                        <option value="أخرى">أخرى</option>
+                      </select>
                     </div>
                   </div>
                 </form>
@@ -570,12 +591,17 @@ export default function TeachersPage() {
                     </div>
                     <div className="sm:col-span-2">
                       <label className="block text-sm font-medium leading-6 text-slate-900">التخصص</label>
-                      <input 
-                        type="text" 
+                      <select 
                         value={addForm.specialization}
                         onChange={(e) => setAddForm({...addForm, specialization: e.target.value})}
                         className="mt-2 block w-full rounded-md border-0 py-1.5 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6" 
-                      />
+                      >
+                        <option value="">اختر التخصص</option>
+                        {specializations.map(spec => (
+                          <option key={spec} value={spec}>{spec}</option>
+                        ))}
+                        <option value="أخرى">أخرى</option>
+                      </select>
                     </div>
                   </div>
                 </form>

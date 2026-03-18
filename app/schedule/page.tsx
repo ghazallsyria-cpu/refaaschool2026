@@ -11,20 +11,32 @@ export default function SchedulePage() {
   const [viewType, setViewType] = useState<'teacher' | 'section'>('teacher');
   const [teachers, setTeachers] = useState<any[]>([]);
   const [sections, setSections] = useState<any[]>([]);
+  const [subjects, setSubjects] = useState<any[]>([]);
   const [selectedId, setSelectedId] = useState<string>('');
   const [scheduleData, setScheduleData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isVirtual, setIsVirtual] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedSlot, setSelectedSlot] = useState<{day: number, period: number} | null>(null);
+  const [formData, setFormData] = useState({ teacher_id: '', section_id: '', subject_id: '' });
 
   const fetchFilters = useCallback(async () => {
     try {
-      const [teachersRes, sectionsRes] = await Promise.all([
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        const { data: profile } = await supabase.from('users').select('role').eq('id', session.user.id).single();
+        setIsAdmin(profile?.role === 'admin');
+      }
+
+      const [teachersRes, sectionsRes, subjectsRes] = await Promise.all([
         supabase.from('teachers').select('id, users(full_name)'),
-        supabase.from('sections').select('id, name, classes(name)')
+        supabase.from('sections').select('id, name, classes(name)'),
+        supabase.from('subjects').select('id, name')
       ]);
 
       if (teachersRes.data) setTeachers(teachersRes.data);
       if (sectionsRes.data) setSections(sectionsRes.data);
+      if (subjectsRes.data) setSubjects(subjectsRes.data);
 
       if (teachersRes.data?.[0]) setSelectedId(teachersRes.data[0].id);
     } catch (err) {
@@ -36,78 +48,42 @@ export default function SchedulePage() {
     fetchFilters();
   }, [fetchFilters]);
 
-  const generateVirtualSchedule = useCallback(async () => {
-    setIsVirtual(true);
+  const handleAddSchedule = async () => {
+    if (!formData.teacher_id || !formData.section_id || !formData.subject_id || !selectedSlot) return;
+    
     try {
-      let query = supabase.from('teacher_sections').select(`
-        teacher_id, section_id, subject_id,
-        teachers(id, users(full_name)),
-        sections(id, name, classes(name)),
-        subjects(id, name)
-      `);
-
-      if (viewType === 'teacher') {
-        query = query.eq('teacher_id', selectedId);
-      } else {
-        query = query.eq('section_id', selectedId);
-      }
-
-      const { data, error } = await query;
+      const { error } = await supabase.from('schedule').insert({
+        teacher_id: formData.teacher_id,
+        section_id: formData.section_id,
+        subject_id: formData.subject_id,
+        day_of_week: selectedSlot.day,
+        period: selectedSlot.period
+      });
       if (error) throw error;
-
-      const virtualData: any[] = [];
-      
-      // Distribute classes evenly across the week
-      if (data && data.length > 0) {
-        const repeatedData: any[] = [];
-        // Repeat to fill a typical week (e.g., 3-4 times a week per subject/section)
-        data.forEach(item => {
-           for(let i=0; i<4; i++) repeatedData.push(item);
-        });
-        
-        // We have N items. We need to place them in 25 slots.
-        const availableSlots = Array.from({length: 25}, (_, i) => i);
-        
-        // Simple deterministic shuffle based on selectedId so it doesn't jump around on every render
-        let seed = selectedId.charCodeAt(0) || 1;
-        const random = () => {
-          const x = Math.sin(seed++) * 10000;
-          return x - Math.floor(x);
-        };
-        
-        availableSlots.sort(() => random() - 0.5);
-
-        repeatedData.forEach((item, index) => {
-          if (index >= 25) return;
-          
-          const slotIndex = availableSlots[index];
-          const day_of_week = Math.floor(slotIndex / 5);
-          const period = (slotIndex % 5) + 1;
-          
-          virtualData.push({
-            id: `virtual-${slotIndex}`,
-            day_of_week,
-            period,
-            teachers: item.teachers,
-            sections: item.sections,
-            subjects: item.subjects
-          });
-        });
-      }
-
-      setScheduleData(virtualData);
+      setIsModalOpen(false);
+      fetchSchedule();
     } catch (err) {
-      console.error('Error generating virtual schedule:', err);
-      setScheduleData([]);
+      console.error(err);
+      alert('حدث خطأ أثناء إضافة الحصة');
     }
-  }, [selectedId, viewType]);
+  };
+
+  const handleDeleteSchedule = async (id: string) => {
+    if (!confirm('هل أنت متأكد من حذف هذه الحصة؟')) return;
+    try {
+      const { error } = await supabase.from('schedule').delete().eq('id', id);
+      if (error) throw error;
+      fetchSchedule();
+    } catch (err) {
+      console.error(err);
+      alert('حدث خطأ أثناء حذف الحصة');
+    }
+  };
 
   const fetchSchedule = useCallback(async () => {
     setLoading(true);
-    setIsVirtual(false);
     try {
-      // Attempt to fetch from real schedules table
-      let query = supabase.from('schedules').select(`
+      let query = supabase.from('schedule').select(`
         id, day_of_week, period,
         teachers(id, users(full_name)),
         sections(id, name, classes(name)),
@@ -121,24 +97,15 @@ export default function SchedulePage() {
       }
 
       const { data, error } = await query;
-
-      if (error) {
-        throw error;
-      }
-
-      if (data && data.length > 0) {
-        setScheduleData(data);
-      } else {
-        // Fallback to virtual schedule if empty
-        generateVirtualSchedule();
-      }
+      if (error) throw error;
+      setScheduleData(data || []);
     } catch (err: any) {
-      console.log('Schedules table might not exist or is empty, generating virtual schedule...');
-      generateVirtualSchedule();
+      console.error('Error fetching schedule:', err);
+      setScheduleData([]);
     } finally {
       setLoading(false);
     }
-  }, [selectedId, viewType, generateVirtualSchedule]);
+  }, [selectedId, viewType]);
 
   useEffect(() => {
     if (!selectedId) return;
@@ -220,16 +187,25 @@ export default function SchedulePage() {
         </div>
       </div>
 
-      {isVirtual && (
-        <div className="rounded-md bg-blue-50 p-4 print:hidden">
-          <div className="flex">
-            <div className="flex-shrink-0">
-              <Info className="h-5 w-5 text-blue-400" aria-hidden="true" />
-            </div>
-            <div className="mr-3 flex-1 md:flex md:justify-between">
-              <p className="text-sm text-blue-700">
-                هذا الجدول تم إنشاؤه افتراضياً (للعرض فقط) بناءً على توزيع الحصص والمواد. لم يتم حفظ جدول نهائي في قاعدة البيانات بعد.
-              </p>
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50">
+          <div className="bg-white rounded-xl p-6 w-full max-w-md space-y-4">
+            <h2 className="text-lg font-bold">إضافة حصة جديدة</h2>
+            <select className="w-full p-2 border rounded" onChange={(e) => setFormData({...formData, teacher_id: e.target.value})}>
+              <option value="">اختر المعلم</option>
+              {teachers.map(t => <option key={t.id} value={t.id}>{t.users?.full_name}</option>)}
+            </select>
+            <select className="w-full p-2 border rounded" onChange={(e) => setFormData({...formData, section_id: e.target.value})}>
+              <option value="">اختر الفصل</option>
+              {sections.map(s => <option key={s.id} value={s.id}>{s.classes?.name} - {s.name}</option>)}
+            </select>
+            <select className="w-full p-2 border rounded" onChange={(e) => setFormData({...formData, subject_id: e.target.value})}>
+              <option value="">اختر المادة</option>
+              {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+            <div className="flex gap-2 justify-end">
+              <button className="px-4 py-2 bg-slate-200 rounded" onClick={() => setIsModalOpen(false)}>إلغاء</button>
+              <button className="px-4 py-2 bg-indigo-600 text-white rounded" onClick={handleAddSchedule}>حفظ</button>
             </div>
           </div>
         </div>
@@ -276,7 +252,14 @@ export default function SchedulePage() {
                     {PERIODS.map(period => {
                       const slot = scheduleData.find(s => s.day_of_week === dayIndex && s.period === period);
                       return (
-                        <div key={`${day}-${period}`} className="p-3 border border-slate-200 rounded-lg bg-white min-h-[100px] flex flex-col items-center justify-center text-center print:border-black print:min-h-[80px]">
+                        <div key={`${day}-${period}`} className={`p-3 border border-slate-200 rounded-lg bg-white min-h-[100px] flex flex-col items-center justify-center text-center print:border-black print:min-h-[80px] ${isAdmin ? 'cursor-pointer hover:bg-slate-50' : ''}`}
+                          onClick={() => {
+                            if (isAdmin) {
+                              setSelectedSlot({day: dayIndex, period: period});
+                              setIsModalOpen(true);
+                            }
+                          }}
+                        >
                           {slot ? (
                             <>
                               <span className="font-bold text-indigo-700 print:text-black">{slot.subjects?.name}</span>
@@ -288,6 +271,9 @@ export default function SchedulePage() {
                                 <span className="text-sm text-slate-600 mt-1 print:text-black">
                                   {slot.teachers?.users?.full_name}
                                 </span>
+                              )}
+                              {isAdmin && (
+                                <button className="mt-2 text-red-500 text-xs" onClick={(e) => { e.stopPropagation(); handleDeleteSchedule(slot.id); }}>حذف</button>
                               )}
                             </>
                           ) : (

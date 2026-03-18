@@ -112,16 +112,18 @@ export default function SchedulePage() {
       if (sError) throw sError;
 
       if (teacherConflict) {
-        const section = Array.isArray(teacherConflict.sections) ? teacherConflict.sections[0] : teacherConflict.sections;
-        const subject = Array.isArray(teacherConflict.subjects) ? teacherConflict.subjects[0] : teacherConflict.subjects;
-        alert(`تضارب: المعلم لديه حصة (${subject?.name}) مع فصل (${section?.classes?.name} - ${section?.name}) في هذا الوقت.`);
+        const section = (Array.isArray(teacherConflict.sections) ? teacherConflict.sections[0] : teacherConflict.sections) as any;
+        const subject = (Array.isArray(teacherConflict.subjects) ? teacherConflict.subjects[0] : teacherConflict.subjects) as any;
+        const className = (section?.classes && Array.isArray(section.classes) ? section.classes[0]?.name : section?.classes?.name);
+        alert(`تضارب: المعلم لديه حصة (${subject?.name}) مع فصل (${className} - ${section?.name}) في هذا الوقت.`);
         return;
       }
 
       if (sectionConflict) {
-        const teacher = Array.isArray(sectionConflict.teachers) ? sectionConflict.teachers[0] : sectionConflict.teachers;
-        const subject = Array.isArray(sectionConflict.subjects) ? sectionConflict.subjects[0] : sectionConflict.subjects;
-        alert(`تضارب: هذا الفصل لديه حصة (${subject?.name}) مع المعلم (${teacher?.users?.full_name}) في هذا الوقت.`);
+        const teacher = (Array.isArray(sectionConflict.teachers) ? sectionConflict.teachers[0] : sectionConflict.teachers) as any;
+        const subject = (Array.isArray(sectionConflict.subjects) ? sectionConflict.subjects[0] : sectionConflict.subjects) as any;
+        const teacherName = (teacher?.users && Array.isArray(teacher.users) ? teacher.users[0]?.full_name : teacher?.users?.full_name);
+        alert(`تضارب: هذا الفصل لديه حصة (${subject?.name}) مع المعلم (${teacherName}) في هذا الوقت.`);
         return;
       }
 

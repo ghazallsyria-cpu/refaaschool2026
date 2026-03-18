@@ -75,14 +75,16 @@ export default function TeachersPage() {
   const handleAddSubmit = async () => {
     console.log('handleAddSubmit triggered');
     if (submitting) return;
+    
+    if (!addForm.full_name || !addForm.national_id) {
+      console.log('Validation failed: missing full_name or national_id');
+      showNotification('error', 'يرجى تعبئة الحقول الإلزامية (الاسم والرقم المدني)');
+      return;
+    }
+
     try {
       setSubmitting(true);
       console.log('Form data:', addForm);
-      if (!addForm.full_name || !addForm.national_id) {
-        console.log('Validation failed: missing full_name or national_id');
-        showNotification('error', 'يرجى تعبئة الحقول الإلزامية (الاسم والرقم المدني)');
-        return;
-      }
 
       console.log('Getting session...');
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
@@ -96,6 +98,7 @@ export default function TeachersPage() {
 
       if (!token) {
         showNotification('error', 'انتهت صلاحية الجلسة، يرجى تسجيل الدخول مرة أخرى');
+        setSubmitting(false);
         return;
       }
 

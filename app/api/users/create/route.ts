@@ -57,34 +57,38 @@ export async function POST(request: Request) {
       email: generatedEmail,
       password: generatedPassword,
       email_confirm: true,
+      user_metadata: {
+        full_name,
+        role,
+      }
     });
 
     if (authError) {
       console.error('Auth creation error:', authError);
-      throw authError;
+      return NextResponse.json({ error: authError.message }, { status: 400 });
     }
     if (!authData.user) throw new Error('Failed to create user');
 
     const userId = authData.user.id;
     console.log('Auth user created:', userId);
 
-    // 2. Insert into users table
+    // 2. Insert/Update into users table (Trigger might have already inserted it)
     const { error: userError } = await supabaseAdmin
       .from('users')
-      .insert({
+      .upsert({
         id: userId,
         full_name,
         email: generatedEmail,
         phone,
         role,
         must_reset_password: true,
-      });
+      }, { onConflict: 'id' });
 
     if (userError) {
       console.error('Users table insertion error:', userError);
       // Rollback auth user creation
       await supabaseAdmin.auth.admin.deleteUser(userId);
-      throw userError;
+      return NextResponse.json({ error: `خطأ في قاعدة البيانات: ${userError.message}` }, { status: 500 });
     }
 
     console.log('Users table insertion successful');

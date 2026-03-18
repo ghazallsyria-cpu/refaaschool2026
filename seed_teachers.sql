@@ -76,7 +76,7 @@ INSERT INTO public.sections (id, class_id, name) VALUES ('2ae284b7-d230-48a7-b23
 -- Teachers
 INSERT INTO auth.users (id, instance_id, aud, role, email, encrypted_password, created_at, updated_at) 
 VALUES ('adf4f33c-9c46-4b28-b93b-28e02d87fd39', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'teacher1@alrefaa.edu', crypt('password123', gen_salt('bf')), now(), now());
-INSERT INTO public.users (id, email, full_name, role) VALUES ('adf4f33c-9c46-4b28-b93b-28e02d87fd39', 'teacher1@alrefaa.edu', 'سمير الشمري', 'teacher');
+INSERT INTO public.users (id, email, full_name, role) VALUES ('adf4f33c-9c46-4b28-b93b-28e02d87fd39', 'teacher1@alrefaa.edu', 'سمير الشمري', 'teacher') ON CONFLICT (id) DO UPDATE SET full_name = EXCLUDED.full_name, role = EXCLUDED.role;
 INSERT INTO public.teachers (id, national_id, specialization) VALUES ('adf4f33c-9c46-4b28-b93b-28e02d87fd39', '231740619564', 'اسلامية');
 INSERT INTO public.teacher_subjects (teacher_id, subject_id) VALUES ('adf4f33c-9c46-4b28-b93b-28e02d87fd39', 'b6e8257d-3362-4101-b6dd-f488aeaa5347');
 INSERT INTO public.teacher_sections (teacher_id, section_id, subject_id) VALUES ('adf4f33c-9c46-4b28-b93b-28e02d87fd39', '1b6c8a8f-cc43-4113-abb2-e83ed3bf30e3', 'b6e8257d-3362-4101-b6dd-f488aeaa5347');
@@ -86,7 +86,7 @@ INSERT INTO public.teacher_sections (teacher_id, section_id, subject_id) VALUES 
 
 INSERT INTO auth.users (id, instance_id, aud, role, email, encrypted_password, created_at, updated_at) 
 VALUES ('8adf6505-ec07-40dc-834e-60418070b8b8', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'teacher2@alrefaa.edu', crypt('password123', gen_salt('bf')), now(), now());
-INSERT INTO public.users (id, email, full_name, role) VALUES ('8adf6505-ec07-40dc-834e-60418070b8b8', 'teacher2@alrefaa.edu', 'ايمن الدسوقي', 'teacher');
+INSERT INTO public.users (id, email, full_name, role) VALUES ('8adf6505-ec07-40dc-834e-60418070b8b8', 'teacher2@alrefaa.edu', 'ايمن الدسوقي', 'teacher') ON CONFLICT (id) DO UPDATE SET full_name = EXCLUDED.full_name, role = EXCLUDED.role;
 INSERT INTO public.teachers (id, national_id, specialization) VALUES ('8adf6505-ec07-40dc-834e-60418070b8b8', '211888384943', 'اسلامية');
 INSERT INTO public.teacher_subjects (teacher_id, subject_id) VALUES ('8adf6505-ec07-40dc-834e-60418070b8b8', 'b6e8257d-3362-4101-b6dd-f488aeaa5347');
 INSERT INTO public.teacher_sections (teacher_id, section_id, subject_id) VALUES ('8adf6505-ec07-40dc-834e-60418070b8b8', '7041a15c-8fb4-49e9-83c5-675518f028c9', 'b6e8257d-3362-4101-b6dd-f488aeaa5347');
@@ -98,7 +98,7 @@ INSERT INTO public.teacher_sections (teacher_id, section_id, subject_id) VALUES 
 
 INSERT INTO auth.users (id, instance_id, aud, role, email, encrypted_password, created_at, updated_at) 
 VALUES ('8e493b84-2799-417d-b232-c911386e0c98', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'teacher3@alrefaa.edu', crypt('password123', gen_salt('bf')), now(), now());
-INSERT INTO public.users (id, email, full_name, role) VALUES ('8e493b84-2799-417d-b232-c911386e0c98', 'teacher3@alrefaa.edu', 'صفوت زكريا', 'teacher');
+INSERT INTO public.users (id, email, full_name, role) VALUES ('8e493b84-2799-417d-b232-c911386e0c98', 'teacher3@alrefaa.edu', 'صفوت زكريا', 'teacher') ON CONFLICT (id) DO UPDATE SET full_name = EXCLUDED.full_name, role = EXCLUDED.role;
 INSERT INTO public.teachers (id, national_id, specialization) VALUES ('8e493b84-2799-417d-b232-c911386e0c98', '213699550490', 'اسلامية');
 INSERT INTO public.teacher_subjects (teacher_id, subject_id) VALUES ('8e493b84-2799-417d-b232-c911386e0c98', 'b6e8257d-3362-4101-b6dd-f488aeaa5347');
 INSERT INTO public.teacher_sections (teacher_id, section_id, subject_id) VALUES ('8e493b84-2799-417d-b232-c911386e0c98', '776dfe93-7fb3-4cb1-8a02-a7effa670d88', 'b6e8257d-3362-4101-b6dd-f488aeaa5347');

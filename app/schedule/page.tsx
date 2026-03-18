@@ -139,8 +139,22 @@ export default function SchedulePage() {
     window.print();
   };
 
+  const groupedTeachers = teachers.reduce((acc, teacher) => {
+    const spec = teacher.specialization || 'غير محدد';
+    if (!acc[spec]) acc[spec] = [];
+    acc[spec].push(teacher);
+    return acc;
+  }, {} as Record<string, any[]>);
+
   return (
     <div className="space-y-6 print:m-0 print:p-0">
+      {/* Debug Info */}
+      {!isAdmin && (
+        <div className="bg-yellow-100 p-4 rounded-lg text-sm text-yellow-800">
+          Debug: isAdmin = {String(isAdmin)}. إذا كنت مديراً ولا تظهر خيارات الإدارة، يرجى التأكد من دورك في قاعدة البيانات.
+        </div>
+      )}
+
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 print:hidden">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">الجدول الدراسي</h1>
@@ -225,7 +239,11 @@ export default function SchedulePage() {
                 <label className="block text-sm font-medium text-slate-700 mb-1">المعلم</label>
                 <select className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500" onChange={(e) => setFormData({...formData, teacher_id: e.target.value})}>
                   <option value="">اختر المعلم</option>
-                  {teachers.map(t => <option key={t.id} value={t.id}>{t.users?.full_name}</option>)}
+                  {Object.entries(groupedTeachers).map(([spec, teachersInSpec]) => (
+                    <optgroup key={spec} label={spec}>
+                      {teachersInSpec.map(t => <option key={t.id} value={t.id}>{t.users?.full_name}</option>)}
+                    </optgroup>
+                  ))}
                 </select>
               </div>
               

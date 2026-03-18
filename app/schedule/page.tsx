@@ -56,14 +56,25 @@ export default function SchedulePage() {
     }
   }, []);
 
-  // تصفية المواد بناءً على الفصل المختار
-  const availableSubjects = formData.section_id 
-    ? subjects.filter(sub => assignments.some(a => a.section_id === formData.section_id && a.subject_id === sub.id))
-    : [];
+  // تصفية الفصول المتاحة بناءً على المعلم المختار (في حال عرض جدول المعلم)
+  const availableSections = (viewType === 'teacher' && selectedId)
+    ? sections.filter(s => assignments.some(a => a.teacher_id === selectedId && a.section_id === s.id))
+    : sections;
 
-  // تصفية المعلمين بناءً على الفصل والمادة المختارة
-  const availableTeachers = (formData.section_id && formData.subject_id)
-    ? teachers.filter(t => assignments.some(a => a.section_id === formData.section_id && a.subject_id === formData.subject_id && a.teacher_id === t.id))
+  // تصفية المعلمين المتاحين بناءً على الفصل المختار (في حال عرض جدول الفصل)
+  const modalAvailableTeachers = (viewType === 'section' && selectedId)
+    ? teachers.filter(t => assignments.some(a => a.section_id === selectedId && a.teacher_id === t.id))
+    : (formData.section_id 
+        ? teachers.filter(t => assignments.some(a => a.section_id === formData.section_id && a.teacher_id === t.id))
+        : teachers);
+
+  // تصفية المواد بناءً على الفصل والمعلم المختارين في النموذج
+  const availableSubjects = (formData.section_id && formData.teacher_id)
+    ? subjects.filter(sub => assignments.some(a => 
+        a.section_id === formData.section_id && 
+        a.teacher_id === formData.teacher_id && 
+        a.subject_id === sub.id
+      ))
     : [];
 
   useEffect(() => {
@@ -259,16 +270,45 @@ export default function SchedulePage() {
             </div>
             
             <div className="space-y-4">
+              {viewType === 'teacher' ? (
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">المعلم</label>
+                  <div className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg text-slate-600">
+                    {teachers.find(t => t.id === selectedId)?.users?.full_name}
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">الفصل</label>
+                  <div className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg text-slate-600">
+                    {sections.find(s => s.id === selectedId)?.classes?.name} - {sections.find(s => s.id === selectedId)?.name}
+                  </div>
+                </div>
+              )}
+
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">الفصل</label>
-                <select 
-                  className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500" 
-                  value={formData.section_id}
-                  onChange={(e) => setFormData({ ...formData, section_id: e.target.value, subject_id: '', teacher_id: '' })}
-                >
-                  <option value="">اختر الفصل</option>
-                  {sections.map(s => <option key={s.id} value={s.id}>{s.classes?.name} - {s.name}</option>)}
-                </select>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  {viewType === 'teacher' ? 'الفصل' : 'المعلم'}
+                </label>
+                {viewType === 'teacher' ? (
+                  <select 
+                    className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500" 
+                    value={formData.section_id}
+                    onChange={(e) => setFormData({ ...formData, section_id: e.target.value, subject_id: '' })}
+                  >
+                    <option value="">اختر الفصل</option>
+                    {availableSections.map(s => <option key={s.id} value={s.id}>{s.classes?.name} - {s.name}</option>)}
+                  </select>
+                ) : (
+                  <select 
+                    className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500" 
+                    value={formData.teacher_id}
+                    onChange={(e) => setFormData({ ...formData, teacher_id: e.target.value, subject_id: '' })}
+                  >
+                    <option value="">اختر المعلم</option>
+                    {modalAvailableTeachers.map(t => <option key={t.id} value={t.id}>{t.users?.full_name}</option>)}
+                  </select>
+                )}
               </div>
 
               <div>
@@ -276,28 +316,14 @@ export default function SchedulePage() {
                 <select 
                   className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 disabled:bg-slate-50 disabled:text-slate-400" 
                   value={formData.subject_id}
-                  disabled={!formData.section_id}
-                  onChange={(e) => setFormData({ ...formData, subject_id: e.target.value, teacher_id: '' })}
+                  disabled={!formData.section_id || !formData.teacher_id}
+                  onChange={(e) => setFormData({ ...formData, subject_id: e.target.value })}
                 >
                   <option value="">اختر المادة</option>
                   {availableSubjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
-                {!formData.section_id && <p className="text-[10px] text-slate-400 mt-1">يرجى اختيار الفصل أولاً</p>}
-                {formData.section_id && availableSubjects.length === 0 && <p className="text-[10px] text-amber-600 mt-1">لا توجد مواد مسندة لهذا الفصل في تعيينات المعلمين</p>}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">المعلم</label>
-                <select 
-                  className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 disabled:bg-slate-50 disabled:text-slate-400" 
-                  value={formData.teacher_id}
-                  disabled={!formData.subject_id}
-                  onChange={(e) => setFormData({ ...formData, teacher_id: e.target.value })}
-                >
-                  <option value="">اختر المعلم</option>
-                  {availableTeachers.map(t => <option key={t.id} value={t.id}>{t.users?.full_name}</option>)}
-                </select>
-                {!formData.subject_id && <p className="text-[10px] text-slate-400 mt-1">يرجى اختيار المادة أولاً</p>}
+                {(!formData.section_id || !formData.teacher_id) && <p className="text-[10px] text-slate-400 mt-1">يرجى اختيار {viewType === 'teacher' ? 'الفصل' : 'المعلم'} أولاً</p>}
+                {formData.section_id && formData.teacher_id && availableSubjects.length === 0 && <p className="text-[10px] text-amber-600 mt-1">لا توجد مواد مسندة لهذا الربط في تعيينات المعلمين</p>}
               </div>
             </div>
 
@@ -353,7 +379,11 @@ export default function SchedulePage() {
                         <div key={`${day}-${period}`} className={`p-3 border border-slate-200 rounded-lg bg-white min-h-[100px] flex flex-col items-center justify-center text-center print:border-black print:min-h-[80px] ${isAdmin ? 'cursor-pointer hover:bg-slate-50' : ''} ${slot?.teachers?.zoom_link ? 'cursor-pointer hover:bg-indigo-50' : ''}`}
                           onClick={() => {
                             if (isAdmin) {
-                              setFormData({ teacher_id: '', section_id: '', subject_id: '' });
+                              setFormData({ 
+                                teacher_id: viewType === 'teacher' ? selectedId : '', 
+                                section_id: viewType === 'section' ? selectedId : '', 
+                                subject_id: '' 
+                              });
                               setSelectedSlot({day: dayIndex, period: period});
                               setIsModalOpen(true);
                             } else if (slot?.teachers?.zoom_link) {

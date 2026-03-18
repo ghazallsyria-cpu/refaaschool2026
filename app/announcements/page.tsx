@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Plus, Search, Edit2, Trash2, Megaphone, Bell, X, Users, Calendar, Filter } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, Megaphone, Bell, X, Users, Calendar, Filter, AlertCircle, ArrowRight } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { useNotifications } from '@/context/notification-context';
+import { motion, AnimatePresence } from 'motion/react';
 
 type Announcement = {
   id: string;
@@ -93,16 +94,12 @@ export default function AnnouncementsPage() {
 
       if (currentAnnouncement.id) {
         // Update
-        const { data, error } = await supabase
+        const { error } = await supabase
           .from('announcements')
           .update(payload)
-          .eq('id', currentAnnouncement.id)
-          .select();
+          .eq('id', currentAnnouncement.id);
           
-        if (error) {
-          console.error('Supabase Update Error Details:', JSON.stringify(error, null, 2));
-          throw error;
-        }
+        if (error) throw error;
       } else {
         // Insert
         const { data: newAnn, error } = await supabase
@@ -111,10 +108,7 @@ export default function AnnouncementsPage() {
           .select()
           .single();
           
-        if (error) {
-          console.error('Supabase Insert Error Details:', JSON.stringify(error, null, 2));
-          throw error;
-        }
+        if (error) throw error;
 
         // Send Notifications to target audience
         try {
@@ -129,9 +123,9 @@ export default function AnnouncementsPage() {
               sendNotification(
                 user.id,
                 'إعلان جديد',
-                payload.title,
+                payload.title as string,
                 'announcement',
-                '/' // Link to home or announcements page
+                '/'
               )
             );
             await Promise.all(notificationPromises);
@@ -187,7 +181,7 @@ export default function AnnouncementsPage() {
   });
 
   const getAudienceLabel = (value: string) => {
-    return AUDIENCE_OPTIONS.find(opt => opt.value === value)?.label || 'غير محدد';
+    return AUDIENCE_OPTIONS.find(opt => opt.value === value)?.label || 'الجميع';
   };
 
   const getAudienceColor = (value: string) => {
@@ -201,241 +195,338 @@ export default function AnnouncementsPage() {
   };
 
   return (
-    <div className="space-y-6 relative">
-      {/* Notification Toast */}
-      {notification && (
-        <div className={`fixed top-4 left-1/2 transform -translate-x-1/2 z-50 px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 transition-all ${
-          notification.type === 'success' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-red-50 text-red-800 border border-red-200'
-        }`}>
-          <div className="font-medium">{notification.message}</div>
-          <button onClick={() => setNotification(null)} className="text-slate-400 hover:text-slate-600">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-      )}
-
-      {/* Delete Confirmation Modal */}
-      <Dialog.Root open={!!announcementToDelete} onOpenChange={(open) => !open && setAnnouncementToDelete(null)}>
-        <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-40" />
-          <Dialog.Content className="fixed left-[50%] top-[50%] z-50 w-full max-w-md translate-x-[-50%] translate-y-[-50%] rounded-xl bg-white p-6 shadow-lg focus:outline-none" dir="rtl">
-            <div className="flex items-center justify-between mb-5">
-              <Dialog.Title className="text-lg font-semibold text-slate-900">
-                تأكيد الحذف
-              </Dialog.Title>
-              <Dialog.Close className="text-slate-400 hover:text-slate-500">
-                <X className="h-5 w-5" />
-              </Dialog.Close>
-            </div>
-            <p className="text-slate-600 mb-6">هل أنت متأكد من رغبتك في حذف هذا الإعلان؟ لا يمكن التراجع عن هذا الإجراء.</p>
-            <div className="flex justify-end gap-3">
-              <Dialog.Close asChild>
-                <button className="rounded-md bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-inset ring-slate-300 hover:bg-slate-50">
-                  إلغاء
-                </button>
-              </Dialog.Close>
-              <button
-                onClick={confirmDelete}
-                className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
-              >
-                تأكيد الحذف
-              </button>
-            </div>
-          </Dialog.Content>
-        </Dialog.Portal>
-      </Dialog.Root>
-
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">الإعلانات والتعاميم</h1>
-          <p className="text-slate-500">إدارة الإعلانات الموجهة للطلاب، المعلمين، وأولياء الأمور</p>
-        </div>
-        <button 
-          onClick={openAddModal}
-          className="inline-flex items-center justify-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700"
-        >
-          <Plus className="mr-2 h-4 w-4 ml-2" />
-          إضافة إعلان جديد
-        </button>
-      </div>
-
-      <div className="bg-white p-4 rounded-xl shadow-sm ring-1 ring-slate-200">
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="relative flex-1">
-            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
-              <Search className="h-5 w-5 text-slate-400" aria-hidden="true" />
-            </div>
-            <input
-              type="text"
-              className="block w-full rounded-md border-0 py-2 pr-10 pl-3 text-slate-900 ring-1 ring-inset ring-slate-300 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
-              placeholder="البحث في الإعلانات..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-          <div className="relative sm:w-64">
-            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
-              <Filter className="h-5 w-5 text-slate-400" aria-hidden="true" />
-            </div>
-            <select
-              className="block w-full rounded-md border-0 py-2 pr-10 pl-3 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
-              value={audienceFilter}
-              onChange={(e) => setAudienceFilter(e.target.value)}
+    <div className="min-h-screen bg-[#F8FAFC] pb-24">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 space-y-12">
+        
+        {/* Notification Toast */}
+        <AnimatePresence>
+          {notification && (
+            <motion.div 
+              initial={{ opacity: 0, y: -20, x: '-50%' }}
+              animate={{ opacity: 1, y: 0, x: '-50%' }}
+              exit={{ opacity: 0, y: -20, x: '-50%' }}
+              className={`fixed top-8 left-1/2 z-50 px-8 py-4 rounded-3xl shadow-2xl flex items-center gap-4 ${
+                notification.type === 'success' ? 'bg-emerald-500 text-white shadow-emerald-100' : 'bg-red-500 text-white shadow-red-100'
+              }`}
             >
-              <option value="all_types">جميع الفئات</option>
-              {AUDIENCE_OPTIONS.map(opt => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-      </div>
+              <div className="h-10 w-10 rounded-2xl bg-white/20 flex items-center justify-center">
+                {notification.type === 'success' ? <Bell className="h-6 w-6" /> : <AlertCircle className="h-6 w-6" />}
+              </div>
+              <div className="font-black tracking-tight">{notification.message}</div>
+              <button onClick={() => setNotification(null)} className="p-1 hover:bg-white/20 rounded-lg transition-colors">
+                <X className="h-5 w-5" />
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-      {loading ? (
-        <div className="flex justify-center items-center py-20">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-        </div>
-      ) : filteredAnnouncements.length === 0 ? (
-        <div className="text-center py-20 bg-white rounded-xl shadow-sm ring-1 ring-slate-200">
-          <Megaphone className="mx-auto h-12 w-12 text-slate-300 mb-3" />
-          <h3 className="text-lg font-medium text-slate-900">لا توجد إعلانات</h3>
-          <p className="text-slate-500 mt-1">لم يتم العثور على إعلانات تطابق معايير البحث.</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 gap-6">
-          {filteredAnnouncements.map((announcement) => {
-            const dateObj = new Date(announcement.created_at);
-            
-            return (
-              <div key={announcement.id} className="bg-white rounded-xl shadow-sm ring-1 ring-slate-200 overflow-hidden flex flex-col sm:flex-row transition-shadow hover:shadow-md">
-                <div className="p-6 flex-1">
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="flex items-center gap-3">
-                      <div className={`p-2 rounded-lg ${getAudienceColor(announcement.target_role).split(' ')[0]}`}>
-                        <Bell className={`h-6 w-6 ${getAudienceColor(announcement.target_role).split(' ')[1]}`} />
-                      </div>
-                      <div>
-                        <h3 className="text-lg font-bold text-slate-900 leading-tight">
-                          {announcement.title}
-                        </h3>
-                        <div className="flex items-center gap-3 mt-1 text-sm text-slate-500">
-                          <div className="flex items-center gap-1">
-                            <Calendar className="h-4 w-4" />
-                            <span dir="ltr">{dateObj.toLocaleDateString('ar-EG')}</span>
+        {/* Header Section */}
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex flex-col md:flex-row md:items-end justify-between gap-8"
+        >
+          <div className="space-y-4">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-indigo-50 text-indigo-600 text-xs font-black uppercase tracking-widest">
+              <Megaphone className="h-4 w-4" />
+              مركز التواصل
+            </div>
+            <h1 className="text-5xl font-black text-slate-900 tracking-tight">الإعلانات والتعاميم</h1>
+            <p className="text-xl text-slate-500 font-medium max-w-2xl">إدارة ونشر الإعلانات الموجهة لمجتمع المدرسة بكفاءة وشفافية.</p>
+          </div>
+          
+          <motion.button 
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={openAddModal}
+            className="inline-flex items-center justify-center gap-3 rounded-3xl bg-indigo-600 px-10 py-5 text-base font-black text-white shadow-2xl shadow-indigo-200 hover:bg-indigo-700 transition-all self-start md:self-end"
+          >
+            <Plus className="h-6 w-6" />
+            إضافة إعلان جديد
+          </motion.button>
+        </motion.div>
+
+        {/* Filters Section */}
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="glass-card p-8 rounded-[2.5rem] shadow-2xl shadow-slate-200/50 border border-white/60"
+        >
+          <div className="flex flex-col md:flex-row gap-8">
+            <div className="relative flex-1 group">
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-6 text-slate-400 group-focus-within:text-indigo-600 transition-colors">
+                <Search className="h-6 w-6" />
+              </div>
+              <input
+                type="text"
+                className="block w-full rounded-3xl border-0 py-5 pr-14 pl-6 text-slate-900 bg-slate-50/50 ring-1 ring-inset ring-slate-100 placeholder:text-slate-400 focus:ring-2 focus:ring-indigo-600 sm:text-base transition-all font-bold"
+                placeholder="البحث عن إعلان بالكلمة المفتاحية..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            <div className="relative md:w-80 group">
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-6 text-slate-400 group-focus-within:text-indigo-600 transition-colors">
+                <Filter className="h-6 w-6" />
+              </div>
+              <select
+                className="block w-full rounded-3xl border-0 py-5 pr-14 pl-6 text-slate-900 bg-slate-50/50 ring-1 ring-inset ring-slate-100 focus:ring-2 focus:ring-indigo-600 sm:text-base transition-all font-bold appearance-none"
+                value={audienceFilter}
+                onChange={(e) => setAudienceFilter(e.target.value)}
+              >
+                <option value="all_types">جميع الفئات المستهدفة</option>
+                {AUDIENCE_OPTIONS.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Content Section */}
+        {loading ? (
+          <div className="flex flex-col justify-center items-center py-40 gap-6">
+            <div className="relative h-20 w-20">
+              <div className="absolute inset-0 rounded-full border-4 border-indigo-100"></div>
+              <div className="absolute inset-0 rounded-full border-4 border-indigo-600 border-t-transparent animate-spin"></div>
+            </div>
+            <p className="text-slate-500 font-black text-lg animate-pulse">جاري جلب آخر الإعلانات...</p>
+          </div>
+        ) : filteredAnnouncements.length === 0 ? (
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="text-center py-40 glass-card rounded-[3rem] border border-white/60 shadow-2xl shadow-slate-200/50"
+          >
+            <div className="h-32 w-32 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-8">
+              <Megaphone className="h-16 w-16 text-slate-200" />
+            </div>
+            <h3 className="text-3xl font-black text-slate-900 tracking-tight">لا توجد إعلانات حالياً</h3>
+            <p className="text-slate-500 mt-4 text-lg font-medium">ابدأ بنشر أول إعلان للمدرسة لإبلاغ الجميع بالمستجدات.</p>
+          </motion.div>
+        ) : (
+          <div className="grid grid-cols-1 gap-10">
+            <AnimatePresence mode="popLayout">
+              {filteredAnnouncements.map((announcement, index) => {
+                const dateObj = new Date(announcement.created_at);
+                
+                return (
+                  <motion.div 
+                    key={announcement.id}
+                    layout
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    transition={{ delay: index * 0.05 }}
+                    className="group glass-card rounded-[2.5rem] shadow-xl shadow-slate-200/40 border border-white/60 overflow-hidden flex flex-col lg:flex-row transition-all hover:shadow-2xl hover:-translate-y-1"
+                  >
+                    <div className="p-10 flex-1">
+                      <div className="flex flex-col sm:flex-row justify-between items-start gap-6 mb-8">
+                        <div className="flex items-center gap-6">
+                          <div className={`h-16 w-16 rounded-3xl flex items-center justify-center shadow-xl ${getAudienceColor(announcement.target_role).split(' ')[0]}`}>
+                            <Bell className={`h-8 w-8 ${getAudienceColor(announcement.target_role).split(' ')[1]}`} />
                           </div>
-                          <div className="flex items-center gap-1">
-                            <Users className="h-4 w-4" />
-                            <span>{getAudienceLabel(announcement.target_role)}</span>
+                          <div>
+                            <h3 className="text-3xl font-black text-slate-900 leading-tight tracking-tight group-hover:text-indigo-600 transition-colors">
+                              {announcement.title}
+                            </h3>
+                            <div className="flex flex-wrap items-center gap-4 mt-3 text-sm font-bold text-slate-500">
+                              <div className="flex items-center gap-2 bg-slate-50 px-4 py-1.5 rounded-2xl border border-slate-100">
+                                <Calendar className="h-4 w-4 text-indigo-500" />
+                                <span dir="ltr">{dateObj.toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                              </div>
+                              <div className={`flex items-center gap-2 px-4 py-1.5 rounded-2xl border ${getAudienceColor(announcement.target_role)}`}>
+                                <Users className="h-4 w-4" />
+                                <span>{getAudienceLabel(announcement.target_role)}</span>
+                              </div>
+                            </div>
                           </div>
                         </div>
+                        
+                        <div className="flex gap-3 opacity-0 group-hover:opacity-100 transition-all translate-x-4 group-hover:translate-x-0">
+                          <motion.button 
+                            whileHover={{ scale: 1.1 }}
+                            whileTap={{ scale: 0.9 }}
+                            onClick={() => openEditModal(announcement)}
+                            className="h-12 w-12 flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-2xl transition-all shadow-sm bg-white border border-slate-100"
+                          >
+                            <Edit2 className="h-5 w-5" />
+                          </motion.button>
+                          <motion.button 
+                            whileHover={{ scale: 1.1 }}
+                            whileTap={{ scale: 0.9 }}
+                            onClick={() => setAnnouncementToDelete(announcement.id)}
+                            className="h-12 w-12 flex items-center justify-center text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-2xl transition-all shadow-sm bg-white border border-slate-100"
+                          >
+                            <Trash2 className="h-5 w-5" />
+                          </motion.button>
+                        </div>
+                      </div>
+                      
+                      <div className="prose prose-xl prose-slate max-w-none text-slate-600 whitespace-pre-wrap leading-relaxed font-medium bg-slate-50/30 p-8 rounded-[2rem] border border-slate-100/50">
+                        {announcement.content}
+                      </div>
+
+                      <div className="mt-8 flex items-center justify-between">
+                        <div className="flex -space-x-2 rtl:space-x-reverse">
+                          {[1,2,3].map(i => (
+                            <div key={i} className="h-8 w-8 rounded-full border-2 border-white bg-slate-200 flex items-center justify-center text-[10px] font-black text-slate-500">
+                              U{i}
+                            </div>
+                          ))}
+                          <div className="h-8 w-8 rounded-full border-2 border-white bg-indigo-50 flex items-center justify-center text-[10px] font-black text-indigo-600">
+                            +12
+                          </div>
+                        </div>
+                        <button className="text-indigo-600 font-black text-sm flex items-center gap-2 hover:gap-3 transition-all">
+                          عرض التفاصيل
+                          <ArrowRight className="h-4 w-4 rtl:rotate-180" />
+                        </button>
                       </div>
                     </div>
                     
-                    <div className="flex gap-1">
-                      <button 
-                        onClick={() => openEditModal(announcement)}
-                        className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors"
-                        title="تعديل الإعلان"
-                      >
-                        <Edit2 className="h-4 w-4" />
-                      </button>
-                      <button 
-                        onClick={() => setAnnouncementToDelete(announcement.id)}
-                        className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
-                        title="حذف الإعلان"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
+                    <div className={`w-full lg:w-4 ${getAudienceColor(announcement.target_role).split(' ')[0]} hidden lg:block opacity-40`}></div>
+                  </motion.div>
+                );
+              })}
+            </AnimatePresence>
+          </div>
+        )}
+
+        {/* Delete Confirmation Modal */}
+        <Dialog.Root open={!!announcementToDelete} onOpenChange={(open) => !open && setAnnouncementToDelete(null)}>
+          <Dialog.Portal>
+            <Dialog.Overlay className="fixed inset-0 bg-slate-900/40 backdrop-blur-xl z-[100] animate-in fade-in duration-300" />
+            <Dialog.Content className="fixed left-[50%] top-[50%] z-[101] w-full max-w-md translate-x-[-50%] translate-y-[-50%] rounded-[3rem] bg-white p-10 shadow-2xl focus:outline-none animate-in zoom-in-95 duration-300" dir="rtl">
+              <div className="flex flex-col items-center text-center">
+                <div className="h-20 w-20 rounded-[2rem] bg-red-50 flex items-center justify-center mb-6">
+                  <Trash2 className="h-10 w-10 text-red-600" />
+                </div>
+                <Dialog.Title className="text-3xl font-black text-slate-900 tracking-tight mb-4">
+                  تأكيد الحذف
+                </Dialog.Title>
+                <p className="text-slate-500 mb-10 font-medium text-lg leading-relaxed">
+                  هل أنت متأكد من رغبتك في حذف هذا الإعلان؟ سيتم إزالته نهائياً من جميع لوحات التحكم.
+                </p>
+                <div className="flex flex-col w-full gap-4">
+                  <button
+                    onClick={confirmDelete}
+                    className="w-full rounded-2xl bg-red-600 py-5 text-base font-black text-white shadow-xl shadow-red-100 hover:bg-red-700 transition-all active:scale-95"
+                  >
+                    تأكيد الحذف النهائي
+                  </button>
+                  <Dialog.Close asChild>
+                    <button className="w-full rounded-2xl bg-slate-100 py-5 text-base font-black text-slate-700 hover:bg-slate-200 transition-all active:scale-95">
+                      إلغاء
+                    </button>
+                  </Dialog.Close>
+                </div>
+              </div>
+            </Dialog.Content>
+          </Dialog.Portal>
+        </Dialog.Root>
+
+        {/* Add/Edit Announcement Modal */}
+        <Dialog.Root open={isModalOpen} onOpenChange={setIsModalOpen}>
+          <Dialog.Portal>
+            <Dialog.Overlay className="fixed inset-0 bg-slate-900/40 backdrop-blur-xl z-[100] animate-in fade-in duration-300" />
+            <Dialog.Content className="fixed left-[50%] top-[50%] z-[101] w-full max-w-3xl translate-x-[-50%] translate-y-[-50%] rounded-[3.5rem] bg-white p-12 shadow-2xl focus:outline-none max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-300" dir="rtl">
+              <div className="flex items-center justify-between mb-12">
+                <div className="flex items-center gap-5">
+                  <div className="h-16 w-16 rounded-3xl bg-indigo-50 flex items-center justify-center shadow-inner">
+                    <Megaphone className="h-8 w-8 text-indigo-600" />
                   </div>
-                  
-                  <div className="prose prose-sm prose-slate max-w-none text-slate-600 whitespace-pre-wrap">
-                    {announcement.content}
+                  <div>
+                    <Dialog.Title className="text-3xl font-black text-slate-900 tracking-tight">
+                      {currentAnnouncement.id ? 'تعديل الإعلان' : 'نشر إعلان جديد'}
+                    </Dialog.Title>
+                    <p className="text-slate-500 font-bold mt-1">أكمل البيانات التالية لنشر الإعلان</p>
                   </div>
                 </div>
-                
-                <div className={`w-full sm:w-2 ${getAudienceColor(announcement.target_role).split(' ')[0]} hidden sm:block`}></div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Add/Edit Announcement Modal */}
-      <Dialog.Root open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-40" />
-          <Dialog.Content className="fixed left-[50%] top-[50%] z-50 w-full max-w-2xl translate-x-[-50%] translate-y-[-50%] rounded-xl bg-white p-6 shadow-lg focus:outline-none max-h-[90vh] overflow-y-auto" dir="rtl">
-            <div className="flex items-center justify-between mb-5">
-              <Dialog.Title className="text-lg font-semibold text-slate-900">
-                {currentAnnouncement.id ? 'تعديل الإعلان' : 'إضافة إعلان جديد'}
-              </Dialog.Title>
-              <Dialog.Close className="text-slate-400 hover:text-slate-500">
-                <X className="h-5 w-5" />
-              </Dialog.Close>
-            </div>
-            
-            <form onSubmit={handleSaveAnnouncement} className="space-y-5">
-              <div>
-                <label className="block text-sm font-medium leading-6 text-slate-900">عنوان الإعلان <span className="text-red-500">*</span></label>
-                <input 
-                  type="text" 
-                  required
-                  placeholder="مثال: موعد اختبارات نهاية الفصل الدراسي" 
-                  className="mt-2 block w-full rounded-md border-0 py-2 px-3 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
-                  value={currentAnnouncement.title || ''}
-                  onChange={(e) => setCurrentAnnouncement({...currentAnnouncement, title: e.target.value})}
-                />
+                <Dialog.Close className="h-12 w-12 flex items-center justify-center rounded-2xl hover:bg-slate-100 transition-colors">
+                  <X className="h-8 w-8 text-slate-400" />
+                </Dialog.Close>
               </div>
               
-              <div>
-                <label className="block text-sm font-medium leading-6 text-slate-900">الفئة المستهدفة <span className="text-red-500">*</span></label>
-                <select 
-                  required
-                  className="mt-2 block w-full rounded-md border-0 py-2 px-3 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
-                  value={currentAnnouncement.target_role || ''}
-                  onChange={(e) => setCurrentAnnouncement({...currentAnnouncement, target_role: e.target.value})}
-                >
-                  {AUDIENCE_OPTIONS.map(opt => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                  ))}
-                </select>
-                <p className="mt-1 text-xs text-slate-500">سيظهر هذا الإعلان فقط للفئة المحددة في لوحة التحكم الخاصة بهم.</p>
-              </div>
+              <form onSubmit={handleSaveAnnouncement} className="space-y-10">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                  <div className="space-y-4">
+                    <label className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] px-2">عنوان الإعلان</label>
+                    <input 
+                      type="text" 
+                      required
+                      placeholder="مثال: موعد اختبارات نهاية الفصل" 
+                      className="block w-full rounded-3xl border-0 py-5 px-6 text-slate-900 bg-slate-50/50 ring-1 ring-inset ring-slate-100 focus:ring-2 focus:ring-indigo-600 sm:text-base transition-all font-bold"
+                      value={currentAnnouncement.title || ''}
+                      onChange={(e) => setCurrentAnnouncement({...currentAnnouncement, title: e.target.value})}
+                    />
+                  </div>
+                  
+                  <div className="space-y-4">
+                    <label className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] px-2">الفئة المستهدفة</label>
+                    <div className="relative group">
+                      <select 
+                        required
+                        className="block w-full rounded-3xl border-0 py-5 px-6 text-slate-900 bg-slate-50/50 ring-1 ring-inset ring-slate-100 focus:ring-2 focus:ring-indigo-600 sm:text-base transition-all font-bold appearance-none"
+                        value={currentAnnouncement.target_role || ''}
+                        onChange={(e) => setCurrentAnnouncement({...currentAnnouncement, target_role: e.target.value})}
+                      >
+                        {AUDIENCE_OPTIONS.map(opt => (
+                          <option key={opt.value} value={opt.value}>{opt.label}</option>
+                        ))}
+                      </select>
+                      <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-6 text-slate-400">
+                        <ArrowRight className="h-5 w-5 rotate-90" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
 
-              <div>
-                <label className="block text-sm font-medium leading-6 text-slate-900">نص الإعلان <span className="text-red-500">*</span></label>
-                <textarea 
-                  required
-                  rows={8}
-                  placeholder="اكتب محتوى الإعلان هنا..." 
-                  className="mt-2 block w-full rounded-md border-0 py-2 px-3 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
-                  value={currentAnnouncement.content || ''}
-                  onChange={(e) => setCurrentAnnouncement({...currentAnnouncement, content: e.target.value})}
-                />
-              </div>
+                <div className="space-y-4">
+                  <label className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] px-2">محتوى الإعلان</label>
+                  <textarea 
+                    required
+                    rows={8}
+                    placeholder="اكتب تفاصيل الإعلان هنا بوضوح..." 
+                    className="block w-full rounded-[2rem] border-0 py-6 px-8 text-slate-900 bg-slate-50/50 ring-1 ring-inset ring-slate-100 focus:ring-2 focus:ring-indigo-600 sm:text-base transition-all font-bold resize-none leading-relaxed"
+                    value={currentAnnouncement.content || ''}
+                    onChange={(e) => setCurrentAnnouncement({...currentAnnouncement, content: e.target.value})}
+                  />
+                </div>
 
-              <div className="mt-8 flex justify-end gap-3 pt-4 border-t border-slate-100">
-                <Dialog.Close asChild>
+                <div className="flex flex-col sm:flex-row justify-end gap-6 pt-6">
+                  <Dialog.Close asChild>
+                    <button
+                      type="button"
+                      className="flex-1 rounded-3xl bg-slate-100 py-5 text-base font-black text-slate-700 hover:bg-slate-200 transition-all active:scale-95"
+                    >
+                      إلغاء
+                    </button>
+                  </Dialog.Close>
                   <button
-                    type="button"
-                    className="rounded-md bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-inset ring-slate-300 hover:bg-slate-50"
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="flex-1 rounded-3xl bg-indigo-600 py-5 text-base font-black text-white shadow-2xl shadow-indigo-100 hover:bg-indigo-700 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-3"
                   >
-                    إلغاء
+                    {isSubmitting ? (
+                      <>
+                        <div className="h-5 w-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                        جاري النشر...
+                      </>
+                    ) : (
+                      <>
+                        <Megaphone className="h-5 w-5" />
+                        نشر الإعلان الآن
+                      </>
+                    )}
                   </button>
-                </Dialog.Close>
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50"
-                >
-                  {isSubmitting ? 'جاري النشر...' : 'نشر الإعلان'}
-                </button>
-              </div>
-            </form>
-          </Dialog.Content>
-        </Dialog.Portal>
-      </Dialog.Root>
+                </div>
+              </form>
+            </Dialog.Content>
+          </Dialog.Portal>
+        </Dialog.Root>
+      </div>
     </div>
   );
 }

@@ -2,9 +2,13 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Plus, Search, MoreHorizontal, Edit, Trash2, X, Key } from 'lucide-react';
+import { Plus, Search, MoreHorizontal, Edit, Trash2, X, Key, Filter, Download, UserPlus, Users, ArrowRight, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import * as Dialog from '@radix-ui/react-dialog';
+import { useNotifications } from '@/context/notification-context';
 
 export default function StudentsPage() {
+  const { sendNotification } = useNotifications();
   const [students, setStudents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -28,7 +32,6 @@ export default function StudentsPage() {
   });
   const [sections, setSections] = useState<any[]>([]);
   const [parents, setParents] = useState<any[]>([]);
-  const [notification, setNotification] = useState<{type: 'success' | 'error', message: string} | null>(null);
 
   useEffect(() => {
     fetchStudents();
@@ -93,7 +96,11 @@ export default function StudentsPage() {
         throw new Error(data.error || 'فشل إنشاء حساب الطالب');
       }
 
-      showNotification('success', `تم إضافة الطالب بنجاح (كلمة المرور: ${data.password})`);
+      sendNotification({
+        title: 'تمت الإضافة بنجاح',
+        message: `تم إضافة الطالب بنجاح (كلمة المرور: ${data.password})`,
+        type: 'success'
+      });
       setShowAddModal(false);
       setAddForm({ full_name: '', national_id: '', email: '', phone: '', section_id: '', parent_id: '' });
       fetchStudents();
@@ -140,12 +147,20 @@ export default function StudentsPage() {
 
       if (studentError) throw studentError;
 
-      showNotification('success', 'تم تحديث بيانات الطالب بنجاح');
+      sendNotification({
+        title: 'تم التحديث',
+        message: 'تم تحديث بيانات الطالب بنجاح',
+        type: 'success'
+      });
       setShowEditModal(false);
       fetchStudents();
     } catch (error: any) {
       console.error('Error updating student:', error);
-      showNotification('error', error.message || 'حدث خطأ أثناء تحديث بيانات الطالب');
+      sendNotification({
+        title: 'خطأ',
+        message: error.message || 'حدث خطأ أثناء تحديث بيانات الطالب',
+        type: 'error'
+      });
     }
   };
   const [showPasswordResetModal, setShowPasswordResetModal] = useState(false);
@@ -172,17 +187,20 @@ export default function StudentsPage() {
       
       if (!response.ok) throw new Error(data.error || 'فشل تغيير كلمة المرور');
       
-      showNotification('success', `تم تغيير كلمة المرور بنجاح. كلمة المرور الجديدة: ${data.newPassword || resetPasswordForm.newPassword}`);
+      sendNotification({
+        title: 'تم تغيير كلمة المرور',
+        message: `تم تغيير كلمة المرور بنجاح. كلمة المرور الجديدة: ${data.newPassword || resetPasswordForm.newPassword}`,
+        type: 'success'
+      });
       setShowPasswordResetModal(false);
     } catch (error: any) {
       console.error('Error resetting password:', error);
-      showNotification('error', error.message || 'حدث خطأ أثناء تغيير كلمة المرور');
+      sendNotification({
+        title: 'خطأ',
+        message: error.message || 'حدث خطأ أثناء تغيير كلمة المرور',
+        type: 'error'
+      });
     }
-  };
-
-  const showNotification = (type: 'success' | 'error', message: string) => {
-    setNotification({ type, message });
-    setTimeout(() => setNotification(null), 5000);
   };
 
   const fetchStudents = async () => {
@@ -237,13 +255,21 @@ export default function StudentsPage() {
         throw new Error(data.error || 'فشل حذف الطالب');
       }
       
-      showNotification('success', 'تم حذف الطالب بنجاح');
+      sendNotification({
+        title: 'تم الحذف',
+        message: 'تم حذف الطالب بنجاح',
+        type: 'success'
+      });
       setShowDeleteModal(false);
       setStudentToDelete(null);
       fetchStudents();
     } catch (error: any) {
       console.error('Error deleting student:', error);
-      showNotification('error', error.message || 'حدث خطأ أثناء حذف الطالب');
+      sendNotification({
+        title: 'خطأ',
+        message: error.message || 'حدث خطأ أثناء حذف الطالب',
+        type: 'error'
+      });
     }
   };
 
@@ -253,123 +279,231 @@ export default function StudentsPage() {
   );
 
   return (
-    <div className="space-y-6 relative">
-      {/* Notification Toast */}
-      {notification && (
-        <div className={`fixed top-4 left-1/2 transform -translate-x-1/2 z-50 px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 transition-all ${
-          notification.type === 'success' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-red-50 text-red-800 border border-red-200'
-        }`}>
-          <div className="font-medium">{notification.message}</div>
-          <button onClick={() => setNotification(null)} className="text-slate-400 hover:text-slate-600">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-      )}
-
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">إدارة الطلاب</h1>
-          <p className="text-slate-500">عرض وإدارة بيانات جميع الطلاب المسجلين في المدرسة</p>
-        </div>
-        <button 
-          onClick={() => setShowAddModal(true)}
-          className="inline-flex items-center justify-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-        >
-          <Plus className="mr-2 h-4 w-4 ml-2" />
-          إضافة طالب جديد
-        </button>
+    <div className="relative min-h-screen">
+      {/* Decorative Background Elements */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
+        <motion.div 
+          animate={{ 
+            scale: [1, 1.2, 1],
+            rotate: [0, 90, 0],
+            x: [0, 100, 0],
+            y: [0, 50, 0]
+          }}
+          transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+          className="absolute -top-[10%] -right-[10%] w-[40%] h-[40%] rounded-full bg-indigo-500/5 blur-[120px]" 
+        />
+        <motion.div 
+          animate={{ 
+            scale: [1, 1.3, 1],
+            rotate: [0, -90, 0],
+            x: [0, -100, 0],
+            y: [0, -50, 0]
+          }}
+          transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
+          className="absolute -bottom-[10%] -left-[10%] w-[50%] h-[50%] rounded-full bg-violet-500/5 blur-[120px]" 
+        />
+        <div className="absolute top-[20%] left-[10%] w-[30%] h-[30%] rounded-full bg-blue-500/5 blur-[100px]" />
       </div>
 
-      <div className="bg-white p-4 rounded-xl shadow-sm ring-1 ring-slate-200">
-        <div className="relative max-w-md">
-          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
-            <Search className="h-5 w-5 text-slate-400" aria-hidden="true" />
+      <div className="relative z-10 max-w-[1600px] mx-auto space-y-10 pb-20 px-4 sm:px-6 lg:px-8">
+        <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 pt-8">
+        <div>
+          <motion.h1 
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            className="text-4xl font-black text-slate-900 tracking-tight"
+          >
+            إدارة الطلاب
+          </motion.h1>
+          <motion.p 
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.1 }}
+            className="text-slate-500 mt-2 font-medium"
+          >
+            قاعدة بيانات شاملة لجميع الطلاب المسجلين في مدرسة الرفعة
+          </motion.p>
+        </div>
+        
+        <div className="flex flex-wrap items-center gap-3">
+          <motion.button 
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.2 }}
+            className="inline-flex items-center justify-center rounded-2xl bg-white/70 backdrop-blur-md px-6 py-3.5 text-sm font-bold text-slate-700 shadow-sm border border-white/20 hover:bg-white transition-all active:scale-95"
+          >
+            <Download className="ml-2 h-5 w-5 text-slate-400" />
+            تصدير البيانات
+          </motion.button>
+          <motion.button 
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.3 }}
+            onClick={() => setShowAddModal(true)}
+            className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-600 px-8 py-3.5 text-sm font-bold text-white shadow-xl shadow-indigo-200/50 hover:shadow-indigo-300/50 transition-all active:scale-95"
+          >
+            <UserPlus className="ml-2 h-5 w-5" />
+            إضافة طالب جديد
+          </motion.button>
+        </div>
+      </div>
+
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2 }}
+        className="glass-card p-8 rounded-[2.5rem] flex flex-col lg:flex-row lg:items-center gap-6"
+      >
+        <div className="relative flex-1 group">
+          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-5">
+            <Search className="h-5 w-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" aria-hidden="true" />
           </div>
           <input
             type="text"
-            className="block w-full rounded-md border-0 py-2 pr-10 pl-3 text-slate-900 ring-1 ring-inset ring-slate-300 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
-            placeholder="البحث بالاسم أو الرقم المدني..."
+            className="block w-full rounded-2xl border-0 py-4 pr-12 pl-5 text-slate-900 bg-white/50 backdrop-blur-sm ring-1 ring-inset ring-slate-200/60 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-indigo-500 sm:text-sm transition-all hover:bg-white/80"
+            placeholder="البحث بالاسم، الرقم المدني، أو البريد الإلكتروني..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-      </div>
+        
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="flex items-center gap-3 bg-white/40 backdrop-blur-md p-2 rounded-2xl border border-white/20">
+            <select 
+              value={selectedSection}
+              onChange={(e) => setSelectedSection(e.target.value)}
+              className="bg-transparent border-0 py-2 pr-2 pl-8 text-sm font-bold text-slate-700 focus:ring-0 cursor-pointer"
+            >
+              <option value="all">جميع الفصول</option>
+              {sections.map(s => (
+                <option key={s.id} value={s.id}>{s.classes?.name} - {s.name}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </motion.div>
 
-      <div className="bg-white rounded-xl shadow-sm ring-1 ring-slate-200 overflow-hidden">
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3 }}
+        className="glass-card rounded-[2.5rem] overflow-hidden"
+      >
         {/* Desktop Table View */}
-        <div className="hidden md:block overflow-x-auto">
-          <table className="min-w-full divide-y divide-slate-200">
-            <thead className="bg-slate-50">
+        <div className="hidden lg:block overflow-x-auto">
+          <table className="min-w-full divide-y divide-white/10">
+            <thead className="bg-white/30">
               <tr>
-                <th scope="col" className="py-3.5 pr-4 pl-3 text-right text-sm font-semibold text-slate-900 sm:pr-6">اسم الطالب</th>
-                <th scope="col" className="px-3 py-3.5 text-right text-sm font-semibold text-slate-900">الرقم المدني</th>
-                <th scope="col" className="px-3 py-3.5 text-right text-sm font-semibold text-slate-900">الصف والشعبة</th>
-                <th scope="col" className="px-3 py-3.5 text-right text-sm font-semibold text-slate-900">ولي الأمر</th>
-                <th scope="col" className="px-3 py-3.5 text-right text-sm font-semibold text-slate-900">البريد الإلكتروني</th>
-                <th scope="col" className="px-3 py-3.5 text-right text-sm font-semibold text-slate-900">رقم الهاتف</th>
-                <th scope="col" className="relative py-3.5 pl-4 pr-3 sm:pl-6">
+                <th scope="col" className="py-6 pr-10 pl-4 text-right text-xs font-black text-slate-500 uppercase tracking-[0.2em]">الطالب</th>
+                <th scope="col" className="px-4 py-6 text-right text-xs font-black text-slate-500 uppercase tracking-[0.2em]">الرقم المدني</th>
+                <th scope="col" className="px-4 py-6 text-right text-xs font-black text-slate-500 uppercase tracking-[0.2em]">الصف والشعبة</th>
+                <th scope="col" className="px-4 py-6 text-right text-xs font-black text-slate-500 uppercase tracking-[0.2em]">ولي الأمر</th>
+                <th scope="col" className="px-4 py-6 text-right text-xs font-black text-slate-500 uppercase tracking-[0.2em]">الحالة</th>
+                <th scope="col" className="relative py-6 pl-10 pr-4">
                   <span className="sr-only">إجراءات</span>
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-200 bg-white">
+            <tbody className="divide-y divide-white/5">
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="py-10 text-center text-sm text-slate-500">
-                    جاري تحميل البيانات...
+                  <td colSpan={6} className="py-32 text-center">
+                    <div className="flex flex-col items-center gap-4">
+                      <div className="relative h-12 w-12">
+                        <div className="absolute inset-0 rounded-full border-4 border-indigo-50/30"></div>
+                        <div className="absolute inset-0 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent"></div>
+                      </div>
+                      <span className="text-sm font-bold text-slate-400 uppercase tracking-widest">جاري تحميل البيانات...</span>
+                    </div>
                   </td>
                 </tr>
               ) : filteredStudents.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-10 text-center text-sm text-slate-500">
-                    لا يوجد طلاب مطابقين للبحث
+                  <td colSpan={6} className="py-32 text-center">
+                    <div className="flex flex-col items-center gap-6">
+                      <div className="h-24 w-24 rounded-[2rem] bg-white/50 flex items-center justify-center">
+                        <Search className="h-10 w-10 text-slate-200" />
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-xl font-black text-slate-900">لا يوجد نتائج</p>
+                        <p className="text-sm font-medium text-slate-400">لم نجد أي طالب يطابق معايير البحث الخاصة بك</p>
+                      </div>
+                    </div>
                   </td>
                 </tr>
               ) : (
-                filteredStudents.map((student) => (
-                  <tr key={student.id} className="hover:bg-slate-50">
-                    <td className="whitespace-nowrap py-4 pr-4 pl-3 text-sm font-medium text-slate-900 sm:pr-6">
-                      {student.users?.full_name}
+                filteredStudents.map((student, idx) => (
+                  <motion.tr 
+                    key={student.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: idx * 0.05 }}
+                    className="hover:bg-white/40 transition-all group cursor-pointer"
+                  >
+                    <td className="whitespace-nowrap py-6 pr-10 pl-4">
+                      <div className="flex items-center gap-4">
+                        <div className="relative">
+                          <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-indigo-50/50 to-white/50 backdrop-blur-sm flex items-center justify-center text-indigo-600 font-black text-sm border border-white/20 shadow-sm group-hover:scale-110 transition-transform">
+                            {student.users?.full_name?.substring(0, 1)}
+                          </div>
+                          <div className="absolute -bottom-1 -left-1 w-4 h-4 bg-emerald-500 border-2 border-white rounded-full shadow-sm" />
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-sm font-black text-slate-900 group-hover:text-indigo-600 transition-colors">{student.users?.full_name}</span>
+                          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">{student.users?.email || 'لا يوجد بريد'}</span>
+                        </div>
+                      </div>
                     </td>
-                    <td className="whitespace-nowrap px-3 py-4 text-sm text-slate-500">
-                      {student.national_id}
+                    <td className="whitespace-nowrap px-4 py-6">
+                      <span className="text-sm font-bold text-slate-600 font-mono">{student.national_id}</span>
                     </td>
-                    <td className="whitespace-nowrap px-3 py-4 text-sm text-slate-500">
-                      {student.sections?.classes?.name} - {student.sections?.name}
+                    <td className="whitespace-nowrap px-4 py-6">
+                      <div className="flex flex-col">
+                        <span className="text-sm font-bold text-slate-900">{student.sections?.classes?.name}</span>
+                        <span className="text-[10px] text-indigo-500 font-black uppercase tracking-widest mt-0.5">{student.sections?.name}</span>
+                      </div>
                     </td>
-                    <td className="whitespace-nowrap px-3 py-4 text-sm text-slate-500">
-                      {student.parents?.users?.full_name || '-'}
+                    <td className="whitespace-nowrap px-4 py-6">
+                      <div className="flex items-center gap-2">
+                        <div className="h-6 w-6 rounded-lg bg-white/50 flex items-center justify-center border border-white/20">
+                          <Users className="h-3 w-3 text-slate-400" />
+                        </div>
+                        <span className="text-sm font-bold text-slate-600">
+                          {student.parents?.users?.full_name || '-'}
+                        </span>
+                      </div>
                     </td>
-                    <td className="whitespace-nowrap px-3 py-4 text-sm text-slate-500">
-                      {student.users?.email}
+                    <td className="whitespace-nowrap px-4 py-6">
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-emerald-50/50 text-emerald-600 border border-emerald-100/50 backdrop-blur-sm">
+                        نشط
+                      </span>
                     </td>
-                    <td className="whitespace-nowrap px-3 py-4 text-sm text-slate-500">
-                      {student.users?.phone || '-'}
-                    </td>
-                    <td className="relative whitespace-nowrap py-4 pl-4 pr-3 text-left text-sm font-medium sm:pl-6">
-                      <div className="flex items-center justify-end gap-2">
+                    <td className="relative whitespace-nowrap py-6 pl-10 pr-4 text-left">
+                      <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-all translate-x-4 group-hover:translate-x-0">
                         <button 
-                          onClick={() => handleResetPasswordClick(student)}
-                          className="text-slate-400 hover:text-indigo-600"
+                          onClick={(e) => { e.stopPropagation(); handleResetPasswordClick(student); }}
+                          className="p-2.5 text-slate-400 hover:text-indigo-600 hover:bg-white rounded-xl transition-all shadow-sm hover:shadow-md bg-white/80 border border-white/20 backdrop-blur-sm"
                           title="إعادة تعيين كلمة المرور"
                         >
                           <Key className="h-4 w-4" />
                         </button>
                         <button 
-                          onClick={() => handleEditClick(student)}
-                          className="text-slate-400 hover:text-indigo-600"
+                          onClick={(e) => { e.stopPropagation(); handleEditClick(student); }}
+                          className="p-2.5 text-slate-400 hover:text-indigo-600 hover:bg-white rounded-xl transition-all shadow-sm hover:shadow-md bg-white/80 border border-white/20 backdrop-blur-sm"
+                          title="تعديل"
                         >
                           <Edit className="h-4 w-4" />
                         </button>
                         <button 
-                          onClick={() => handleDeleteClick(student.id)}
-                          className="text-slate-400 hover:text-red-600"
+                          onClick={(e) => { e.stopPropagation(); handleDeleteClick(student.id); }}
+                          className="p-2.5 text-slate-400 hover:text-red-600 hover:bg-white rounded-xl transition-all shadow-sm hover:shadow-md bg-white/80 border border-white/20 backdrop-blur-sm"
+                          title="حذف"
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>
                       </div>
                     </td>
-                  </tr>
+                  </motion.tr>
                 ))
               )}
             </tbody>
@@ -377,119 +511,143 @@ export default function StudentsPage() {
         </div>
 
         {/* Mobile Card View */}
-        <div className="md:hidden divide-y divide-slate-200">
+        <div className="lg:hidden p-6 grid gap-6">
           {loading ? (
-            <div className="py-10 text-center text-sm text-slate-500">
-              جاري تحميل البيانات...
+            <div className="py-20 text-center">
+               <div className="h-10 w-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+               <span className="text-sm font-bold text-slate-400 uppercase tracking-widest">جاري التحميل...</span>
             </div>
           ) : filteredStudents.length === 0 ? (
-            <div className="py-10 text-center text-sm text-slate-500">
-              لا يوجد طلاب مطابقين للبحث
+            <div className="py-20 text-center text-sm font-bold text-slate-400 uppercase tracking-widest">
+              لا يوجد نتائج
             </div>
           ) : (
-            filteredStudents.map((student) => (
-              <div key={student.id} className="p-4 space-y-3">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <h3 className="font-medium text-slate-900">{student.users?.full_name}</h3>
-                    <p className="text-xs text-slate-500">{student.national_id}</p>
+            filteredStudents.map((student, idx) => (
+              <motion.div 
+                key={student.id}
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: idx * 0.05 }}
+                className="p-8 rounded-[2.5rem] bg-white/40 backdrop-blur-md border border-white/20 space-y-8 relative overflow-hidden group"
+              >
+                <div className="flex justify-between items-start relative z-10">
+                  <div className="flex items-center gap-5">
+                    <div className="relative">
+                      <div className="h-16 w-16 rounded-3xl bg-white/80 backdrop-blur-sm shadow-xl shadow-slate-200/50 flex items-center justify-center text-indigo-600 font-black text-xl border border-white/20">
+                        {student.users?.full_name?.substring(0, 1)}
+                      </div>
+                      <div className="absolute -bottom-1 -left-1 w-5 h-5 bg-emerald-500 border-4 border-white rounded-full" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-black text-slate-900 leading-tight">{student.users?.full_name}</h3>
+                      <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">{student.national_id}</p>
+                    </div>
                   </div>
+                  
                   <div className="flex gap-2">
                     <button 
-                      onClick={() => handleResetPasswordClick(student)}
-                      className="p-1 text-slate-400 hover:text-indigo-600"
-                      title="إعادة تعيين كلمة المرور"
-                    >
-                      <Key className="h-4 w-4" />
-                    </button>
-                    <button 
                       onClick={() => handleEditClick(student)}
-                      className="p-1 text-slate-400 hover:text-indigo-600"
+                      className="p-3 text-slate-400 hover:text-indigo-600 hover:bg-white rounded-2xl transition-all shadow-sm border border-transparent hover:border-white/20"
                     >
-                      <Edit className="h-4 w-4" />
+                      <Edit className="h-5 w-5" />
                     </button>
                     <button 
                       onClick={() => handleDeleteClick(student.id)}
-                      className="p-1 text-slate-400 hover:text-red-600"
+                      className="p-3 text-slate-400 hover:text-red-600 hover:bg-white rounded-2xl transition-all shadow-sm border border-transparent hover:border-white/20"
                     >
-                      <Trash2 className="h-4 w-4" />
+                      <Trash2 className="h-5 w-5" />
                     </button>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div>
-                    <span className="text-slate-400 block">الصف والشعبة</span>
-                    <span className="text-slate-700">{student.sections?.classes?.name} - {student.sections?.name}</span>
+
+                <div className="grid grid-cols-2 gap-4 relative z-10">
+                  <div className="bg-white/60 backdrop-blur-sm p-5 rounded-3xl border border-white/20 shadow-sm">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] block mb-2">الصف والشعبة</span>
+                    <span className="text-sm font-bold text-slate-900">{student.sections?.classes?.name}</span>
+                    <span className="text-[10px] text-indigo-500 font-black block mt-1">{student.sections?.name}</span>
                   </div>
-                  <div>
-                    <span className="text-slate-400 block">رقم الهاتف</span>
-                    <span className="text-slate-700">{student.users?.phone || '-'}</span>
+                  <div className="bg-white/60 backdrop-blur-sm p-5 rounded-3xl border border-white/20 shadow-sm">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] block mb-2">رقم الهاتف</span>
+                    <span className="text-sm font-bold text-slate-900">{student.users?.phone || '-'}</span>
                   </div>
-                  <div className="col-span-2">
-                    <span className="text-slate-400 block">البريد الإلكتروني</span>
-                    <span className="text-slate-700">{student.users?.email}</span>
+                  <div className="col-span-2 bg-white/60 backdrop-blur-sm p-5 rounded-3xl border border-white/20 shadow-sm">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] block mb-2">ولي الأمر</span>
+                    <div className="flex items-center gap-3">
+                      <div className="h-8 w-8 rounded-xl bg-white/50 flex items-center justify-center border border-white/20">
+                        <Users className="h-4 w-4 text-slate-400" />
+                      </div>
+                      <span className="text-sm font-bold text-slate-900">{student.parents?.users?.full_name || 'غير مسجل'}</span>
+                    </div>
                   </div>
                 </div>
-              </div>
+                
+                <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 blur-3xl rounded-full -translate-y-1/2 translate-x-1/2" />
+              </motion.div>
             ))
           )}
         </div>
-      </div>
+      </motion.div>
+    </div>
 
-      {/* Edit Student Modal */}
+    {/* Edit Student Modal */}
       {showEditModal && (
         <div className="fixed inset-0 z-50 overflow-y-auto">
           <div className="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
-            <div className="fixed inset-0 bg-slate-900/75 transition-opacity" onClick={() => setShowEditModal(false)}></div>
+            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" onClick={() => setShowEditModal(false)}></div>
             
-            <div className="relative transform overflow-hidden rounded-xl bg-white text-right shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-2xl">
-              <div className="bg-white px-4 pb-4 pt-5 sm:p-6 sm:pb-4">
-                <h3 className="text-xl font-semibold leading-6 text-slate-900 mb-6">تعديل بيانات الطالب</h3>
+            <div className="relative transform overflow-hidden rounded-4xl bg-white text-right shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-2xl">
+              <div className="bg-white px-8 pb-8 pt-10 sm:p-10">
+                <div className="flex items-center justify-between mb-8">
+                  <h3 className="text-2xl font-bold text-slate-900 tracking-tight">تعديل بيانات الطالب</h3>
+                  <button onClick={() => setShowEditModal(false)} className="p-2 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-50 transition-all">
+                    <X className="h-6 w-6" />
+                  </button>
+                </div>
                 
-                <form className="space-y-4">
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <div>
-                      <label className="block text-sm font-medium leading-6 text-slate-900">الاسم الرباعي</label>
+                <form className="space-y-6">
+                  <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <label className="text-sm font-bold text-slate-700 mr-1">الاسم الرباعي</label>
                       <input 
                         type="text" 
                         value={editForm.full_name}
                         onChange={(e) => setEditForm({...editForm, full_name: e.target.value})}
-                        className="mt-2 block w-full rounded-md border-0 py-1.5 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6" 
+                        className="block w-full rounded-2xl border-0 py-3 px-4 text-slate-900 bg-slate-50 ring-1 ring-inset ring-slate-100 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-indigo-500 sm:text-sm transition-all" 
                       />
                     </div>
-                    <div>
-                      <label className="block text-sm font-medium leading-6 text-slate-900">الرقم المدني</label>
+                    <div className="space-y-2">
+                      <label className="text-sm font-bold text-slate-700 mr-1">الرقم المدني</label>
                       <input 
                         type="text" 
                         value={editForm.national_id}
                         onChange={(e) => setEditForm({...editForm, national_id: e.target.value})}
-                        className="mt-2 block w-full rounded-md border-0 py-1.5 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6" 
+                        className="block w-full rounded-2xl border-0 py-3 px-4 text-slate-900 bg-slate-50 ring-1 ring-inset ring-slate-100 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-indigo-500 sm:text-sm transition-all" 
                       />
                     </div>
-                    <div>
-                      <label className="block text-sm font-medium leading-6 text-slate-900">البريد الإلكتروني</label>
+                    <div className="space-y-2">
+                      <label className="text-sm font-bold text-slate-700 mr-1">البريد الإلكتروني</label>
                       <input 
                         type="email" 
                         value={editForm.email}
                         onChange={(e) => setEditForm({...editForm, email: e.target.value})}
-                        className="mt-2 block w-full rounded-md border-0 py-1.5 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6" 
+                        className="block w-full rounded-2xl border-0 py-3 px-4 text-slate-900 bg-slate-50 ring-1 ring-inset ring-slate-100 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-indigo-500 sm:text-sm transition-all" 
                       />
                     </div>
-                    <div>
-                      <label className="block text-sm font-medium leading-6 text-slate-900">رقم الهاتف</label>
+                    <div className="space-y-2">
+                      <label className="text-sm font-bold text-slate-700 mr-1">رقم الهاتف</label>
                       <input 
                         type="text" 
                         value={editForm.phone}
                         onChange={(e) => setEditForm({...editForm, phone: e.target.value})}
-                        className="mt-2 block w-full rounded-md border-0 py-1.5 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6" 
+                        className="block w-full rounded-2xl border-0 py-3 px-4 text-slate-900 bg-slate-50 ring-1 ring-inset ring-slate-100 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-indigo-500 sm:text-sm transition-all" 
                       />
                     </div>
-                    <div className="sm:col-span-2">
-                      <label className="block text-sm font-medium leading-6 text-slate-900">ولي الأمر</label>
+                    <div className="sm:col-span-2 space-y-2">
+                      <label className="text-sm font-bold text-slate-700 mr-1">ولي الأمر</label>
                       <select 
                         value={editForm.parent_id}
                         onChange={(e) => setEditForm({...editForm, parent_id: e.target.value})}
-                        className="mt-2 block w-full rounded-md border-0 py-1.5 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                        className="block w-full rounded-2xl border-0 py-3 px-4 text-slate-900 bg-slate-50 ring-1 ring-inset ring-slate-100 focus:ring-2 focus:ring-inset focus:ring-indigo-500 sm:text-sm transition-all"
                       >
                         <option value="">بدون ولي أمر</option>
                         {parents.map(parent => (
@@ -502,17 +660,17 @@ export default function StudentsPage() {
                   </div>
                 </form>
               </div>
-              <div className="bg-slate-50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6">
+              <div className="bg-slate-50/50 px-8 py-6 sm:flex sm:flex-row-reverse sm:px-10 gap-3">
                 <button
                   type="button"
-                  className="inline-flex w-full justify-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 sm:ml-3 sm:w-auto"
+                  className="inline-flex w-full justify-center rounded-2xl bg-indigo-600 px-8 py-3 text-sm font-bold text-white shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all active:scale-95 sm:w-auto"
                   onClick={handleEditSubmit}
                 >
                   حفظ التعديلات
                 </button>
                 <button
                   type="button"
-                  className="mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-slate-900 shadow-sm ring-1 ring-inset ring-slate-300 hover:bg-slate-50 sm:mt-0 sm:w-auto"
+                  className="mt-3 inline-flex w-full justify-center rounded-2xl bg-white px-8 py-3 text-sm font-bold text-slate-700 shadow-sm ring-1 ring-inset ring-slate-200 hover:bg-slate-50 sm:mt-0 sm:w-auto transition-all"
                   onClick={() => setShowEditModal(false)}
                 >
                   إلغاء
@@ -527,34 +685,30 @@ export default function StudentsPage() {
       {showDeleteModal && (
         <div className="fixed inset-0 z-50 overflow-y-auto">
           <div className="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
-            <div className="fixed inset-0 bg-slate-500 bg-opacity-75 transition-opacity" onClick={() => setShowDeleteModal(false)}></div>
-            <div className="relative transform overflow-hidden rounded-2xl bg-white text-right shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg">
-              <div className="bg-white px-4 pb-4 pt-5 sm:p-6 sm:pb-4">
-                <div className="sm:flex sm:items-start sm:flex-row-reverse">
-                  <div className="mx-auto flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10">
-                    <Trash2 className="h-6 w-6 text-red-600" aria-hidden="true" />
+            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" onClick={() => setShowDeleteModal(false)}></div>
+            <div className="relative transform overflow-hidden rounded-4xl bg-white text-right shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-lg">
+              <div className="bg-white px-8 pb-8 pt-10 sm:p-10">
+                <div className="flex flex-col items-center text-center">
+                  <div className="mx-auto flex h-20 w-20 flex-shrink-0 items-center justify-center rounded-3xl bg-red-50 mb-6">
+                    <Trash2 className="h-10 w-10 text-red-500" aria-hidden="true" />
                   </div>
-                  <div className="mt-3 text-center sm:mr-4 sm:mt-0 sm:text-right">
-                    <h3 className="text-xl font-bold leading-6 text-slate-900">حذف الطالب</h3>
-                    <div className="mt-2">
-                      <p className="text-sm text-slate-500">
-                        هل أنت متأكد من حذف هذا الطالب؟ سيتم حذف جميع البيانات المرتبطة به نهائياً. لا يمكن التراجع عن هذا الإجراء.
-                      </p>
-                    </div>
-                  </div>
+                  <h3 className="text-2xl font-bold text-slate-900 mb-4">حذف الطالب</h3>
+                  <p className="text-slate-500 leading-relaxed">
+                    هل أنت متأكد من حذف هذا الطالب؟ سيتم حذف جميع البيانات المرتبطة به نهائياً. لا يمكن التراجع عن هذا الإجراء.
+                  </p>
                 </div>
               </div>
-              <div className="bg-slate-50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6 gap-3">
+              <div className="bg-slate-50/50 px-8 py-6 sm:flex sm:flex-row-reverse sm:px-10 gap-3">
                 <button
                   type="button"
-                  className="inline-flex w-full justify-center rounded-xl bg-red-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-red-500 sm:w-auto"
+                  className="inline-flex w-full justify-center rounded-2xl bg-red-600 px-8 py-3 text-sm font-bold text-white shadow-lg shadow-red-100 hover:bg-red-700 transition-all active:scale-95 sm:w-auto"
                   onClick={confirmDelete}
                 >
                   تأكيد الحذف
                 </button>
                 <button
                   type="button"
-                  className="mt-3 inline-flex w-full justify-center rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-slate-900 shadow-sm ring-1 ring-inset ring-slate-300 hover:bg-slate-50 sm:mt-0 sm:w-auto"
+                  className="mt-3 inline-flex w-full justify-center rounded-2xl bg-white px-8 py-3 text-sm font-bold text-slate-700 shadow-sm ring-1 ring-inset ring-slate-200 hover:bg-slate-50 sm:mt-0 sm:w-auto transition-all"
                   onClick={() => setShowDeleteModal(false)}
                 >
                   إلغاء
@@ -567,36 +721,42 @@ export default function StudentsPage() {
       {showPasswordResetModal && (
         <div className="fixed inset-0 z-50 overflow-y-auto">
           <div className="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
-            <div className="fixed inset-0 bg-slate-900/75 transition-opacity" onClick={() => setShowPasswordResetModal(false)}></div>
+            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" onClick={() => setShowPasswordResetModal(false)}></div>
             
-            <div className="relative transform overflow-hidden rounded-xl bg-white text-right shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-md">
-              <div className="bg-white px-4 pb-4 pt-5 sm:p-6 sm:pb-4">
-                <h3 className="text-xl font-semibold leading-6 text-slate-900 mb-6">إعادة تعيين كلمة المرور</h3>
+            <div className="relative transform overflow-hidden rounded-4xl bg-white text-right shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-md">
+              <div className="bg-white px-8 pb-8 pt-10 sm:p-10">
+                <div className="flex items-center justify-between mb-8">
+                  <h3 className="text-2xl font-bold text-slate-900 tracking-tight">إعادة تعيين كلمة المرور</h3>
+                  <button onClick={() => setShowPasswordResetModal(false)} className="p-2 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-50 transition-all">
+                    <X className="h-6 w-6" />
+                  </button>
+                </div>
                 
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium leading-6 text-slate-900">كلمة المرور الجديدة</label>
+                <div className="space-y-6">
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold text-slate-700 mr-1">كلمة المرور الجديدة</label>
                     <input 
                       type="password" 
                       value={resetPasswordForm.newPassword}
                       onChange={(e) => setResetPasswordForm({...resetPasswordForm, newPassword: e.target.value})}
-                      className="mt-2 block w-full rounded-md border-0 py-1.5 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6" 
+                      className="block w-full rounded-2xl border-0 py-3 px-4 text-slate-900 bg-slate-50 ring-1 ring-inset ring-slate-100 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-indigo-500 sm:text-sm transition-all" 
+                      placeholder="أدخل كلمة المرور الجديدة..."
                     />
                   </div>
                 </div>
               </div>
-              <div className="bg-slate-50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6">
+              <div className="bg-slate-50/50 px-8 py-6 sm:flex sm:flex-row-reverse sm:px-10 gap-3">
                 <button
                   type="button"
                   onClick={handleResetPasswordSubmit}
-                  className="inline-flex w-full justify-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 sm:ml-3 sm:w-auto"
+                  className="inline-flex w-full justify-center rounded-2xl bg-indigo-600 px-8 py-3 text-sm font-bold text-white shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all active:scale-95 sm:w-auto"
                 >
-                  حفظ
+                  حفظ كلمة المرور
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowPasswordResetModal(false)}
-                  className="mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-slate-900 shadow-sm ring-1 ring-inset ring-slate-300 hover:bg-slate-50 sm:mt-0 sm:w-auto"
+                  className="mt-3 inline-flex w-full justify-center rounded-2xl bg-white px-8 py-3 text-sm font-bold text-slate-700 shadow-sm ring-1 ring-inset ring-slate-200 hover:bg-slate-50 sm:mt-0 sm:w-auto transition-all"
                 >
                   إلغاء
                 </button>
@@ -610,56 +770,65 @@ export default function StudentsPage() {
       {showAddModal && (
         <div className="fixed inset-0 z-50 overflow-y-auto">
           <div className="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
-            <div className="fixed inset-0 bg-slate-900/75 transition-opacity" onClick={() => setShowAddModal(false)}></div>
+            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" onClick={() => setShowAddModal(false)}></div>
             
-            <div className="relative transform overflow-hidden rounded-xl bg-white text-right shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-2xl">
-              <div className="bg-white px-4 pb-4 pt-5 sm:p-6 sm:pb-4">
-                <h3 className="text-xl font-semibold leading-6 text-slate-900 mb-6">إضافة طالب جديد</h3>
+            <div className="relative transform overflow-hidden rounded-4xl bg-white text-right shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-2xl">
+              <div className="bg-white px-8 pb-8 pt-10 sm:p-10">
+                <div className="flex items-center justify-between mb-8">
+                  <h3 className="text-2xl font-bold text-slate-900 tracking-tight">إضافة طالب جديد</h3>
+                  <button onClick={() => setShowAddModal(false)} className="p-2 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-50 transition-all">
+                    <X className="h-6 w-6" />
+                  </button>
+                </div>
                 
-                <form className="space-y-4">
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <div>
-                      <label className="block text-sm font-medium leading-6 text-slate-900">الاسم الرباعي</label>
+                <form className="space-y-6">
+                  <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <label className="text-sm font-bold text-slate-700 mr-1">الاسم الرباعي</label>
                       <input 
                         type="text" 
                         value={addForm.full_name}
                         onChange={(e) => setAddForm({...addForm, full_name: e.target.value})}
-                        className="mt-2 block w-full rounded-md border-0 py-1.5 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6" 
+                        className="block w-full rounded-2xl border-0 py-3 px-4 text-slate-900 bg-slate-50 ring-1 ring-inset ring-slate-100 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-indigo-500 sm:text-sm transition-all" 
+                        placeholder="أدخل الاسم الكامل..."
                       />
                     </div>
-                    <div>
-                      <label className="block text-sm font-medium leading-6 text-slate-900">الرقم المدني</label>
+                    <div className="space-y-2">
+                      <label className="text-sm font-bold text-slate-700 mr-1">الرقم المدني</label>
                       <input 
                         type="text" 
                         value={addForm.national_id}
                         onChange={(e) => setAddForm({...addForm, national_id: e.target.value})}
-                        className="mt-2 block w-full rounded-md border-0 py-1.5 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6" 
+                        className="block w-full rounded-2xl border-0 py-3 px-4 text-slate-900 bg-slate-50 ring-1 ring-inset ring-slate-100 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-indigo-500 sm:text-sm transition-all" 
+                        placeholder="أدخل الرقم المدني..."
                       />
                     </div>
-                    <div>
-                      <label className="block text-sm font-medium leading-6 text-slate-900">البريد الإلكتروني</label>
+                    <div className="space-y-2">
+                      <label className="text-sm font-bold text-slate-700 mr-1">البريد الإلكتروني</label>
                       <input 
                         type="email" 
                         value={addForm.email}
                         onChange={(e) => setAddForm({...addForm, email: e.target.value})}
-                        className="mt-2 block w-full rounded-md border-0 py-1.5 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6" 
+                        className="block w-full rounded-2xl border-0 py-3 px-4 text-slate-900 bg-slate-50 ring-1 ring-inset ring-slate-100 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-indigo-500 sm:text-sm transition-all" 
+                        placeholder="example@school.com"
                       />
                     </div>
-                    <div>
-                      <label className="block text-sm font-medium leading-6 text-slate-900">رقم الهاتف</label>
+                    <div className="space-y-2">
+                      <label className="text-sm font-bold text-slate-700 mr-1">رقم الهاتف</label>
                       <input 
                         type="text" 
                         value={addForm.phone}
                         onChange={(e) => setAddForm({...addForm, phone: e.target.value})}
-                        className="mt-2 block w-full rounded-md border-0 py-1.5 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6" 
+                        className="block w-full rounded-2xl border-0 py-3 px-4 text-slate-900 bg-slate-50 ring-1 ring-inset ring-slate-100 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-indigo-500 sm:text-sm transition-all" 
+                        placeholder="أدخل رقم الهاتف..."
                       />
                     </div>
-                    <div className="sm:col-span-2">
-                      <label className="block text-sm font-medium leading-6 text-slate-900">الشعبة (الصف)</label>
+                    <div className="sm:col-span-2 space-y-2">
+                      <label className="text-sm font-bold text-slate-700 mr-1">الشعبة (الصف)</label>
                       <select 
                         value={addForm.section_id}
                         onChange={(e) => setAddForm({...addForm, section_id: e.target.value})}
-                        className="mt-2 block w-full rounded-md border-0 py-1.5 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                        className="block w-full rounded-2xl border-0 py-3 px-4 text-slate-900 bg-slate-50 ring-1 ring-inset ring-slate-100 focus:ring-2 focus:ring-inset focus:ring-indigo-500 sm:text-sm transition-all"
                       >
                         <option value="">اختر الشعبة</option>
                         {sections.map(section => (
@@ -669,12 +838,12 @@ export default function StudentsPage() {
                         ))}
                       </select>
                     </div>
-                    <div className="sm:col-span-2">
-                      <label className="block text-sm font-medium leading-6 text-slate-900">ولي الأمر</label>
+                    <div className="sm:col-span-2 space-y-2">
+                      <label className="text-sm font-bold text-slate-700 mr-1">ولي الأمر</label>
                       <select 
                         value={addForm.parent_id}
                         onChange={(e) => setAddForm({...addForm, parent_id: e.target.value})}
-                        className="mt-2 block w-full rounded-md border-0 py-1.5 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                        className="block w-full rounded-2xl border-0 py-3 px-4 text-slate-900 bg-slate-50 ring-1 ring-inset ring-slate-100 focus:ring-2 focus:ring-inset focus:ring-indigo-500 sm:text-sm transition-all"
                       >
                         <option value="">بدون ولي أمر</option>
                         {parents.map(parent => (
@@ -687,17 +856,17 @@ export default function StudentsPage() {
                   </div>
                 </form>
               </div>
-              <div className="bg-slate-50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6">
+              <div className="bg-slate-50/50 px-8 py-6 sm:flex sm:flex-row-reverse sm:px-10 gap-3">
                 <button
                   type="button"
-                  className="inline-flex w-full justify-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 sm:ml-3 sm:w-auto"
+                  className="inline-flex w-full justify-center rounded-2xl bg-indigo-600 px-8 py-3 text-sm font-bold text-white shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all active:scale-95 sm:w-auto"
                   onClick={handleAddSubmit}
                 >
                   حفظ البيانات
                 </button>
                 <button
                   type="button"
-                  className="mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-slate-900 shadow-sm ring-1 ring-inset ring-slate-300 hover:bg-slate-50 sm:mt-0 sm:w-auto"
+                  className="mt-3 inline-flex w-full justify-center rounded-2xl bg-white px-8 py-3 text-sm font-bold text-slate-700 shadow-sm ring-1 ring-inset ring-slate-200 hover:bg-slate-50 sm:mt-0 sm:w-auto transition-all"
                   onClick={() => setShowAddModal(false)}
                 >
                   إلغاء

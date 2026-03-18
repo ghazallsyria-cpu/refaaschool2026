@@ -354,123 +354,127 @@ export default function QuizBuilder() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-20 relative">
+    <div className="min-h-screen bg-slate-50/50 pb-24 relative">
       {/* Notification Toast */}
-      {notification && (
-        <div className={`fixed top-4 left-1/2 transform -translate-x-1/2 z-50 px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 transition-all ${
-          notification.type === 'success' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-red-50 text-red-800 border border-red-200'
-        }`}>
-          <div className="font-medium">{notification.message}</div>
-          <button onClick={() => setNotification(null)} className="text-slate-400 hover:text-slate-600">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-      )}
+      <AnimatePresence>
+        {notification && (
+          <motion.div 
+            initial={{ opacity: 0, y: -20, x: '-50%' }}
+            animate={{ opacity: 1, y: 0, x: '-50%' }}
+            exit={{ opacity: 0, y: -20, x: '-50%' }}
+            className={`fixed top-6 left-1/2 z-50 px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-4 border backdrop-blur-md ${
+              notification.type === 'success' ? 'bg-emerald-50/90 text-emerald-800 border-emerald-200' : 'bg-red-50/90 text-red-800 border-red-200'
+            }`}
+          >
+            <div className="h-8 w-8 rounded-full bg-white/50 flex items-center justify-center">
+              {notification.type === 'success' ? <Check className="h-5 w-5" /> : <AlertCircle className="h-5 w-5" />}
+            </div>
+            <div className="font-black tracking-tight">{notification.message}</div>
+            <button onClick={() => setNotification(null)} className="p-1 hover:bg-black/5 rounded-lg transition-colors">
+              <X className="h-4 w-4" />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Sticky Header */}
-      <header className="sticky top-0 z-40 bg-white border-b border-slate-200 px-4 py-3 shadow-sm">
-        <div className="max-w-5xl mx-auto flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
+      <header className="sticky top-0 z-40 glass-card border-b border-white/60 px-6 py-4 shadow-xl shadow-slate-200/20">
+        <div className="max-w-6xl mx-auto flex items-center justify-between gap-6">
+          <div className="flex items-center gap-5">
             <button 
               onClick={() => router.back()}
-              className="p-2 hover:bg-slate-100 rounded-lg text-slate-500 transition-colors"
+              className="h-12 w-12 flex items-center justify-center rounded-2xl bg-white border border-slate-100 text-slate-500 hover:text-indigo-600 hover:shadow-lg transition-all active:scale-95"
             >
               <ArrowRight className="h-5 w-5" />
             </button>
-            <div className="hidden sm:block">
-              <h1 className="text-lg font-bold text-slate-900 truncate max-w-[200px]">
+            <div className="hidden sm:block space-y-0.5">
+              <h1 className="text-xl font-black text-slate-900 tracking-tight truncate max-w-[300px]">
                 {exam.title || 'اختبار جديد'}
               </h1>
-              <p className="text-xs text-slate-500">جاري الحفظ تلقائياً...</p>
+              <div className="flex items-center gap-2">
+                <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">جاري الحفظ تلقائياً</p>
+              </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <button 
               onClick={() => router.push(`/exams/take/${params.id}`)}
-              className="hidden sm:flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 rounded-xl transition-all"
+              className="hidden md:flex items-center gap-3 px-6 py-3 text-sm font-black text-slate-600 hover:bg-white hover:shadow-lg rounded-2xl transition-all active:scale-95 border border-transparent hover:border-slate-100"
             >
-              <Eye className="h-4 w-4" />
+              <Eye className="h-5 w-5" />
               <span>معاينة</span>
             </button>
             <Dialog.Root>
               <Dialog.Trigger asChild>
-                <button className="p-2 hover:bg-slate-100 rounded-xl text-slate-600 transition-all">
+                <button className="h-12 w-12 flex items-center justify-center rounded-2xl bg-white border border-slate-100 text-slate-600 hover:text-indigo-600 hover:shadow-lg transition-all active:scale-95">
                   <Settings className="h-5 w-5" />
                 </button>
               </Dialog.Trigger>
               <Dialog.Portal>
-                <Dialog.Overlay className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50" />
-                <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-white rounded-3xl p-6 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-200">
-                  <div className="flex items-center justify-between mb-6">
-                    <Dialog.Title className="text-xl font-bold text-slate-900">إعدادات الاختبار</Dialog.Title>
-                    <Dialog.Close className="p-2 hover:bg-slate-100 rounded-full transition-colors">
-                      <X className="h-5 w-5" />
+                <Dialog.Overlay className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-50" />
+                <Dialog.Content className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-lg bg-white rounded-[40px] p-10 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-300 border border-white/20">
+                  <div className="flex items-center justify-between mb-10">
+                    <div>
+                      <Dialog.Title className="text-3xl font-black text-slate-900 tracking-tight">إعدادات الاختبار</Dialog.Title>
+                      <p className="text-slate-500 font-bold">تخصيص تجربة الاختبار للطلاب</p>
+                    </div>
+                    <Dialog.Close className="h-12 w-12 flex items-center justify-center bg-slate-50 hover:bg-slate-100 rounded-2xl transition-all active:scale-95">
+                      <X className="h-6 w-6 text-slate-500" />
                     </Dialog.Close>
                   </div>
                   
-                  <div className="space-y-6">
-                    <div className="space-y-4">
-                      <h4 className="text-sm font-bold text-slate-900 border-b pb-2">الإعدادات العامة</h4>
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-medium text-slate-700">ترتيب الأسئلة عشوائياً</p>
-                          <p className="text-xs text-slate-500">تغيير ترتيب الأسئلة لكل طالب</p>
-                        </div>
-                        <Switch.Root 
-                          checked={exam.settings.shuffle_questions}
-                          onCheckedChange={(val) => setExam({...exam, settings: {...exam.settings, shuffle_questions: val}})}
-                          className="w-11 h-6 bg-slate-200 rounded-full relative data-[state=checked]:bg-indigo-600 transition-colors outline-none cursor-pointer"
-                        >
-                          <Switch.Thumb className="block w-5 h-5 bg-white rounded-full shadow-lg transition-transform duration-100 translate-x-0.5 will-change-transform data-[state=checked]:translate-x-[22px]" />
-                        </Switch.Root>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-medium text-slate-700">ترتيب الخيارات عشوائياً</p>
-                          <p className="text-xs text-slate-500">تغيير ترتيب خيارات الإجابة</p>
-                        </div>
-                        <Switch.Root 
-                          checked={exam.settings.shuffle_options}
-                          onCheckedChange={(val) => setExam({...exam, settings: {...exam.settings, shuffle_options: val}})}
-                          className="w-11 h-6 bg-slate-200 rounded-full relative data-[state=checked]:bg-indigo-600 transition-colors outline-none cursor-pointer"
-                        >
-                          <Switch.Thumb className="block w-5 h-5 bg-white rounded-full shadow-lg transition-transform duration-100 translate-x-0.5 will-change-transform data-[state=checked]:translate-x-[22px]" />
-                        </Switch.Root>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-medium text-slate-700">إظهار النتيجة فوراً</p>
-                          <p className="text-xs text-slate-500">عرض الدرجة للطالب بعد الإرسال</p>
-                        </div>
-                        <Switch.Root 
-                          checked={exam.settings.show_result_immediately}
-                          onCheckedChange={(val) => setExam({...exam, settings: {...exam.settings, show_result_immediately: val}})}
-                          className="w-11 h-6 bg-slate-200 rounded-full relative data-[state=checked]:bg-indigo-600 transition-colors outline-none cursor-pointer"
-                        >
-                          <Switch.Thumb className="block w-5 h-5 bg-white rounded-full shadow-lg transition-transform duration-100 translate-x-0.5 will-change-transform data-[state=checked]:translate-x-[22px]" />
-                        </Switch.Root>
+                  <div className="space-y-10">
+                    <div className="space-y-6">
+                      <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-4">الإعدادات العامة</h4>
+                      <div className="space-y-4">
+                        {[
+                          { label: 'ترتيب الأسئلة عشوائياً', desc: 'تغيير ترتيب الأسئلة لكل طالب', key: 'shuffle_questions' },
+                          { label: 'ترتيب الخيارات عشوائياً', desc: 'تغيير ترتيب خيارات الإجابة', key: 'shuffle_options' },
+                          { label: 'إظهار النتيجة فوراً', desc: 'عرض الدرجة للطالب بعد الإرسال', key: 'show_result_immediately' },
+                        ].map((setting) => (
+                          <div key={setting.key} className="flex items-center justify-between p-4 rounded-3xl bg-slate-50/50 border border-slate-100">
+                            <div>
+                              <p className="text-sm font-black text-slate-800 tracking-tight">{setting.label}</p>
+                              <p className="text-xs text-slate-500 font-bold">{setting.desc}</p>
+                            </div>
+                            <Switch.Root 
+                              checked={(exam.settings as any)[setting.key]}
+                              onCheckedChange={(val) => setExam({...exam, settings: {...exam.settings, [setting.key]: val}})}
+                              className="w-14 h-8 bg-slate-200 rounded-full relative data-[state=checked]:bg-indigo-600 transition-all outline-none cursor-pointer shadow-inner"
+                            >
+                              <Switch.Thumb className="block w-6 h-6 bg-white rounded-full shadow-xl transition-transform duration-200 translate-x-1 will-change-transform data-[state=checked]:translate-x-[26px]" />
+                            </Switch.Root>
+                          </div>
+                        ))}
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-slate-500">مدة الاختبار (دقيقة)</label>
-                        <input 
-                          type="number" 
-                          value={exam.duration}
-                          onChange={(e) => setExam({...exam, duration: parseInt(e.target.value)})}
-                          className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500/20 outline-none"
-                        />
+                    <div className="grid grid-cols-2 gap-6">
+                      <div className="space-y-3">
+                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest">مدة الاختبار (دقيقة)</label>
+                        <div className="relative">
+                          <Clock className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
+                          <input 
+                            type="number" 
+                            value={exam.duration}
+                            onChange={(e) => setExam({...exam, duration: parseInt(e.target.value)})}
+                            className="w-full pr-12 pl-4 py-4 rounded-2xl bg-slate-50 border-0 ring-1 ring-inset ring-slate-100 focus:ring-2 focus:ring-indigo-600 outline-none font-black text-slate-900 transition-all"
+                          />
+                        </div>
                       </div>
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-slate-500">عدد المحاولات</label>
-                        <input 
-                          type="number" 
-                          value={exam.max_attempts}
-                          onChange={(e) => setExam({...exam, max_attempts: parseInt(e.target.value)})}
-                          className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500/20 outline-none"
-                        />
+                      <div className="space-y-3">
+                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest">عدد المحاولات</label>
+                        <div className="relative">
+                          <HelpCircle className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
+                          <input 
+                            type="number" 
+                            value={exam.max_attempts}
+                            onChange={(e) => setExam({...exam, max_attempts: parseInt(e.target.value)})}
+                            className="w-full pr-12 pl-4 py-4 rounded-2xl bg-slate-50 border-0 ring-1 ring-inset ring-slate-100 focus:ring-2 focus:ring-indigo-600 outline-none font-black text-slate-900 transition-all"
+                          />
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -480,66 +484,69 @@ export default function QuizBuilder() {
             <button 
               onClick={handleSave}
               disabled={saving}
-              className="flex items-center gap-2 bg-indigo-600 text-white px-6 py-2 rounded-xl hover:bg-indigo-700 transition-all shadow-sm shadow-indigo-200 font-medium disabled:opacity-50"
+              className="flex items-center gap-3 bg-indigo-600 text-white px-8 py-3 rounded-2xl hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-200 font-black disabled:opacity-50 active:scale-95"
             >
               {saving ? (
                 <div className="h-5 w-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
               ) : (
                 <Save className="h-5 w-5" />
               )}
-              <span>حفظ</span>
+              <span>حفظ الاختبار</span>
             </button>
           </div>
         </div>
       </header>
 
-      <main className="max-w-3xl mx-auto px-4 py-8 space-y-6">
+      <main className="max-w-4xl mx-auto px-6 py-12 space-y-10">
         {/* Quiz Header Info */}
-        <div className="bg-white rounded-3xl border-t-[12px] border-t-indigo-600 border border-slate-200 shadow-sm p-6 space-y-4">
-          <input 
-            type="text"
-            placeholder="عنوان الاختبار"
-            value={exam.title}
-            onChange={(e) => setExam({...exam, title: e.target.value})}
-            className="w-full text-3xl font-bold text-slate-900 border-none focus:ring-0 placeholder:text-slate-300 p-0"
-          />
-          <textarea 
-            placeholder="وصف الاختبار (اختياري)"
-            value={exam.description}
-            onChange={(e) => setExam({...exam, description: e.target.value})}
-            className="w-full text-base text-slate-600 border-none focus:ring-0 placeholder:text-slate-300 p-0 resize-none h-12"
-          />
-          <div className="flex flex-wrap gap-4 pt-4 border-t border-slate-100">
+        <div className="glass-card rounded-[40px] border-t-[16px] border-t-indigo-600 border border-white/60 shadow-2xl shadow-slate-200/50 p-10 space-y-8 relative overflow-hidden">
+          <div className="absolute -right-20 -top-20 h-64 w-64 bg-indigo-50/30 rounded-full blur-3xl -z-10" />
+          <div className="space-y-4">
+            <input 
+              type="text"
+              placeholder="عنوان الاختبار"
+              value={exam.title}
+              onChange={(e) => setExam({...exam, title: e.target.value})}
+              className="w-full text-5xl font-black text-slate-900 border-none focus:ring-0 placeholder:text-slate-200 p-0 bg-transparent tracking-tighter leading-tight"
+            />
+            <textarea 
+              placeholder="وصف الاختبار (اختياري)"
+              value={exam.description}
+              onChange={(e) => setExam({...exam, description: e.target.value})}
+              className="w-full text-xl text-slate-500 border-none focus:ring-0 placeholder:text-slate-200 p-0 resize-none h-16 bg-transparent font-bold leading-relaxed"
+            />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pt-10 border-t border-slate-100">
             {isAdmin && (
-              <div className="flex-1 min-w-[200px]">
-                <label className="text-xs font-bold text-slate-500 mb-1.5 block">المعلم</label>
+              <div className="space-y-3">
+                <label className="text-xs font-black text-slate-400 uppercase tracking-widest block">المعلم المسئول</label>
                 <select 
                   value={exam.teacher_id || ''}
                   onChange={(e) => setExam({...exam, teacher_id: e.target.value})}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500/20 outline-none bg-white text-sm"
+                  className="w-full px-5 py-4 rounded-2xl bg-slate-50 border-0 ring-1 ring-inset ring-slate-100 focus:ring-2 focus:ring-indigo-600 outline-none font-bold text-slate-700 transition-all appearance-none cursor-pointer"
                 >
                   <option value="">اختر المعلم</option>
                   {teachers.map(t => <option key={t.id} value={t.id}>{t.full_name}</option>)}
                 </select>
               </div>
             )}
-            <div className="flex-1 min-w-[200px]">
-              <label className="text-xs font-bold text-slate-500 mb-1.5 block">المادة</label>
+            <div className="space-y-3">
+              <label className="text-xs font-black text-slate-400 uppercase tracking-widest block">المادة الدراسية</label>
               <select 
                 value={exam.subject_id}
                 onChange={(e) => setExam({...exam, subject_id: e.target.value})}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500/20 outline-none bg-white text-sm"
+                className="w-full px-5 py-4 rounded-2xl bg-slate-50 border-0 ring-1 ring-inset ring-slate-100 focus:ring-2 focus:ring-indigo-600 outline-none font-bold text-slate-700 transition-all appearance-none cursor-pointer"
               >
                 <option value="">اختر المادة</option>
                 {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
             </div>
-            <div className="flex-1 min-w-[200px]">
-              <label className="text-xs font-bold text-slate-500 mb-1.5 block">الشعبة (اختياري)</label>
+            <div className="space-y-3">
+              <label className="text-xs font-black text-slate-400 uppercase tracking-widest block">الشعبة المستهدفة</label>
               <select 
                 value={exam.section_id}
                 onChange={(e) => setExam({...exam, section_id: e.target.value})}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500/20 outline-none bg-white text-sm"
+                className="w-full px-5 py-4 rounded-2xl bg-slate-50 border-0 ring-1 ring-inset ring-slate-100 focus:ring-2 focus:ring-indigo-600 outline-none font-bold text-slate-700 transition-all appearance-none cursor-pointer"
               >
                 <option value="">جميع الشعب</option>
                 {sections.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
@@ -549,7 +556,7 @@ export default function QuizBuilder() {
         </div>
 
         {/* Questions List */}
-        <Reorder.Group axis="y" values={questions} onReorder={setQuestions} className="space-y-6">
+        <Reorder.Group axis="y" values={questions} onReorder={setQuestions} className="space-y-10">
           <AnimatePresence initial={false}>
             {questions.map((q, index) => (
               <Reorder.Item 
@@ -558,30 +565,32 @@ export default function QuizBuilder() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95 }}
-                className="bg-white rounded-3xl border border-slate-200 shadow-sm group relative overflow-hidden"
+                className="glass-card rounded-[40px] border border-white/60 shadow-2xl shadow-slate-200/50 group relative overflow-hidden"
               >
                 {/* Drag Handle */}
-                <div className="absolute top-0 left-1/2 -translate-x-1/2 p-1 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing">
-                  <GripVertical className="h-4 w-4 text-slate-300" />
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 p-2 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing z-10">
+                  <GripVertical className="h-6 w-6 text-slate-300" />
                 </div>
 
-                <div className="p-6 space-y-6">
+                <div className="p-10 space-y-10">
                   {/* Question Header */}
-                  <div className="flex flex-col sm:flex-row gap-4">
-                    <div className="flex-1">
+                  <div className="flex flex-col md:flex-row gap-8">
+                    <div className="flex-1 space-y-3">
+                      <label className="text-xs font-black text-slate-400 uppercase tracking-widest block">نص السؤال {index + 1}</label>
                       <input 
                         type="text"
-                        placeholder="السؤال"
+                        placeholder="اكتب سؤالك هنا..."
                         value={q.content}
                         onChange={(e) => updateQuestion(q.id, { content: e.target.value })}
-                        className="w-full bg-slate-50 px-4 py-3 rounded-xl border-none focus:ring-2 focus:ring-indigo-500/20 text-slate-900 font-medium placeholder:text-slate-400"
+                        className="w-full bg-slate-50/50 px-6 py-5 rounded-3xl border-0 ring-1 ring-inset ring-slate-100 focus:ring-2 focus:ring-indigo-600 text-xl font-black text-slate-900 placeholder:text-slate-200 transition-all outline-none"
                       />
                     </div>
-                    <div className="w-full sm:w-48">
+                    <div className="w-full md:w-64 space-y-3">
+                      <label className="text-xs font-black text-slate-400 uppercase tracking-widest block">نوع السؤال</label>
                       <select 
                         value={q.type}
                         onChange={(e) => updateQuestion(q.id, { type: e.target.value as QuestionType })}
-                        className="w-full px-3 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500/20 outline-none bg-white text-sm font-medium"
+                        className="w-full px-6 py-5 rounded-3xl bg-white border-0 ring-1 ring-inset ring-slate-200 focus:ring-2 focus:ring-indigo-600 outline-none font-black text-slate-700 transition-all appearance-none cursor-pointer"
                       >
                         <option value="multiple_choice">اختيار من متعدد</option>
                         <option value="true_false">صح أو خطأ</option>
@@ -593,92 +602,99 @@ export default function QuizBuilder() {
                   </div>
 
                   {/* Options Area */}
-                  <div className="space-y-3">
+                  <div className="space-y-6">
                     {q.type === 'multiple_choice' || q.type === 'multi_select' || q.type === 'true_false' ? (
-                      <div className="space-y-2">
-                        {q.options.map((opt, optIdx) => (
-                          <div key={opt.id} className="flex items-center gap-3 group/opt">
-                            <button 
-                              onClick={() => updateOption(q.id, opt.id, { is_correct: !opt.is_correct })}
-                              className={`h-6 w-6 rounded-full border-2 flex items-center justify-center transition-all ${
-                                opt.is_correct 
-                                  ? 'bg-emerald-500 border-emerald-500 text-white' 
-                                  : 'border-slate-200 hover:border-indigo-500'
-                              }`}
-                            >
-                              {opt.is_correct && <Check className="h-4 w-4" />}
-                            </button>
-                            <input 
-                              type="text"
-                              value={opt.content}
-                              onChange={(e) => updateOption(q.id, opt.id, { content: e.target.value })}
-                              placeholder={`الخيار ${optIdx + 1}`}
-                              className="flex-1 bg-transparent border-none focus:ring-0 text-sm text-slate-700 p-0"
-                            />
-                            {q.options.length > 2 && q.type !== 'true_false' && (
+                      <div className="space-y-4">
+                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest block">خيارات الإجابة</label>
+                        <div className="grid grid-cols-1 gap-4">
+                          {q.options.map((opt, optIdx) => (
+                            <div key={opt.id} className="flex items-center gap-5 p-4 rounded-3xl bg-slate-50/50 border border-slate-100 group/opt hover:bg-white hover:shadow-lg transition-all">
                               <button 
-                                onClick={() => deleteOption(q.id, opt.id)}
-                                className="p-1.5 opacity-0 group-hover/opt:opacity-100 hover:bg-red-50 hover:text-red-600 rounded-lg text-slate-400 transition-all"
+                                onClick={() => updateOption(q.id, opt.id, { is_correct: !opt.is_correct })}
+                                className={`h-10 w-10 rounded-2xl border-2 flex items-center justify-center transition-all shrink-0 ${
+                                  opt.is_correct 
+                                    ? 'bg-emerald-500 border-emerald-500 text-white shadow-lg shadow-emerald-200' 
+                                    : 'border-slate-200 bg-white hover:border-indigo-500'
+                                }`}
                               >
-                                <X className="h-4 w-4" />
+                                {opt.is_correct && <Check className="h-6 w-6" />}
                               </button>
-                            )}
-                          </div>
-                        ))}
+                              <input 
+                                type="text"
+                                value={opt.content}
+                                onChange={(e) => updateOption(q.id, opt.id, { content: e.target.value })}
+                                placeholder={`الخيار ${optIdx + 1}`}
+                                className="flex-1 bg-transparent border-none focus:ring-0 text-lg font-bold text-slate-700 p-0 placeholder:text-slate-300"
+                              />
+                              {q.options.length > 2 && q.type !== 'true_false' && (
+                                <button 
+                                  onClick={() => deleteOption(q.id, opt.id)}
+                                  className="h-10 w-10 flex items-center justify-center opacity-0 group-hover/opt:opacity-100 hover:bg-red-50 hover:text-red-600 rounded-xl text-slate-400 transition-all active:scale-95"
+                                >
+                                  <X className="h-5 w-5" />
+                                </button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
                         {q.type !== 'true_false' && (
                           <button 
                             onClick={() => addOption(q.id)}
-                            className="flex items-center gap-2 text-sm text-indigo-600 hover:text-indigo-700 font-medium pt-2"
+                            className="flex items-center gap-3 px-6 py-4 rounded-2xl border-2 border-dashed border-slate-200 text-slate-500 hover:border-indigo-500 hover:text-indigo-600 hover:bg-indigo-50 transition-all font-black text-sm group"
                           >
-                            <Plus className="h-4 w-4" />
-                            <span>إضافة خيار</span>
+                            <Plus className="h-5 w-5 group-hover:scale-110 transition-transform" />
+                            <span>إضافة خيار إجابة</span>
                           </button>
                         )}
                       </div>
                     ) : q.type === 'essay' ? (
-                      <div className="p-4 bg-slate-50 rounded-xl border border-dashed border-slate-200 text-slate-400 text-sm italic">
-                        سيقوم الطالب بكتابة إجابته هنا...
+                      <div className="p-8 bg-slate-50/50 rounded-[32px] border-2 border-dashed border-slate-200 text-slate-400 font-bold italic text-center">
+                        سيقوم الطالب بكتابة إجابته المقالية هنا...
                       </div>
                     ) : (
-                      <div className="p-4 bg-slate-50 rounded-xl border border-dashed border-slate-200 text-slate-400 text-sm italic">
-                        أدخل النص مع استخدام [____] لمكان الفراغ...
+                      <div className="p-8 bg-slate-50/50 rounded-[32px] border-2 border-dashed border-slate-200 text-slate-400 font-bold italic text-center">
+                        أدخل النص مع استخدام [____] لمكان الفراغ الذي سيملأه الطالب...
                       </div>
                     )}
                   </div>
 
                   {/* Question Footer Actions */}
-                  <div className="flex items-center justify-between pt-6 border-t border-slate-100">
-                    <div className="flex items-center gap-4">
-                      <div className="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200">
-                        <span className="text-xs font-bold text-slate-500">النقاط:</span>
+                  <div className="flex flex-col sm:flex-row items-center justify-between pt-10 border-t border-slate-100 gap-6">
+                    <div className="flex items-center gap-6">
+                      <div className="flex items-center gap-4 bg-slate-50 px-5 py-3 rounded-2xl border border-slate-100 shadow-inner">
+                        <span className="text-xs font-black text-slate-400 uppercase tracking-widest">النقاط:</span>
                         <input 
                           type="number"
                           value={q.points}
                           onChange={(e) => updateQuestion(q.id, { points: parseFloat(e.target.value) })}
-                          className="w-12 bg-transparent border-none focus:ring-0 text-sm font-bold text-slate-900 p-0 text-center"
+                          className="w-16 bg-transparent border-none focus:ring-0 text-xl font-black text-slate-900 p-0 text-center tracking-tighter"
                         />
                       </div>
-                      <button className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-all">
-                        <ImageIcon className="h-5 w-5" />
-                      </button>
-                      <button className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-all">
-                        <Video className="h-5 w-5" />
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button className="h-12 w-12 flex items-center justify-center rounded-2xl bg-white border border-slate-100 text-slate-400 hover:text-indigo-600 hover:shadow-lg transition-all active:scale-95">
+                          <ImageIcon className="h-5 w-5" />
+                        </button>
+                        <button className="h-12 w-12 flex items-center justify-center rounded-2xl bg-white border border-slate-100 text-slate-400 hover:text-indigo-600 hover:shadow-lg transition-all active:scale-95">
+                          <Video className="h-5 w-5" />
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-3">
                       <button 
                         onClick={() => duplicateQuestion(q.id)}
-                        className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-all"
+                        className="h-12 px-6 flex items-center gap-3 rounded-2xl bg-white border border-slate-100 text-slate-400 hover:text-slate-900 hover:shadow-lg transition-all active:scale-95 font-black text-sm"
                         title="تكرار السؤال"
                       >
                         <Copy className="h-5 w-5" />
+                        <span>تكرار</span>
                       </button>
                       <button 
                         onClick={() => deleteQuestion(q.id)}
-                        className="p-2 hover:bg-red-50 rounded-lg text-slate-400 hover:text-red-600 transition-all"
+                        className="h-12 px-6 flex items-center gap-3 rounded-2xl bg-red-50 text-red-400 hover:text-red-600 hover:bg-red-100 transition-all active:scale-95 font-black text-sm"
                         title="حذف السؤال"
                       >
                         <Trash2 className="h-5 w-5" />
+                        <span>حذف</span>
                       </button>
                     </div>
                   </div>
@@ -689,30 +705,40 @@ export default function QuizBuilder() {
         </Reorder.Group>
 
         {/* Add Question Button */}
-        <div className="flex justify-center pt-4">
+        <div className="flex justify-center pt-10">
           <DropdownMenu.Root>
             <DropdownMenu.Trigger asChild>
-              <button className="flex items-center gap-2 bg-white border-2 border-dashed border-slate-300 text-slate-500 px-8 py-4 rounded-3xl hover:border-indigo-500 hover:text-indigo-600 hover:bg-indigo-50 transition-all font-bold group">
-                <Plus className="h-6 w-6 group-hover:scale-110 transition-transform" />
-                <span>إضافة سؤال جديد</span>
+              <button className="flex items-center gap-4 bg-white border-2 border-dashed border-slate-300 text-slate-500 px-12 py-6 rounded-[40px] hover:border-indigo-500 hover:text-indigo-600 hover:bg-indigo-50 hover:shadow-2xl hover:shadow-indigo-200/50 transition-all font-black text-xl group active:scale-95">
+                <div className="h-12 w-12 rounded-2xl bg-slate-50 flex items-center justify-center group-hover:bg-indigo-600 group-hover:text-white transition-all">
+                  <Plus className="h-8 w-8 group-hover:scale-110 transition-transform" />
+                </div>
+                <span>إضافة سؤال جديد للاختبار</span>
               </button>
             </DropdownMenu.Trigger>
             <DropdownMenu.Portal>
-              <DropdownMenu.Content className="bg-white rounded-2xl shadow-2xl border border-slate-200 p-2 min-w-[220px] z-50 animate-in fade-in slide-in-from-bottom-2 duration-200">
+              <DropdownMenu.Content className="bg-white rounded-[32px] shadow-[0_32px_64px_-12px_rgba(0,0,0,0.14)] border border-slate-100 p-4 min-w-[280px] z-50 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                <div className="px-4 py-2 mb-2">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">اختر نوع السؤال</p>
+                </div>
                 {[
-                  { type: 'multiple_choice', label: 'اختيار من متعدد', icon: List },
-                  { type: 'true_false', label: 'صح أو خطأ', icon: CheckSquare },
-                  { type: 'multi_select', label: 'اختيار متعدد', icon: CheckSquare },
-                  { type: 'essay', label: 'سؤال مقالي', icon: AlignLeft },
-                  { type: 'fill_in_blank', label: 'ملء الفراغ', icon: Type },
+                  { type: 'multiple_choice', label: 'اختيار من متعدد', icon: List, desc: 'سؤال مع خيارات إجابة واحدة صحيحة' },
+                  { type: 'true_false', label: 'صح أو خطأ', icon: CheckSquare, desc: 'سؤال بإجابة منطقية بسيطة' },
+                  { type: 'multi_select', label: 'اختيار متعدد', icon: CheckSquare, desc: 'سؤال مع عدة إجابات صحيحة محتملة' },
+                  { type: 'essay', label: 'سؤال مقالي', icon: AlignLeft, desc: 'سؤال يتطلب كتابة نصية من الطالب' },
+                  { type: 'fill_in_blank', label: 'ملء الفراغ', icon: Type, desc: 'سؤال يتطلب إكمال جملة ناقصة' },
                 ].map((item) => (
                   <DropdownMenu.Item 
                     key={item.type}
                     onClick={() => addQuestion(item.type as QuestionType)}
-                    className="flex items-center gap-3 px-3 py-2.5 text-sm text-slate-700 hover:bg-indigo-50 hover:text-indigo-700 rounded-xl outline-none cursor-pointer transition-colors"
+                    className="flex items-center gap-4 px-4 py-3 text-slate-700 hover:bg-indigo-50 hover:text-indigo-700 rounded-2xl outline-none cursor-pointer transition-all group"
                   >
-                    <item.icon className="h-4 w-4" />
-                    <span>{item.label}</span>
+                    <div className="h-10 w-10 rounded-xl bg-slate-50 flex items-center justify-center group-hover:bg-white transition-colors">
+                      <item.icon className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-black tracking-tight">{item.label}</p>
+                      <p className="text-[10px] font-bold text-slate-400 group-hover:text-indigo-400">{item.desc}</p>
+                    </div>
                   </DropdownMenu.Item>
                 ))}
               </DropdownMenu.Content>
@@ -722,12 +748,14 @@ export default function QuizBuilder() {
       </main>
 
       {/* Floating Bottom Bar for Mobile */}
-      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 sm:hidden flex items-center gap-2 bg-white/80 backdrop-blur-md border border-slate-200 p-2 rounded-2xl shadow-2xl z-40">
-        <button onClick={() => addQuestion('multiple_choice')} className="p-3 bg-indigo-600 text-white rounded-xl shadow-lg shadow-indigo-200">
-          <Plus className="h-6 w-6" />
+      <div className="fixed bottom-8 left-1/2 -translate-x-1/2 md:hidden flex items-center gap-4 bg-white/80 backdrop-blur-xl border border-white/60 p-3 rounded-[32px] shadow-[0_32px_64px_-12px_rgba(0,0,0,0.2)] z-40">
+        <button onClick={() => addQuestion('multiple_choice')} className="h-14 w-14 flex items-center justify-center bg-indigo-600 text-white rounded-2xl shadow-xl shadow-indigo-200 active:scale-90 transition-transform">
+          <Plus className="h-8 w-8" />
         </button>
-        <button onClick={handleSave} className="p-3 bg-emerald-600 text-white rounded-xl shadow-lg shadow-emerald-200">
+        <div className="h-8 w-px bg-slate-200 mx-1" />
+        <button onClick={handleSave} className="h-14 px-8 flex items-center gap-3 bg-emerald-600 text-white rounded-2xl shadow-xl shadow-emerald-200 active:scale-90 transition-transform font-black">
           <Save className="h-6 w-6" />
+          <span>حفظ</span>
         </button>
       </div>
     </div>

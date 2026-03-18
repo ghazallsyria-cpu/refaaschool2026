@@ -46,50 +46,83 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
   const pathname = usePathname();
 
   return (
-    <div className="flex h-full w-64 flex-col bg-slate-900 text-slate-300">
-      <div className="flex h-16 shrink-0 items-center justify-between px-6 bg-slate-950">
-        <div className="flex items-center gap-3">
-          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-indigo-600">
-            <School className="h-5 w-5 text-white" />
+    <div className="flex h-full w-72 flex-col bg-slate-900 text-slate-300 border-l border-slate-800/50 shadow-2xl relative overflow-hidden">
+      {/* Decorative background elements */}
+      <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 blur-3xl rounded-full -translate-y-1/2 translate-x-1/2" />
+      <div className="absolute bottom-0 left-0 w-32 h-32 bg-emerald-500/10 blur-3xl rounded-full translate-y-1/2 -translate-x-1/2" />
+
+      <div className="flex h-24 shrink-0 items-center justify-between px-8 border-b border-slate-800/50 relative z-10">
+        <div className="flex items-center gap-4">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 shadow-xl shadow-indigo-500/20 ring-1 ring-white/20">
+            <School className="h-7 w-7 text-white" />
           </div>
-          <span className="text-lg font-bold text-white tracking-tight">مدرسة الرفعة</span>
+          <div className="flex flex-col">
+            <span className="text-lg font-black text-white tracking-tight leading-none">مدرسة الرفعة</span>
+            <span className="text-[10px] text-indigo-400 font-bold uppercase tracking-[0.2em] mt-1">المنصة الرقمية</span>
+          </div>
         </div>
         {onClose && (
           <button 
             onClick={onClose}
-            className="lg:hidden p-2 -mr-2 text-slate-400 hover:text-white rounded-md"
+            className="lg:hidden p-2 text-slate-500 hover:text-white rounded-xl hover:bg-white/5 transition-all"
           >
             <X className="h-5 w-5" />
           </button>
         )}
       </div>
-      <div className="flex flex-1 flex-col overflow-y-auto">
-        <nav className="flex-1 space-y-1 px-3 py-4">
+
+      <div className="flex flex-1 flex-col overflow-y-auto py-8 px-4 custom-scrollbar relative z-10">
+        <nav className="space-y-1.5">
           {navigation.map((item) => {
-            const isActive = pathname === item.href || pathname?.startsWith(item.href + '/');
+            const isActive = pathname === item.href || (item.href !== '/' && pathname?.startsWith(item.href));
             return (
               <Link
                 key={item.name}
                 href={item.href}
+                onClick={onClose}
                 className={cn(
-                  isActive
-                    ? 'bg-indigo-600 text-white'
-                    : 'text-slate-300 hover:bg-slate-800 hover:text-white',
-                  'group flex items-center rounded-md px-3 py-2 text-sm font-medium transition-colors'
+                  "flex items-center px-4 py-3.5 rounded-2xl text-sm font-medium transition-all duration-200 group relative overflow-hidden",
+                  isActive 
+                    ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/20" 
+                    : "hover:bg-white/5 hover:text-white"
                 )}
               >
+                {isActive && (
+                  <motion.div 
+                    layoutId="sidebar-active"
+                    className="absolute inset-0 bg-gradient-to-r from-indigo-600 to-violet-600 -z-10"
+                  />
+                )}
                 <item.icon
                   className={cn(
-                    isActive ? 'text-white' : 'text-slate-400 group-hover:text-white',
-                    'mr-3 h-5 w-5 shrink-0 ml-3'
+                    "h-5 w-5 shrink-0 ml-3.5 transition-all duration-300",
+                    isActive ? "text-white scale-110" : "text-slate-500 group-hover:text-indigo-400 group-hover:scale-110"
                   )}
                   aria-hidden="true"
                 />
-                {item.name}
+                <span className="relative z-10">{item.name}</span>
+                {isActive && (
+                  <div className="absolute right-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-white rounded-l-full" />
+                )}
               </Link>
             );
           })}
         </nav>
+      </div>
+      
+      <div className="p-6 border-t border-slate-800/50 relative z-10">
+        <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-4 flex items-center gap-4 border border-white/5 hover:bg-white/10 transition-colors cursor-pointer group">
+          <div className="relative">
+            <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white font-black text-sm shadow-lg ring-2 ring-white/10">
+              AD
+            </div>
+            <div className="absolute -bottom-1 -left-1 w-4 h-4 bg-emerald-500 border-2 border-slate-900 rounded-full shadow-sm" />
+          </div>
+          <div className="flex flex-col overflow-hidden">
+            <span className="text-sm font-bold text-white truncate group-hover:text-indigo-400 transition-colors">المدير العام</span>
+            <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">لوحة التحكم المركزية</span>
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Calendar, Save, CheckCircle2, XCircle, Clock, AlertCircle } from 'lucide-react';
+import { Calendar, Save, CheckCircle2, XCircle, Clock, AlertCircle, Users } from 'lucide-react';
 import { useNotifications } from '@/context/notification-context';
 
 type AttendanceStatus = 'present' | 'absent' | 'late' | 'excused';
@@ -155,135 +155,194 @@ export default function AttendancePage() {
   };
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">سجل الحضور والغياب</h1>
-          <p className="text-slate-500">تسجيل ومتابعة حضور الطلاب اليومي</p>
+    <div className="space-y-10 max-w-6xl mx-auto pb-24">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-8">
+        <div className="space-y-2">
+          <h1 className="text-4xl font-black text-slate-900 tracking-tight">سجل الحضور والغياب</h1>
+          <p className="text-lg text-slate-500 font-medium">تسجيل ومتابعة حضور الطلاب اليومي بدقة وكفاءة</p>
         </div>
+        
         <button 
           onClick={handleSave}
           disabled={saving || students.length === 0}
-          className="inline-flex items-center justify-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="inline-flex items-center justify-center gap-3 rounded-2xl bg-indigo-600 px-8 py-4 text-sm font-black text-white shadow-xl shadow-indigo-200 hover:bg-indigo-700 hover:shadow-indigo-300 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed self-start md:self-end"
         >
-          <Save className="mr-2 h-4 w-4 ml-2" />
-          {saving ? 'جاري الحفظ...' : 'حفظ السجل'}
+          <Save className="h-5 w-5" />
+          {saving ? 'جاري الحفظ...' : 'حفظ سجل اليوم'}
         </button>
       </div>
 
       {message.text && (
-        <div className={`p-4 rounded-md ${message.type === 'success' ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}>
-          {message.text}
+        <div className={`p-6 rounded-3xl shadow-xl animate-in fade-in slide-in-from-top-4 duration-500 flex items-center gap-4 ${
+          message.type === 'success' 
+            ? 'bg-emerald-500 text-white shadow-emerald-100' 
+            : 'bg-red-500 text-white shadow-red-100'
+        }`}>
+          <div className="h-10 w-10 rounded-2xl bg-white/20 flex items-center justify-center">
+            {message.type === 'success' ? <CheckCircle2 className="h-6 w-6" /> : <AlertCircle className="h-6 w-6" />}
+          </div>
+          <span className="font-bold tracking-tight">{message.text}</span>
         </div>
       )}
 
-      <div className="bg-white p-4 rounded-xl shadow-sm ring-1 ring-slate-200">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">الفصل / الشعبة</label>
+      <div className="glass-card p-8 rounded-4xl shadow-2xl shadow-slate-200/50 border border-white/60">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="space-y-2">
+            <label className="text-sm font-black text-slate-700 mr-1">الفصل / الشعبة</label>
             <select
               value={selectedSection}
               onChange={(e) => setSelectedSection(e.target.value)}
-              className="block w-full rounded-md border-0 py-2 pl-3 pr-10 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-indigo-600 sm:text-sm sm:leading-6"
+              className="block w-full rounded-2xl border-0 py-4 px-4 text-slate-900 bg-slate-50 ring-1 ring-inset ring-slate-100 focus:ring-2 focus:ring-indigo-600 sm:text-sm transition-all font-bold"
             >
               {sections.map(s => (
                 <option key={s.id} value={s.id}>{s.classes?.name} - {s.name}</option>
               ))}
             </select>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">التاريخ</label>
-            <div className="relative">
-              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
-                <Calendar className="h-5 w-5 text-slate-400" />
+          <div className="space-y-2">
+            <label className="text-sm font-black text-slate-700 mr-1">التاريخ</label>
+            <div className="relative group">
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-4 text-slate-400 group-focus-within:text-indigo-600 transition-colors">
+                <Calendar className="h-5 w-5" />
               </div>
               <input
                 type="date"
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
-                className="block w-full rounded-md border-0 py-2 pr-10 pl-3 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                className="block w-full rounded-2xl border-0 py-4 pr-12 pl-4 text-slate-900 bg-slate-50 ring-1 ring-inset ring-slate-100 focus:ring-2 focus:ring-indigo-600 sm:text-sm transition-all font-bold"
               />
             </div>
           </div>
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm ring-1 ring-slate-200 overflow-hidden">
-        <div className="p-4 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
-          <h3 className="font-medium text-slate-900">قائمة الطلاب</h3>
-          <div className="flex gap-4">
-            <button onClick={() => markAllAs('present')} className="text-xs text-emerald-600 hover:underline font-medium">الكل حاضر</button>
-            <span className="text-slate-300">|</span>
-            <button onClick={() => markAllAs('absent')} className="text-xs text-red-600 hover:underline font-medium">الكل غائب</button>
+      <div className="glass-card rounded-4xl shadow-2xl shadow-slate-200/50 border border-white/60 overflow-hidden">
+        <div className="p-8 border-b border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row justify-between items-center gap-6">
+          <div className="flex items-center gap-4">
+            <div className="h-12 w-12 rounded-2xl bg-indigo-600 flex items-center justify-center text-white shadow-lg shadow-indigo-100">
+              <Users className="h-6 w-6" />
+            </div>
+            <div>
+              <h3 className="text-xl font-black text-slate-900 tracking-tight">قائمة الطلاب</h3>
+              <p className="text-sm text-slate-500 font-bold">{students.length} طالب مسجل</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 bg-white p-2 rounded-2xl shadow-sm border border-slate-100">
+            <button 
+              onClick={() => markAllAs('present')} 
+              className="px-4 py-2 text-xs text-emerald-600 hover:bg-emerald-50 rounded-xl font-black transition-all"
+            >
+              الكل حاضر
+            </button>
+            <div className="w-px h-4 bg-slate-100" />
+            <button 
+              onClick={() => markAllAs('absent')} 
+              className="px-4 py-2 text-xs text-red-600 hover:bg-red-50 rounded-xl font-black transition-all"
+            >
+              الكل غائب
+            </button>
           </div>
         </div>
         
         {/* Desktop Table View */}
-        <div className="hidden sm:block overflow-x-auto">
-          <table className="min-w-full divide-y divide-slate-200">
-            <thead className="bg-white">
-              <tr>
-                <th scope="col" className="py-3.5 pr-4 pl-3 text-right text-sm font-semibold text-slate-900 sm:pr-6">اسم الطالب</th>
-                <th scope="col" className="px-3 py-3.5 text-center text-sm font-semibold text-slate-900">حاضر</th>
-                <th scope="col" className="px-3 py-3.5 text-center text-sm font-semibold text-slate-900">غائب</th>
-                <th scope="col" className="px-3 py-3.5 text-center text-sm font-semibold text-slate-900">متأخر</th>
-                <th scope="col" className="px-3 py-3.5 text-center text-sm font-semibold text-slate-900">مستأذن</th>
+        <div className="hidden md:block overflow-x-auto">
+          <table className="min-w-full divide-y divide-slate-100">
+            <thead>
+              <tr className="bg-slate-50/30">
+                <th scope="col" className="py-6 pr-8 pl-4 text-right text-[10px] font-black uppercase tracking-widest text-slate-400">اسم الطالب</th>
+                <th scope="col" className="px-4 py-6 text-center text-[10px] font-black uppercase tracking-widest text-slate-400">حاضر</th>
+                <th scope="col" className="px-4 py-6 text-center text-[10px] font-black uppercase tracking-widest text-slate-400">غائب</th>
+                <th scope="col" className="px-4 py-6 text-center text-[10px] font-black uppercase tracking-widest text-slate-400">متأخر</th>
+                <th scope="col" className="px-4 py-6 text-center text-[10px] font-black uppercase tracking-widest text-slate-400">مستأذن</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-200 bg-white">
+            <tbody className="divide-y divide-slate-50 bg-white">
               {loading ? (
                 <tr>
-                  <td colSpan={5} className="py-10 text-center text-sm text-slate-500">
-                    جاري تحميل قائمة الطلاب...
+                  <td colSpan={5} className="py-20 text-center">
+                    <div className="flex flex-col items-center gap-4">
+                      <div className="h-12 w-12 border-4 border-indigo-600/20 border-t-indigo-600 rounded-full animate-spin" />
+                      <p className="text-slate-400 font-bold">جاري تحميل قائمة الطلاب...</p>
+                    </div>
                   </td>
                 </tr>
               ) : students.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="py-10 text-center text-sm text-slate-500">
-                    لا يوجد طلاب مسجلين في هذه الشعبة
+                  <td colSpan={5} className="py-20 text-center">
+                    <div className="flex flex-col items-center gap-4">
+                      <div className="h-16 w-16 rounded-3xl bg-slate-50 flex items-center justify-center">
+                        <Users className="h-8 w-8 text-slate-200" />
+                      </div>
+                      <p className="text-slate-400 font-bold text-lg">لا يوجد طلاب مسجلين في هذه الشعبة</p>
+                    </div>
                   </td>
                 </tr>
               ) : (
                 students.map((student) => (
-                  <tr key={student.id} className="hover:bg-slate-50">
-                    <td className="whitespace-nowrap py-4 pr-4 pl-3 text-sm font-medium text-slate-900 sm:pr-6">
-                      {student.users?.full_name}
+                  <tr key={student.id} className="group hover:bg-slate-50/50 transition-colors">
+                    <td className="whitespace-nowrap py-6 pr-8 pl-4">
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-600 font-black text-sm group-hover:bg-white group-hover:shadow-sm transition-all border border-transparent group-hover:border-slate-100">
+                          {student.users?.full_name?.charAt(0)}
+                        </div>
+                        <span className="font-bold text-slate-900 tracking-tight">{student.users?.full_name}</span>
+                      </div>
                     </td>
-                    <td className="whitespace-nowrap px-3 py-4 text-center">
-                      <input
-                        type="radio"
-                        name={`status-${student.id}`}
-                        checked={attendance[student.id] === 'present'}
-                        onChange={() => handleStatusChange(student.id, 'present')}
-                        className="h-4 w-4 border-slate-300 text-emerald-600 focus:ring-emerald-600 cursor-pointer"
-                      />
+                    <td className="whitespace-nowrap px-4 py-6 text-center">
+                      <label className="relative inline-flex items-center cursor-pointer group/radio">
+                        <input
+                          type="radio"
+                          name={`status-${student.id}`}
+                          checked={attendance[student.id] === 'present'}
+                          onChange={() => handleStatusChange(student.id, 'present')}
+                          className="peer sr-only"
+                        />
+                        <div className="w-6 h-6 rounded-lg border-2 border-slate-200 peer-checked:border-emerald-500 peer-checked:bg-emerald-500 transition-all flex items-center justify-center group-hover/radio:border-emerald-200">
+                          <CheckCircle2 className="h-4 w-4 text-white scale-0 peer-checked:scale-100 transition-transform" />
+                        </div>
+                      </label>
                     </td>
-                    <td className="whitespace-nowrap px-3 py-4 text-center">
-                      <input
-                        type="radio"
-                        name={`status-${student.id}`}
-                        checked={attendance[student.id] === 'absent'}
-                        onChange={() => handleStatusChange(student.id, 'absent')}
-                        className="h-4 w-4 border-slate-300 text-red-600 focus:ring-red-600 cursor-pointer"
-                      />
+                    <td className="whitespace-nowrap px-4 py-6 text-center">
+                      <label className="relative inline-flex items-center cursor-pointer group/radio">
+                        <input
+                          type="radio"
+                          name={`status-${student.id}`}
+                          checked={attendance[student.id] === 'absent'}
+                          onChange={() => handleStatusChange(student.id, 'absent')}
+                          className="peer sr-only"
+                        />
+                        <div className="w-6 h-6 rounded-lg border-2 border-slate-200 peer-checked:border-red-500 peer-checked:bg-red-500 transition-all flex items-center justify-center group-hover/radio:border-red-200">
+                          <XCircle className="h-4 w-4 text-white scale-0 peer-checked:scale-100 transition-transform" />
+                        </div>
+                      </label>
                     </td>
-                    <td className="whitespace-nowrap px-3 py-4 text-center">
-                      <input
-                        type="radio"
-                        name={`status-${student.id}`}
-                        checked={attendance[student.id] === 'late'}
-                        onChange={() => handleStatusChange(student.id, 'late')}
-                        className="h-4 w-4 border-slate-300 text-amber-600 focus:ring-amber-600 cursor-pointer"
-                      />
+                    <td className="whitespace-nowrap px-4 py-6 text-center">
+                      <label className="relative inline-flex items-center cursor-pointer group/radio">
+                        <input
+                          type="radio"
+                          name={`status-${student.id}`}
+                          checked={attendance[student.id] === 'late'}
+                          onChange={() => handleStatusChange(student.id, 'late')}
+                          className="peer sr-only"
+                        />
+                        <div className="w-6 h-6 rounded-lg border-2 border-slate-200 peer-checked:border-amber-500 peer-checked:bg-amber-500 transition-all flex items-center justify-center group-hover/radio:border-amber-200">
+                          <Clock className="h-4 w-4 text-white scale-0 peer-checked:scale-100 transition-transform" />
+                        </div>
+                      </label>
                     </td>
-                    <td className="whitespace-nowrap px-3 py-4 text-center">
-                      <input
-                        type="radio"
-                        name={`status-${student.id}`}
-                        checked={attendance[student.id] === 'excused'}
-                        onChange={() => handleStatusChange(student.id, 'excused')}
-                        className="h-4 w-4 border-slate-300 text-blue-600 focus:ring-blue-600 cursor-pointer"
-                      />
+                    <td className="whitespace-nowrap px-4 py-6 text-center">
+                      <label className="relative inline-flex items-center cursor-pointer group/radio">
+                        <input
+                          type="radio"
+                          name={`status-${student.id}`}
+                          checked={attendance[student.id] === 'excused'}
+                          onChange={() => handleStatusChange(student.id, 'excused')}
+                          className="peer sr-only"
+                        />
+                        <div className="w-6 h-6 rounded-lg border-2 border-slate-200 peer-checked:border-blue-500 peer-checked:bg-blue-500 transition-all flex items-center justify-center group-hover/radio:border-blue-200">
+                          <AlertCircle className="h-4 w-4 text-white scale-0 peer-checked:scale-100 transition-transform" />
+                        </div>
+                      </label>
                     </td>
                   </tr>
                 ))
@@ -293,62 +352,70 @@ export default function AttendancePage() {
         </div>
 
         {/* Mobile View */}
-        <div className="sm:hidden divide-y divide-slate-200">
+        <div className="md:hidden divide-y divide-slate-100">
           {loading ? (
-            <div className="py-10 text-center text-sm text-slate-500">
-              جاري تحميل قائمة الطلاب...
+            <div className="py-20 text-center">
+              <div className="flex flex-col items-center gap-4">
+                <div className="h-10 w-10 border-4 border-indigo-600/20 border-t-indigo-600 rounded-full animate-spin" />
+                <p className="text-slate-400 font-bold">جاري تحميل قائمة الطلاب...</p>
+              </div>
             </div>
           ) : students.length === 0 ? (
-            <div className="py-10 text-center text-sm text-slate-500">
-              لا يوجد طلاب مسجلين في هذه الشعبة
+            <div className="py-20 text-center">
+              <p className="text-slate-400 font-bold">لا يوجد طلاب مسجلين في هذه الشعبة</p>
             </div>
           ) : (
             students.map((student) => (
-              <div key={student.id} className="p-4 space-y-3">
-                <div className="font-medium text-slate-900">{student.users?.full_name}</div>
-                <div className="grid grid-cols-2 gap-2">
+              <div key={student.id} className="p-6 space-y-6 bg-white hover:bg-slate-50/50 transition-colors">
+                <div className="flex items-center gap-4">
+                  <div className="h-12 w-12 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-600 font-black">
+                    {student.users?.full_name?.charAt(0)}
+                  </div>
+                  <div className="font-black text-slate-900 text-lg tracking-tight">{student.users?.full_name}</div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
                   <button
                     onClick={() => handleStatusChange(student.id, 'present')}
-                    className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg border text-sm transition-colors ${
+                    className={`flex items-center justify-center gap-3 py-4 px-4 rounded-2xl border-2 transition-all font-black text-sm ${
                       attendance[student.id] === 'present'
-                        ? 'bg-emerald-50 border-emerald-200 text-emerald-700 font-bold'
-                        : 'bg-white border-slate-200 text-slate-600'
+                        ? 'bg-emerald-500 border-emerald-500 text-white shadow-lg shadow-emerald-100'
+                        : 'bg-white border-slate-100 text-slate-500 hover:border-emerald-200 hover:text-emerald-600'
                     }`}
                   >
-                    <CheckCircle2 className={`h-4 w-4 ${attendance[student.id] === 'present' ? 'text-emerald-600' : 'text-slate-300'}`} />
+                    <CheckCircle2 className="h-5 w-5" />
                     حاضر
                   </button>
                   <button
                     onClick={() => handleStatusChange(student.id, 'absent')}
-                    className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg border text-sm transition-colors ${
+                    className={`flex items-center justify-center gap-3 py-4 px-4 rounded-2xl border-2 transition-all font-black text-sm ${
                       attendance[student.id] === 'absent'
-                        ? 'bg-red-50 border-red-200 text-red-700 font-bold'
-                        : 'bg-white border-slate-200 text-slate-600'
+                        ? 'bg-red-500 border-red-500 text-white shadow-lg shadow-red-100'
+                        : 'bg-white border-slate-100 text-slate-500 hover:border-red-200 hover:text-red-600'
                     }`}
                   >
-                    <XCircle className={`h-4 w-4 ${attendance[student.id] === 'absent' ? 'text-red-600' : 'text-slate-300'}`} />
+                    <XCircle className="h-5 w-5" />
                     غائب
                   </button>
                   <button
                     onClick={() => handleStatusChange(student.id, 'late')}
-                    className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg border text-sm transition-colors ${
+                    className={`flex items-center justify-center gap-3 py-4 px-4 rounded-2xl border-2 transition-all font-black text-sm ${
                       attendance[student.id] === 'late'
-                        ? 'bg-amber-50 border-amber-200 text-amber-700 font-bold'
-                        : 'bg-white border-slate-200 text-slate-600'
+                        ? 'bg-amber-500 border-amber-500 text-white shadow-lg shadow-amber-100'
+                        : 'bg-white border-slate-100 text-slate-500 hover:border-amber-200 hover:text-amber-600'
                     }`}
                   >
-                    <Clock className={`h-4 w-4 ${attendance[student.id] === 'late' ? 'text-amber-600' : 'text-slate-300'}`} />
+                    <Clock className="h-5 w-5" />
                     متأخر
                   </button>
                   <button
                     onClick={() => handleStatusChange(student.id, 'excused')}
-                    className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg border text-sm transition-colors ${
+                    className={`flex items-center justify-center gap-3 py-4 px-4 rounded-2xl border-2 transition-all font-black text-sm ${
                       attendance[student.id] === 'excused'
-                        ? 'bg-blue-50 border-blue-200 text-blue-700 font-bold'
-                        : 'bg-white border-slate-200 text-slate-600'
+                        ? 'bg-blue-500 border-blue-500 text-white shadow-lg shadow-blue-100'
+                        : 'bg-white border-slate-100 text-slate-500 hover:border-blue-200 hover:text-blue-600'
                     }`}
                   >
-                    <AlertCircle className={`h-4 w-4 ${attendance[student.id] === 'excused' ? 'text-blue-600' : 'text-slate-300'}`} />
+                    <AlertCircle className="h-5 w-5" />
                     مستأذن
                   </button>
                 </div>

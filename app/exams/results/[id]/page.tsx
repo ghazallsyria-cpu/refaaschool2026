@@ -114,27 +114,33 @@ export default function ExamResults() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto p-4 sm:p-6 space-y-8 pb-20">
+    <div className="max-w-7xl mx-auto p-4 sm:p-8 space-y-10 pb-24">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-8">
+        <div className="flex items-center gap-6">
           <button 
             onClick={() => router.back()}
-            className="p-2 hover:bg-slate-100 rounded-xl text-slate-500 transition-colors"
+            className="h-14 w-14 flex items-center justify-center glass-card rounded-2xl text-slate-500 hover:text-indigo-600 hover:shadow-xl transition-all active:scale-95 border border-white/60"
           >
             <ArrowRight className="h-6 w-6" />
           </button>
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">{exam?.title}</h1>
-            <p className="text-slate-500">نتائج وتحليلات الاختبار • {exam?.subject?.name}</p>
+          <div className="space-y-1">
+            <h1 className="text-4xl font-black text-slate-900 tracking-tight leading-tight">{exam?.title}</h1>
+            <div className="flex items-center gap-3 text-slate-500 font-bold">
+              <span className="px-3 py-1 rounded-xl bg-indigo-50 text-indigo-600 text-xs uppercase tracking-widest border border-indigo-100">
+                {exam?.subject?.name}
+              </span>
+              <span className="text-slate-300">•</span>
+              <p className="text-lg">نتائج وتحليلات الاختبار</p>
+            </div>
           </div>
         </div>
-        <div className="flex gap-2">
-          <button className="flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 font-medium transition-all">
-            <FileSpreadsheet className="h-5 w-5" />
+        <div className="flex gap-3 self-start md:self-end">
+          <button className="flex items-center gap-3 px-6 py-4 rounded-2xl glass-card border border-white/60 hover:bg-white/80 text-slate-600 font-black transition-all shadow-xl shadow-slate-200/50 active:scale-95">
+            <FileSpreadsheet className="h-5 w-5 text-emerald-500" />
             <span>تصدير Excel</span>
           </button>
-          <button className="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 font-medium transition-all shadow-sm shadow-indigo-100">
+          <button className="flex items-center gap-3 px-6 py-4 rounded-2xl bg-indigo-600 text-white hover:bg-indigo-700 font-black transition-all shadow-xl shadow-indigo-200 active:scale-95">
             <Download className="h-5 w-5" />
             <span>تقرير PDF</span>
           </button>
@@ -142,7 +148,7 @@ export default function ExamResults() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
         {[
           { label: 'متوسط الدرجات', value: `${stats?.avg_score}%`, icon: BarChart2, color: 'text-indigo-600', bg: 'bg-indigo-50', trend: '+5%', trendUp: true },
           { label: 'نسبة النجاح', value: `${stats?.pass_rate}%`, icon: CheckCircle, color: 'text-emerald-600', bg: 'bg-emerald-50', trend: '+2%', trendUp: true },
@@ -154,36 +160,42 @@ export default function ExamResults() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.1 }}
-            className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm"
+            className="glass-card p-8 rounded-4xl border border-white/60 shadow-2xl shadow-slate-200/50 relative overflow-hidden group"
           >
-            <div className="flex items-start justify-between mb-4">
-              <div className={`p-3 rounded-2xl ${stat.bg}`}>
-                <stat.icon className={`h-6 w-6 ${stat.color}`} />
+            <div className="absolute -right-4 -top-4 h-24 w-24 bg-slate-50 rounded-full scale-0 group-hover:scale-100 transition-transform duration-500 -z-10" />
+            <div className="flex items-start justify-between mb-6">
+              <div className={`h-14 w-14 rounded-2xl ${stat.bg} flex items-center justify-center shadow-inner`}>
+                <stat.icon className={`h-7 w-7 ${stat.color}`} />
               </div>
               {stat.trendUp !== null && (
-                <div className={`flex items-center gap-1 text-xs font-bold ${stat.trendUp ? 'text-emerald-600' : 'text-red-600'}`}>
+                <div className={`flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-black ${stat.trendUp ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-red-50 text-red-600 border border-red-100'}`}>
                   {stat.trendUp ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
                   <span>{stat.trend}</span>
                 </div>
               )}
             </div>
-            <p className="text-sm font-medium text-slate-500 mb-1">{stat.label}</p>
-            <p className="text-2xl font-black text-slate-900">{stat.value}</p>
+            <p className="text-sm font-black text-slate-500 mb-1 uppercase tracking-widest">{stat.label}</p>
+            <p className="text-4xl font-black text-slate-900 tracking-tighter">{stat.value}</p>
           </motion.div>
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
         {/* Main Chart */}
-        <div className="lg:col-span-2 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-6">
+        <div className="lg:col-span-2 glass-card p-8 rounded-4xl border border-white/60 shadow-2xl shadow-slate-200/50 space-y-8">
           <div className="flex items-center justify-between">
-            <h3 className="text-lg font-bold text-slate-900">أداء الأسئلة</h3>
-            <div className="flex items-center gap-2 text-xs text-slate-500">
-              <div className="w-3 h-3 rounded-full bg-indigo-500" />
-              <span>نسبة الإجابات الصحيحة</span>
+            <div>
+              <h3 className="text-2xl font-black text-slate-900 tracking-tight">أداء الأسئلة</h3>
+              <p className="text-slate-500 font-bold">تحليل دقة الإجابات لكل سؤال</p>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 text-xs font-black text-slate-500 uppercase tracking-widest">
+                <div className="w-3 h-3 rounded-full bg-indigo-500 shadow-sm shadow-indigo-200" />
+                <span>نسبة الإجابات الصحيحة</span>
+              </div>
             </div>
           </div>
-          <div className="h-[300px] w-full">
+          <div className="h-[350px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={questionAnalytics} margin={{ top: 20, right: 0, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
@@ -191,19 +203,19 @@ export default function ExamResults() {
                   dataKey="name" 
                   axisLine={false} 
                   tickLine={false} 
-                  tick={{ fill: '#64748b', fontSize: 12 }}
-                  dy={10}
+                  tick={{ fill: '#64748b', fontSize: 12, fontWeight: 700 }}
+                  dy={15}
                 />
                 <YAxis 
                   axisLine={false} 
                   tickLine={false} 
-                  tick={{ fill: '#64748b', fontSize: 12 }}
+                  tick={{ fill: '#64748b', fontSize: 12, fontWeight: 700 }}
                 />
                 <Tooltip 
-                  cursor={{ fill: '#f8fafc' }}
-                  contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                  cursor={{ fill: '#f8fafc', radius: 12 }}
+                  contentStyle={{ borderRadius: '24px', border: 'none', boxShadow: '0 25px 50px -12px rgb(0 0 0 / 0.15)', padding: '16px' }}
                 />
-                <Bar dataKey="correct" radius={[8, 8, 0, 0]} barSize={40}>
+                <Bar dataKey="correct" radius={[12, 12, 0, 0]} barSize={48}>
                   {questionAnalytics.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.correct < 50 ? '#ef4444' : '#4f46e5'} />
                   ))}
@@ -211,19 +223,24 @@ export default function ExamResults() {
               </BarChart>
             </ResponsiveContainer>
           </div>
-          <div className="bg-red-50 p-4 rounded-2xl flex items-start gap-3">
-            <AlertCircle className="h-5 w-5 text-red-600 shrink-0 mt-0.5" />
+          <div className="bg-red-50/50 p-6 rounded-3xl border border-red-100 flex items-start gap-4 animate-pulse">
+            <div className="h-12 w-12 rounded-2xl bg-red-100 flex items-center justify-center shrink-0">
+              <AlertCircle className="h-6 w-6 text-red-600" />
+            </div>
             <div>
-              <p className="text-sm font-bold text-red-900">تنبيه: السؤال رقم 4 يحتاج مراجعة</p>
-              <p className="text-xs text-red-700">نسبة الإجابة الصحيحة منخفضة جداً (30%). قد يكون السؤال غير واضح أو صعب جداً.</p>
+              <p className="text-lg font-black text-red-900 tracking-tight">تنبيه: السؤال رقم 4 يحتاج مراجعة</p>
+              <p className="text-sm text-red-700 font-bold leading-relaxed">نسبة الإجابة الصحيحة منخفضة جداً (30%). قد يكون السؤال غير واضح أو صعب جداً أو يحتاج لإعادة صياغة.</p>
             </div>
           </div>
         </div>
 
         {/* Score Distribution */}
-        <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-6">
-          <h3 className="text-lg font-bold text-slate-900">توزيع الدرجات</h3>
-          <div className="h-[250px] w-full">
+        <div className="glass-card p-8 rounded-4xl border border-white/60 shadow-2xl shadow-slate-200/50 space-y-8">
+          <div>
+            <h3 className="text-2xl font-black text-slate-900 tracking-tight">توزيع الدرجات</h3>
+            <p className="text-slate-500 font-bold">نظرة عامة على مستويات الطلاب</p>
+          </div>
+          <div className="h-[280px] w-full relative">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
@@ -234,32 +251,38 @@ export default function ExamResults() {
                     { name: 'مقبول', value: 7 },
                     { name: 'ضعيف', value: 3 },
                   ]}
-                  innerRadius={60}
-                  outerRadius={80}
-                  paddingAngle={5}
+                  innerRadius={75}
+                  outerRadius={100}
+                  paddingAngle={8}
                   dataKey="value"
                 >
                   {[0, 1, 2, 3, 4].map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} stroke="none" />
                   ))}
                 </Pie>
-                <Tooltip />
+                <Tooltip 
+                  contentStyle={{ borderRadius: '20px', border: 'none', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)' }}
+                />
               </PieChart>
             </ResponsiveContainer>
+            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+              <span className="text-4xl font-black text-slate-900 tracking-tighter">{stats?.pass_rate}%</span>
+              <span className="text-xs font-black text-slate-400 uppercase tracking-widest">نسبة النجاح</span>
+            </div>
           </div>
-          <div className="space-y-3">
+          <div className="space-y-4">
             {[
               { label: 'ممتاز (90-100)', value: '40%', color: 'bg-indigo-600' },
               { label: 'جيد جداً (80-89)', value: '30%', color: 'bg-emerald-500' },
               { label: 'جيد (70-79)', value: '20%', color: 'bg-amber-500' },
               { label: 'ضعيف (أقل من 50)', value: '3%', color: 'bg-red-500' },
             ].map((item, i) => (
-              <div key={i} className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className={`w-2 h-2 rounded-full ${item.color}`} />
-                  <span className="text-xs text-slate-600">{item.label}</span>
+              <div key={i} className="flex items-center justify-between p-3 rounded-2xl hover:bg-slate-50 transition-colors">
+                <div className="flex items-center gap-3">
+                  <div className={`w-3 h-3 rounded-full ${item.color} shadow-sm`} />
+                  <span className="text-sm font-bold text-slate-600">{item.label}</span>
                 </div>
-                <span className="text-xs font-bold text-slate-900">{item.value}</span>
+                <span className="text-sm font-black text-slate-900">{item.value}</span>
               </div>
             ))}
           </div>
@@ -267,68 +290,71 @@ export default function ExamResults() {
       </div>
 
       {/* Student Results Table */}
-      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="p-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <h3 className="text-lg font-bold text-slate-900">نتائج الطلاب التفصيلية</h3>
-          <div className="relative">
-            <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+      <div className="glass-card rounded-4xl border border-white/60 shadow-2xl shadow-slate-200/50 overflow-hidden">
+        <div className="p-8 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+          <div>
+            <h3 className="text-2xl font-black text-slate-900 tracking-tight">نتائج الطلاب التفصيلية</h3>
+            <p className="text-slate-500 font-bold">قائمة كاملة بمحاولات الطلاب ودرجاتهم</p>
+          </div>
+          <div className="relative group max-w-xs w-full">
+            <Search className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 group-focus-within:text-indigo-600 transition-colors" />
             <input 
               type="text" 
               placeholder="البحث عن طالب..."
-              className="pr-10 pl-4 py-2 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none w-full sm:w-64"
+              className="w-full pr-12 pl-4 py-4 rounded-2xl border-0 bg-slate-50 ring-1 ring-inset ring-slate-100 text-sm font-bold focus:ring-2 focus:ring-indigo-600 outline-none transition-all"
             />
           </div>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-right">
             <thead>
-              <tr className="bg-slate-50 text-slate-500 text-xs font-bold uppercase tracking-wider">
-                <th className="px-6 py-4">الطالب</th>
-                <th className="px-6 py-4">تاريخ التقديم</th>
-                <th className="px-6 py-4">الوقت المستغرق</th>
-                <th className="px-6 py-4">الدرجة</th>
-                <th className="px-6 py-4">الحالة</th>
-                <th className="px-6 py-4"></th>
+              <tr className="bg-slate-50/50 text-slate-400 text-xs font-black uppercase tracking-widest">
+                <th className="px-8 py-6">الطالب</th>
+                <th className="px-8 py-6">تاريخ التقديم</th>
+                <th className="px-8 py-6">الوقت المستغرق</th>
+                <th className="px-8 py-6">الدرجة</th>
+                <th className="px-8 py-6">الحالة</th>
+                <th className="px-8 py-6 text-left">الإجراءات</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {attempts.map((attempt) => (
-                <tr key={attempt.id} className="hover:bg-slate-50 transition-colors group">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold text-sm">
+                <tr key={attempt.id} className="hover:bg-slate-50/50 transition-all group">
+                  <td className="px-8 py-6">
+                    <div className="flex items-center gap-4">
+                      <div className="h-12 w-12 rounded-2xl bg-indigo-100 flex items-center justify-center text-indigo-700 font-black text-lg shadow-inner">
                         {attempt.student.full_name.charAt(0)}
                       </div>
                       <div>
-                        <p className="text-sm font-bold text-slate-900">{attempt.student.full_name}</p>
-                        <p className="text-xs text-slate-500">{attempt.student.email}</p>
+                        <p className="text-base font-black text-slate-900 tracking-tight">{attempt.student.full_name}</p>
+                        <p className="text-xs text-slate-500 font-bold">{attempt.student.email}</p>
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-sm text-slate-600">
-                    {new Date(attempt.completed_at).toLocaleDateString('ar-SA')}
+                  <td className="px-8 py-6 text-sm font-bold text-slate-600">
+                    {new Date(attempt.completed_at).toLocaleDateString('ar-SA', { year: 'numeric', month: 'long', day: 'numeric' })}
                   </td>
-                  <td className="px-6 py-4 text-sm text-slate-600">
-                    <div className="flex items-center gap-1">
+                  <td className="px-8 py-6 text-sm font-bold text-slate-600">
+                    <div className="flex items-center gap-2">
                       <Clock className="h-4 w-4 text-slate-400" />
                       <span>14 دقيقة</span>
                     </div>
                   </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 h-1.5 w-16 bg-slate-100 rounded-full overflow-hidden">
+                  <td className="px-8 py-6">
+                    <div className="flex items-center gap-4">
+                      <div className="flex-1 h-2 w-24 bg-slate-100 rounded-full overflow-hidden shadow-inner">
                         <div 
-                          className={`h-full rounded-full ${attempt.score >= 50 ? 'bg-emerald-500' : 'bg-red-500'}`}
+                          className={`h-full rounded-full transition-all duration-1000 ${attempt.score >= 50 ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.3)]' : 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.3)]'}`}
                           style={{ width: `${attempt.score}%` }}
                         />
                       </div>
-                      <span className={`text-sm font-bold ${attempt.score >= 50 ? 'text-emerald-600' : 'text-red-600'}`}>
+                      <span className={`text-base font-black tracking-tighter ${attempt.score >= 50 ? 'text-emerald-600' : 'text-red-600'}`}>
                         {attempt.score}%
                       </span>
                     </div>
                   </td>
-                  <td className="px-6 py-4">
-                    <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium border ${
+                  <td className="px-8 py-6">
+                    <span className={`inline-flex px-4 py-1.5 rounded-xl text-xs font-black uppercase tracking-widest border ${
                       attempt.score >= 50 
                         ? 'bg-emerald-50 text-emerald-700 border-emerald-100' 
                         : 'bg-red-50 text-red-700 border-red-100'
@@ -336,8 +362,8 @@ export default function ExamResults() {
                       {attempt.score >= 50 ? 'ناجح' : 'راسب'}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-left">
-                    <button className="p-2 hover:bg-white rounded-lg text-slate-400 hover:text-indigo-600 transition-all">
+                  <td className="px-8 py-6 text-left">
+                    <button className="h-10 w-10 flex items-center justify-center rounded-xl bg-white shadow-sm border border-slate-100 text-slate-400 hover:text-indigo-600 hover:border-indigo-100 hover:shadow-md transition-all active:scale-95">
                       <ChevronRight className="h-5 w-5 rotate-180" />
                     </button>
                   </td>
@@ -346,8 +372,8 @@ export default function ExamResults() {
             </tbody>
           </table>
         </div>
-        <div className="p-4 bg-slate-50 border-t border-slate-100 text-center">
-          <button className="text-sm font-bold text-indigo-600 hover:text-indigo-700 transition-colors">
+        <div className="p-6 bg-slate-50/50 border-t border-slate-100 text-center">
+          <button className="px-8 py-3 rounded-2xl text-sm font-black text-indigo-600 hover:bg-white hover:shadow-lg transition-all active:scale-95">
             عرض المزيد من النتائج
           </button>
         </div>

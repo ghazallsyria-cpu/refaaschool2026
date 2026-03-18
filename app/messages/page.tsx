@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { MessageSquare, Megaphone, Plus, Search, Send, User, Clock, Check, CheckCheck, X } from 'lucide-react';
+import { MessageSquare, Megaphone, Plus, Search, Send, User, Clock, Check, CheckCheck, X, UserPlus, Filter, Mail, Bell } from 'lucide-react';
 import { useNotifications } from '@/context/notification-context';
+import { motion, AnimatePresence } from 'motion/react';
 
 type Tab = 'messages' | 'announcements';
 
@@ -112,15 +113,13 @@ export default function MessagesPage() {
 
     setIsSubmitting(true);
     try {
-      // In a real app, sender_id would be the current logged in user
-      // Here we just pick the first admin or teacher
-      const sender = users.find(u => u.role === 'admin' || u.role === 'teacher');
-      if (!sender) throw new Error('No sender found');
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('يجب تسجيل الدخول أولاً');
 
       const { error } = await supabase
         .from('messages')
         .insert([{
-          sender_id: sender.id,
+          sender_id: user.id,
           receiver_id: newMessage.receiver_id,
           subject: newMessage.subject,
           content: newMessage.content,
@@ -129,7 +128,6 @@ export default function MessagesPage() {
 
       if (error) throw error;
       
-      // Send Notification to receiver
       try {
         await sendNotification(
           newMessage.receiver_id,
@@ -163,13 +161,13 @@ export default function MessagesPage() {
 
     setIsSubmitting(true);
     try {
-      const author = users.find(u => u.role === 'admin');
-      if (!author) throw new Error('No admin found to author announcement');
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('يجب تسجيل الدخول أولاً');
 
       const { error } = await supabase
         .from('announcements')
         .insert([{
-          author_id: author.id,
+          author_id: user.id,
           title: newAnnouncement.title,
           content: newAnnouncement.content,
           target_role: newAnnouncement.target_role === 'all' ? null : newAnnouncement.target_role
@@ -177,7 +175,6 @@ export default function MessagesPage() {
 
       if (error) throw error;
       
-      // Send Notifications to target audience
       try {
         let usersQuery = supabase.from('users').select('id');
         if (newAnnouncement.target_role !== 'all') {
@@ -186,9 +183,9 @@ export default function MessagesPage() {
         const { data: targetUsers } = await usersQuery;
 
         if (targetUsers && targetUsers.length > 0) {
-          const notificationPromises = targetUsers.map(user => 
+          const notificationPromises = targetUsers.map(u => 
             sendNotification(
-              user.id,
+              u.id,
               'إعلان جديد',
               newAnnouncement.title,
               'announcement',
@@ -214,320 +211,476 @@ export default function MessagesPage() {
   };
 
   const filteredMessages = messages.filter(m => 
-    m.subject?.includes(searchTerm) || 
-    m.sender?.full_name?.includes(searchTerm)
+    m.subject?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    m.sender?.full_name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const filteredAnnouncements = announcements.filter(a => 
-    a.title?.includes(searchTerm) || 
-    a.content?.includes(searchTerm)
+    a.title?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    a.content?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto relative">
+    <div className="max-w-[1400px] mx-auto space-y-10 pb-20">
       {/* Notification Toast */}
-      {notification && (
-        <div className={`fixed top-4 left-1/2 transform -translate-x-1/2 z-50 px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 transition-all ${
-          notification.type === 'success' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-red-50 text-red-800 border border-red-200'
-        }`}>
-          <div className="font-medium">{notification.message}</div>
-          <button onClick={() => setNotification(null)} className="text-slate-400 hover:text-slate-600">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-      )}
+      <AnimatePresence>
+        {notification && (
+          <motion.div 
+            initial={{ opacity: 0, y: -20, x: '-50%' }}
+            animate={{ opacity: 1, y: 0, x: '-50%' }}
+            exit={{ opacity: 0, y: -20, x: '-50%' }}
+            className={`fixed top-8 left-1/2 z-50 px-8 py-4 rounded-2xl shadow-2xl flex items-center gap-4 border border-white/20 backdrop-blur-xl ${
+              notification.type === 'success' ? 'bg-emerald-600/90 text-white' : 'bg-red-600/90 text-white'
+            }`}
+          >
+            <div className="h-6 w-6 rounded-full bg-white/20 flex items-center justify-center shrink-0">
+              {notification.type === 'success' ? '✓' : '!'}
+            </div>
+            <div className="font-bold text-sm tracking-wide">{notification.message}</div>
+            <button onClick={() => setNotification(null)} className="p-1 hover:bg-white/10 rounded-lg transition-colors">
+              <X className="h-4 w-4" />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">الرسائل والإعلانات</h1>
-          <p className="text-slate-500">التواصل الداخلي وإعلانات المدرسة</p>
+          <motion.h1 
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            className="text-4xl font-black text-slate-900 tracking-tight"
+          >
+            الرسائل والإعلانات
+          </motion.h1>
+          <motion.p 
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.1 }}
+            className="text-slate-500 mt-2 font-medium"
+          >
+            مركز التواصل الداخلي وإعلانات مدرسة الرفعة
+          </motion.p>
         </div>
-        <div className="flex gap-3">
+        
+        <div className="flex flex-wrap items-center gap-3">
           {activeTab === 'messages' ? (
             <button 
               onClick={() => setShowNewMessage(true)}
-              className="inline-flex items-center justify-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700"
+              className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-600 px-8 py-3.5 text-sm font-bold text-white shadow-xl shadow-indigo-200 hover:shadow-indigo-300 transition-all active:scale-95"
             >
-              <Plus className="mr-2 h-4 w-4 ml-2" />
+              <Plus className="ml-2 h-5 w-5" />
               رسالة جديدة
             </button>
           ) : (
             <button 
               onClick={() => setShowNewAnnouncement(true)}
-              className="inline-flex items-center justify-center rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-emerald-700"
+              className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 px-8 py-3.5 text-sm font-bold text-white shadow-xl shadow-emerald-200 hover:shadow-emerald-300 transition-all active:scale-95"
             >
-              <Plus className="mr-2 h-4 w-4 ml-2" />
-              إعلان جديد
+              <Plus className="ml-2 h-5 w-5" />
+              نشر إعلان جديد
             </button>
           )}
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="border-b border-slate-200">
-        <nav className="-mb-px flex space-x-8 space-x-reverse" aria-label="Tabs">
+      {/* Tabs & Search Container */}
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2 }}
+        className="bg-white p-2 rounded-[2.5rem] shadow-2xl shadow-slate-200/50 border border-white flex flex-col md:flex-row items-stretch md:items-center gap-2"
+      >
+        <div className="flex p-1 bg-slate-100 rounded-[2rem] flex-1 md:flex-none">
           <button
             onClick={() => setActiveTab('messages')}
-            className={`
-              whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium flex items-center gap-2
-              ${activeTab === 'messages'
-                ? 'border-indigo-500 text-indigo-600'
-                : 'border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700'
-              }
-            `}
+            className={`flex-1 md:flex-none px-8 py-3 rounded-[1.75rem] text-sm font-black transition-all flex items-center justify-center gap-3 ${
+              activeTab === 'messages' 
+                ? 'bg-white text-indigo-600 shadow-sm' 
+                : 'text-slate-400 hover:text-slate-600'
+            }`}
           >
-            <MessageSquare className="h-5 w-5" />
+            <MessageSquare className="h-4 w-4" />
             صندوق الوارد
           </button>
           <button
             onClick={() => setActiveTab('announcements')}
-            className={`
-              whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium flex items-center gap-2
-              ${activeTab === 'announcements'
-                ? 'border-emerald-500 text-emerald-600'
-                : 'border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700'
-              }
-            `}
+            className={`flex-1 md:flex-none px-8 py-3 rounded-[1.75rem] text-sm font-black transition-all flex items-center justify-center gap-3 ${
+              activeTab === 'announcements' 
+                ? 'bg-white text-emerald-600 shadow-sm' 
+                : 'text-slate-400 hover:text-slate-600'
+            }`}
           >
-            <Megaphone className="h-5 w-5" />
+            <Megaphone className="h-4 w-4" />
             لوحة الإعلانات
           </button>
-        </nav>
-      </div>
+        </div>
 
-      {/* Search */}
-      <div className="bg-white p-4 rounded-xl shadow-sm ring-1 ring-slate-200">
-        <div className="relative max-w-md">
-          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
-            <Search className="h-5 w-5 text-slate-400" aria-hidden="true" />
+        <div className="relative flex-1 group px-2">
+          <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center pr-3">
+            <Search className="h-5 w-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" aria-hidden="true" />
           </div>
           <input
             type="text"
-            className="block w-full rounded-md border-0 py-2 pr-10 pl-3 text-slate-900 ring-1 ring-inset ring-slate-300 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+            className="block w-full rounded-[1.75rem] border-0 py-3.5 pr-12 pl-5 text-slate-900 bg-slate-50 ring-1 ring-inset ring-slate-100 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-indigo-500 sm:text-sm transition-all"
             placeholder={`البحث في ${activeTab === 'messages' ? 'الرسائل' : 'الإعلانات'}...`}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-      </div>
+      </motion.div>
 
       {/* Content Area */}
-      <div className="bg-white rounded-xl shadow-sm ring-1 ring-slate-200 overflow-hidden min-h-[400px]">
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3 }}
+        className="bg-white rounded-[2.5rem] shadow-2xl shadow-slate-200/50 border border-white overflow-hidden min-h-[500px]"
+      >
         {loading ? (
-          <div className="flex items-center justify-center h-64">
-            <div className="text-slate-500">جاري التحميل...</div>
+          <div className="flex flex-col items-center justify-center h-[500px] gap-4">
+            <div className="relative h-12 w-12">
+              <div className="absolute inset-0 rounded-full border-4 border-slate-50"></div>
+              <div className="absolute inset-0 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent"></div>
+            </div>
+            <span className="text-sm font-black text-slate-400 uppercase tracking-widest">جاري التحميل...</span>
           </div>
         ) : activeTab === 'messages' ? (
           /* Messages List */
-          <div className="divide-y divide-slate-200">
+          <div className="divide-y divide-slate-50">
             {filteredMessages.length === 0 ? (
-              <div className="p-10 text-center text-slate-500">لا توجد رسائل</div>
+              <div className="flex flex-col items-center justify-center h-[500px] gap-6">
+                <div className="h-24 w-24 rounded-[2.5rem] bg-slate-50 flex items-center justify-center">
+                  <Mail className="h-10 w-10 text-slate-200" />
+                </div>
+                <div className="text-center">
+                  <p className="text-xl font-black text-slate-900">لا توجد رسائل</p>
+                  <p className="text-sm font-medium text-slate-400 mt-1">صندوق الوارد الخاص بك فارغ حالياً</p>
+                </div>
+              </div>
             ) : (
-              filteredMessages.map((message) => (
-                <div key={message.id} className={`p-4 hover:bg-slate-50 cursor-pointer transition-colors ${!message.is_read ? 'bg-indigo-50/30' : ''}`}>
-                  <div className="flex items-start gap-4">
-                    <div className="flex-shrink-0">
-                      <div className="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold">
-                        {message.sender?.full_name?.charAt(0) || <User className="h-5 w-5" />}
+              filteredMessages.map((message, idx) => (
+                <motion.div 
+                  key={message.id}
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: idx * 0.05 }}
+                  className={`p-6 hover:bg-slate-50/80 cursor-pointer transition-all relative group ${!message.is_read ? 'bg-indigo-50/20' : ''}`}
+                >
+                  <div className="flex items-start gap-6">
+                    <div className="flex-shrink-0 relative">
+                      <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-indigo-50 to-slate-50 flex items-center justify-center text-indigo-600 font-black text-lg border border-indigo-100 shadow-sm group-hover:scale-110 transition-transform">
+                        {message.sender?.full_name?.charAt(0) || <User className="h-6 w-6" />}
                       </div>
+                      {!message.is_read && (
+                        <div className="absolute -top-1 -left-1 w-4 h-4 bg-indigo-600 border-2 border-white rounded-full shadow-sm" />
+                      )}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center justify-between">
-                        <p className={`text-sm font-medium ${!message.is_read ? 'text-slate-900' : 'text-slate-700'}`}>
-                          {message.sender?.full_name || 'مستخدم غير معروف'}
-                        </p>
-                        <div className="flex items-center gap-2 text-xs text-slate-500">
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center gap-3">
+                          <p className={`text-sm font-black ${!message.is_read ? 'text-slate-900' : 'text-slate-700'}`}>
+                            {message.sender?.full_name || 'مستخدم غير معروف'}
+                          </p>
+                          <span className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">
+                            {message.sender?.role === 'admin' ? 'إدارة' : message.sender?.role === 'teacher' ? 'معلم' : 'طالب'}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">
                           <Clock className="h-3 w-3" />
                           {new Date(message.created_at).toLocaleDateString('ar-EG')}
                         </div>
                       </div>
-                      <p className={`text-sm mt-1 ${!message.is_read ? 'font-semibold text-slate-900' : 'text-slate-600'}`}>
+                      <p className={`text-base mb-2 ${!message.is_read ? 'font-black text-slate-900' : 'font-bold text-slate-700'}`}>
                         {message.subject || 'بدون عنوان'}
                       </p>
-                      <p className="text-sm text-slate-500 mt-1 line-clamp-1">
+                      <p className="text-sm text-slate-500 line-clamp-2 leading-relaxed">
                         {message.content}
                       </p>
                     </div>
+                    <div className="flex-shrink-0 self-center opacity-0 group-hover:opacity-100 transition-all translate-x-4 group-hover:translate-x-0">
+                      <div className="h-10 w-10 rounded-xl bg-white shadow-sm border border-slate-100 flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:border-indigo-100 transition-all">
+                        <Send className="h-4 w-4" />
+                      </div>
+                    </div>
                   </div>
-                </div>
+                </motion.div>
               ))
             )}
           </div>
         ) : (
           /* Announcements List */
-          <div className="p-6 grid grid-cols-1 gap-6">
+          <div className="p-10 grid grid-cols-1 md:grid-cols-2 gap-8">
             {filteredAnnouncements.length === 0 ? (
-              <div className="p-10 text-center text-slate-500">لا توجد إعلانات</div>
+              <div className="col-span-full flex flex-col items-center justify-center h-[400px] gap-6">
+                <div className="h-24 w-24 rounded-[2.5rem] bg-slate-50 flex items-center justify-center">
+                  <Bell className="h-10 w-10 text-slate-200" />
+                </div>
+                <div className="text-center">
+                  <p className="text-xl font-black text-slate-900">لا توجد إعلانات</p>
+                  <p className="text-sm font-medium text-slate-400 mt-1">لم يتم نشر أي إعلانات في هذه الفئة</p>
+                </div>
+              </div>
             ) : (
-              filteredAnnouncements.map((announcement) => (
-                <div key={announcement.id} className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow">
-                  <div className="flex justify-between items-start mb-4">
-                    <h3 className="text-lg font-bold text-slate-900">{announcement.title}</h3>
-                    <span className="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-600/20">
+              filteredAnnouncements.map((announcement, idx) => (
+                <motion.div 
+                  key={announcement.id}
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: idx * 0.05 }}
+                  className="bg-slate-50/50 border border-slate-100 rounded-[2.5rem] p-8 shadow-sm hover:shadow-xl hover:shadow-slate-200/50 transition-all group relative overflow-hidden"
+                >
+                  <div className="flex justify-between items-start mb-6 relative z-10">
+                    <div className="flex items-center gap-4">
+                      <div className="h-12 w-12 rounded-2xl bg-white shadow-sm border border-slate-100 flex items-center justify-center text-emerald-600">
+                        <Megaphone className="h-6 w-6" />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-black text-slate-900 leading-tight group-hover:text-emerald-600 transition-colors">{announcement.title}</h3>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                            {new Date(announcement.created_at).toLocaleDateString('ar-EG')}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <span className="inline-flex items-center rounded-full bg-emerald-100 px-3 py-1 text-[10px] font-black text-emerald-700 uppercase tracking-widest border border-emerald-200 shadow-sm">
                       {announcement.target_role === 'student' ? 'للطلاب' : 
                        announcement.target_role === 'teacher' ? 'للمعلمين' : 
                        announcement.target_role === 'parent' ? 'لأولياء الأمور' : 'للجميع'}
                     </span>
                   </div>
-                  <p className="text-slate-600 text-sm leading-relaxed mb-4 whitespace-pre-line">
+                  <p className="text-slate-600 text-sm leading-relaxed mb-8 whitespace-pre-line relative z-10 font-medium">
                     {announcement.content}
                   </p>
-                  <div className="flex items-center justify-between text-xs text-slate-500 border-t border-slate-100 pt-4 mt-4">
-                    <div className="flex items-center gap-1.5">
-                      <User className="h-3.5 w-3.5" />
+                  <div className="flex items-center justify-between text-[10px] font-black text-slate-400 uppercase tracking-widest border-t border-slate-200/60 pt-6 relative z-10">
+                    <div className="flex items-center gap-2">
+                      <div className="h-6 w-6 rounded-lg bg-white border border-slate-100 flex items-center justify-center">
+                        <User className="h-3 w-3" />
+                      </div>
                       <span>{announcement.author?.full_name || 'الإدارة'}</span>
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      <Clock className="h-3.5 w-3.5" />
-                      <span>{new Date(announcement.created_at).toLocaleDateString('ar-EG')}</span>
+                    <div className="flex items-center gap-2">
+                      <Clock className="h-3 w-3" />
+                      <span>{new Date(announcement.created_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}</span>
                     </div>
                   </div>
-                </div>
+                  
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 blur-3xl rounded-full -translate-y-1/2 translate-x-1/2" />
+                </motion.div>
               ))
             )}
           </div>
         )}
-      </div>
+      </motion.div>
 
       {/* New Message Modal */}
-      {showNewMessage && (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
-          <div className="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
-            <div className="fixed inset-0 bg-slate-900/75 transition-opacity" onClick={() => setShowNewMessage(false)}></div>
-            <div className="relative transform overflow-hidden rounded-xl bg-white text-right shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg">
-              <div className="bg-white px-4 pb-4 pt-5 sm:p-6 sm:pb-4">
-                <h3 className="text-xl font-semibold leading-6 text-slate-900 mb-6">رسالة جديدة</h3>
-                <form id="new-message-form" onSubmit={handleSendMessage} className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium leading-6 text-slate-900">إلى</label>
-                    <select 
-                      required
-                      value={newMessage.receiver_id}
-                      onChange={(e) => setNewMessage({...newMessage, receiver_id: e.target.value})}
-                      className="mt-2 block w-full rounded-md border-0 py-1.5 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
-                    >
-                      <option value="">اختر المستلم...</option>
-                      {users.map(user => (
-                        <option key={user.id} value={user.id}>
-                          {user.full_name} ({user.role === 'admin' ? 'إدارة' : user.role === 'teacher' ? 'معلم' : user.role === 'student' ? 'طالب' : 'ولي أمر'})
-                        </option>
-                      ))}
-                    </select>
+      <AnimatePresence>
+        {showNewMessage && (
+          <div className="fixed inset-0 z-50 overflow-y-auto">
+            <div className="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" 
+                onClick={() => setShowNewMessage(false)}
+              />
+              
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                className="relative transform overflow-hidden rounded-[2.5rem] bg-white text-right shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-2xl border border-white"
+              >
+                <div className="bg-white px-8 pb-8 pt-10 sm:p-10">
+                  <div className="flex items-center justify-between mb-10">
+                    <div className="flex items-center gap-4">
+                      <div className="h-12 w-12 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600">
+                        <Plus className="h-6 w-6" />
+                      </div>
+                      <h3 className="text-2xl font-black text-slate-900 tracking-tight">إنشاء رسالة جديدة</h3>
+                    </div>
+                    <button onClick={() => setShowNewMessage(false)} className="p-2 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-50 transition-all">
+                      <X className="h-6 w-6" />
+                    </button>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium leading-6 text-slate-900">الموضوع</label>
-                    <input 
-                      type="text" 
-                      required
-                      value={newMessage.subject}
-                      onChange={(e) => setNewMessage({...newMessage, subject: e.target.value})}
-                      className="mt-2 block w-full rounded-md border-0 py-1.5 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6" 
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium leading-6 text-slate-900">نص الرسالة</label>
-                    <textarea 
-                      rows={5} 
-                      required
-                      value={newMessage.content}
-                      onChange={(e) => setNewMessage({...newMessage, content: e.target.value})}
-                      className="mt-2 block w-full rounded-md border-0 py-1.5 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
-                    ></textarea>
-                  </div>
-                </form>
-              </div>
-              <div className="bg-slate-50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6">
-                <button
-                  type="submit"
-                  form="new-message-form"
-                  disabled={isSubmitting}
-                  className="inline-flex w-full justify-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 disabled:opacity-50 sm:ml-3 sm:w-auto"
-                >
-                  <Send className="w-4 h-4 ml-2" />
-                  {isSubmitting ? 'جاري الإرسال...' : 'إرسال'}
-                </button>
-                <button
-                  type="button"
-                  disabled={isSubmitting}
-                  className="mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-slate-900 shadow-sm ring-1 ring-inset ring-slate-300 hover:bg-slate-50 disabled:opacity-50 sm:mt-0 sm:w-auto"
-                  onClick={() => setShowNewMessage(false)}
-                >
-                  إلغاء
-                </button>
-              </div>
+                  
+                  <form id="new-message-form" onSubmit={handleSendMessage} className="space-y-8">
+                    <div className="space-y-2">
+                      <label className="text-xs font-black text-slate-400 uppercase tracking-widest mr-1">إلى المستلم</label>
+                      <div className="relative">
+                        <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
+                          <UserPlus className="h-4 w-4 text-slate-400" />
+                        </div>
+                        <select 
+                          required
+                          value={newMessage.receiver_id}
+                          onChange={(e) => setNewMessage({...newMessage, receiver_id: e.target.value})}
+                          className="block w-full rounded-2xl border-0 py-4 pr-11 pl-4 text-slate-900 bg-slate-50 ring-1 ring-inset ring-slate-100 focus:ring-2 focus:ring-inset focus:ring-indigo-500 sm:text-sm transition-all font-bold appearance-none"
+                        >
+                          <option value="">اختر المستلم من القائمة...</option>
+                          {users.map(user => (
+                            <option key={user.id} value={user.id}>
+                              {user.full_name} ({user.role === 'admin' ? 'إدارة' : user.role === 'teacher' ? 'معلم' : user.role === 'student' ? 'طالب' : 'ولي أمر'})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <label className="text-xs font-black text-slate-400 uppercase tracking-widest mr-1">موضوع الرسالة</label>
+                      <div className="relative">
+                        <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
+                          <Filter className="h-4 w-4 text-slate-400" />
+                        </div>
+                        <input 
+                          type="text" 
+                          required
+                          value={newMessage.subject}
+                          onChange={(e) => setNewMessage({...newMessage, subject: e.target.value})}
+                          className="block w-full rounded-2xl border-0 py-4 pr-11 pl-4 text-slate-900 bg-slate-50 ring-1 ring-inset ring-slate-100 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-indigo-500 sm:text-sm transition-all font-bold" 
+                          placeholder="أدخل عنواناً مختصراً للرسالة..."
+                        />
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <label className="text-xs font-black text-slate-400 uppercase tracking-widest mr-1">محتوى الرسالة</label>
+                      <textarea 
+                        rows={6} 
+                        required
+                        value={newMessage.content}
+                        onChange={(e) => setNewMessage({...newMessage, content: e.target.value})}
+                        className="block w-full rounded-2xl border-0 py-4 px-5 text-slate-900 bg-slate-50 ring-1 ring-inset ring-slate-100 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-indigo-500 sm:text-sm transition-all font-bold resize-none"
+                        placeholder="اكتب رسالتك هنا بالتفصيل..."
+                      ></textarea>
+                    </div>
+                  </form>
+                </div>
+                <div className="bg-slate-50/50 px-8 py-6 sm:flex sm:flex-row-reverse sm:px-10 gap-3">
+                  <button
+                    type="submit"
+                    form="new-message-form"
+                    disabled={isSubmitting}
+                    className="inline-flex w-full justify-center rounded-2xl bg-indigo-600 px-8 py-4 text-sm font-black text-white shadow-xl shadow-indigo-200 hover:bg-indigo-700 transition-all active:scale-95 sm:w-auto disabled:opacity-50"
+                  >
+                    <Send className="w-4 h-4 ml-2" />
+                    {isSubmitting ? 'جاري الإرسال...' : 'إرسال الرسالة'}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isSubmitting}
+                    className="mt-3 inline-flex w-full justify-center rounded-2xl bg-white px-8 py-4 text-sm font-black text-slate-700 shadow-sm ring-1 ring-inset ring-slate-200 hover:bg-slate-50 sm:mt-0 sm:w-auto transition-all"
+                    onClick={() => setShowNewMessage(false)}
+                  >
+                    إلغاء
+                  </button>
+                </div>
+              </motion.div>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </AnimatePresence>
 
       {/* New Announcement Modal */}
-      {showNewAnnouncement && (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
-          <div className="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
-            <div className="fixed inset-0 bg-slate-900/75 transition-opacity" onClick={() => setShowNewAnnouncement(false)}></div>
-            <div className="relative transform overflow-hidden rounded-xl bg-white text-right shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg">
-              <div className="bg-white px-4 pb-4 pt-5 sm:p-6 sm:pb-4">
-                <h3 className="text-xl font-semibold leading-6 text-slate-900 mb-6">إعلان جديد</h3>
-                <form id="new-announcement-form" onSubmit={handleSendAnnouncement} className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium leading-6 text-slate-900">عنوان الإعلان</label>
-                    <input 
-                      type="text" 
-                      required
-                      value={newAnnouncement.title}
-                      onChange={(e) => setNewAnnouncement({...newAnnouncement, title: e.target.value})}
-                      className="mt-2 block w-full rounded-md border-0 py-1.5 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-emerald-600 sm:text-sm sm:leading-6" 
-                    />
+      <AnimatePresence>
+        {showNewAnnouncement && (
+          <div className="fixed inset-0 z-50 overflow-y-auto">
+            <div className="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" 
+                onClick={() => setShowNewAnnouncement(false)}
+              />
+              
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                className="relative transform overflow-hidden rounded-[2.5rem] bg-white text-right shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-2xl border border-white"
+              >
+                <div className="bg-white px-8 pb-8 pt-10 sm:p-10">
+                  <div className="flex items-center justify-between mb-10">
+                    <div className="flex items-center gap-4">
+                      <div className="h-12 w-12 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600">
+                        <Megaphone className="h-6 w-6" />
+                      </div>
+                      <h3 className="text-2xl font-black text-slate-900 tracking-tight">نشر إعلان جديد</h3>
+                    </div>
+                    <button onClick={() => setShowNewAnnouncement(false)} className="p-2 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-50 transition-all">
+                      <X className="h-6 w-6" />
+                    </button>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium leading-6 text-slate-900">الفئة المستهدفة</label>
-                    <select 
-                      required
-                      value={newAnnouncement.target_role}
-                      onChange={(e) => setNewAnnouncement({...newAnnouncement, target_role: e.target.value})}
-                      className="mt-2 block w-full rounded-md border-0 py-1.5 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-emerald-600 sm:text-sm sm:leading-6"
-                    >
-                      <option value="all">الجميع</option>
-                      <option value="student">الطلاب</option>
-                      <option value="teacher">المعلمين</option>
-                      <option value="parent">أولياء الأمور</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium leading-6 text-slate-900">نص الإعلان</label>
-                    <textarea 
-                      rows={5} 
-                      required
-                      value={newAnnouncement.content}
-                      onChange={(e) => setNewAnnouncement({...newAnnouncement, content: e.target.value})}
-                      className="mt-2 block w-full rounded-md border-0 py-1.5 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-emerald-600 sm:text-sm sm:leading-6"
-                    ></textarea>
-                  </div>
-                </form>
-              </div>
-              <div className="bg-slate-50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6">
-                <button
-                  type="submit"
-                  form="new-announcement-form"
-                  disabled={isSubmitting}
-                  className="inline-flex w-full justify-center rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-500 disabled:opacity-50 sm:ml-3 sm:w-auto"
-                >
-                  <Megaphone className="w-4 h-4 ml-2" />
-                  {isSubmitting ? 'جاري النشر...' : 'نشر الإعلان'}
-                </button>
-                <button
-                  type="button"
-                  disabled={isSubmitting}
-                  className="mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-slate-900 shadow-sm ring-1 ring-inset ring-slate-300 hover:bg-slate-50 disabled:opacity-50 sm:mt-0 sm:w-auto"
-                  onClick={() => setShowNewAnnouncement(false)}
-                >
-                  إلغاء
-                </button>
-              </div>
+                  
+                  <form id="new-announcement-form" onSubmit={handleSendAnnouncement} className="space-y-8">
+                    <div className="space-y-2">
+                      <label className="text-xs font-black text-slate-400 uppercase tracking-widest mr-1">عنوان الإعلان</label>
+                      <input 
+                        type="text" 
+                        required
+                        value={newAnnouncement.title}
+                        onChange={(e) => setNewAnnouncement({...newAnnouncement, title: e.target.value})}
+                        className="block w-full rounded-2xl border-0 py-4 px-5 text-slate-900 bg-slate-50 ring-1 ring-inset ring-slate-100 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-emerald-600 sm:text-sm transition-all font-bold" 
+                        placeholder="أدخل عنواناً جذاباً للإعلان..."
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <label className="text-xs font-black text-slate-400 uppercase tracking-widest mr-1">الفئة المستهدفة</label>
+                      <select 
+                        required
+                        value={newAnnouncement.target_role}
+                        onChange={(e) => setNewAnnouncement({...newAnnouncement, target_role: e.target.value})}
+                        className="block w-full rounded-2xl border-0 py-4 px-5 text-slate-900 bg-slate-50 ring-1 ring-inset ring-slate-100 focus:ring-2 focus:ring-inset focus:ring-emerald-600 sm:text-sm transition-all font-bold appearance-none"
+                      >
+                        <option value="all">الجميع (طلاب، معلمين، أولياء أمور)</option>
+                        <option value="student">الطلاب فقط</option>
+                        <option value="teacher">المعلمين فقط</option>
+                        <option value="parent">أولياء الأمور فقط</option>
+                      </select>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <label className="text-xs font-black text-slate-400 uppercase tracking-widest mr-1">نص الإعلان</label>
+                      <textarea 
+                        rows={6} 
+                        required
+                        value={newAnnouncement.content}
+                        onChange={(e) => setNewAnnouncement({...newAnnouncement, content: e.target.value})}
+                        className="block w-full rounded-2xl border-0 py-4 px-5 text-slate-900 bg-slate-50 ring-1 ring-inset ring-slate-100 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-emerald-600 sm:text-sm transition-all font-bold resize-none"
+                        placeholder="اكتب تفاصيل الإعلان هنا..."
+                      ></textarea>
+                    </div>
+                  </form>
+                </div>
+                <div className="bg-slate-50/50 px-8 py-6 sm:flex sm:flex-row-reverse sm:px-10 gap-3">
+                  <button
+                    type="submit"
+                    form="new-announcement-form"
+                    disabled={isSubmitting}
+                    className="inline-flex w-full justify-center rounded-2xl bg-emerald-600 px-8 py-4 text-sm font-black text-white shadow-xl shadow-emerald-200 hover:bg-emerald-700 transition-all active:scale-95 sm:w-auto disabled:opacity-50"
+                  >
+                    <Megaphone className="w-4 h-4 ml-2" />
+                    {isSubmitting ? 'جاري النشر...' : 'نشر الإعلان الآن'}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isSubmitting}
+                    className="mt-3 inline-flex w-full justify-center rounded-2xl bg-white px-8 py-4 text-sm font-black text-slate-700 shadow-sm ring-1 ring-inset ring-slate-200 hover:bg-slate-50 sm:mt-0 sm:w-auto transition-all"
+                    onClick={() => setShowNewAnnouncement(false)}
+                  >
+                    إلغاء
+                  </button>
+                </div>
+              </motion.div>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </AnimatePresence>
     </div>
   );
 }

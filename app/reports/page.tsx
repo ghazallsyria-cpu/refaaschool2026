@@ -120,123 +120,214 @@ export default function ReportsPage() {
     }
   };
 
-  const StatCard = ({ title, value, icon: Icon, colorClass }: any) => (
-    <div className="bg-white p-6 rounded-xl shadow-sm ring-1 ring-slate-200 flex items-center gap-4">
-      <div className={`p-3 rounded-lg ${colorClass}`}>
-        <Icon className="w-6 h-6 text-white" />
+  const StatCard = ({ title, value, icon: Icon, colorClass, delay }: any) => (
+    <div className={`glass-card p-8 rounded-4xl border border-slate-200/60 shadow-2xl shadow-slate-200/50 flex items-center gap-6 hover:-translate-y-1 transition-all duration-500 group animate-in fade-in slide-in-from-bottom-4 fill-mode-both`} style={{ animationDelay: `${delay}ms` }}>
+      <div className={`h-16 w-16 rounded-2xl flex items-center justify-center shadow-xl transition-all duration-500 group-hover:scale-110 ${colorClass}`}>
+        <Icon className="w-8 h-8 text-white" />
       </div>
-      <div>
-        <p className="text-sm font-medium text-slate-500">{title}</p>
-        <h3 className="text-2xl font-bold text-slate-900">{value}</h3>
+      <div className="space-y-1">
+        <p className="text-sm font-black text-slate-400 uppercase tracking-widest">{title}</p>
+        <h3 className="text-3xl font-black text-slate-900 tracking-tight">{value}</h3>
       </div>
     </div>
   );
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900">التقارير والإحصائيات</h1>
-        <p className="text-slate-500">نظرة عامة على أداء المدرسة، الحضور، والدرجات</p>
+    <div className="space-y-12 max-w-7xl mx-auto pb-24">
+      <div className="space-y-2">
+        <h1 className="text-4xl font-black text-slate-900 tracking-tight">التقارير والإحصائيات</h1>
+        <p className="text-lg text-slate-500 font-medium">نظرة عامة شاملة على أداء المدرسة، الحضور، والدرجات</p>
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
         <StatCard 
           title="إجمالي الطلاب" 
           value={loading ? '...' : stats.totalStudents} 
           icon={Users} 
-          colorClass="bg-indigo-500" 
+          colorClass="bg-indigo-600 shadow-indigo-100" 
+          delay={100}
         />
         <StatCard 
           title="إجمالي المعلمين" 
           value={loading ? '...' : stats.totalTeachers} 
           icon={GraduationCap} 
-          colorClass="bg-emerald-500" 
+          colorClass="bg-emerald-600 shadow-emerald-100" 
+          delay={200}
         />
         <StatCard 
           title="الصفوف الدراسية" 
           value={loading ? '...' : stats.totalClasses} 
           icon={BookOpen} 
-          colorClass="bg-amber-500" 
+          colorClass="bg-amber-600 shadow-amber-100" 
+          delay={300}
         />
         <StatCard 
           title="متوسط الحضور" 
           value={`${stats.avgAttendance}%`} 
           icon={CalendarCheck} 
-          colorClass="bg-sky-500" 
+          colorClass="bg-sky-600 shadow-sky-100" 
+          delay={400}
         />
       </div>
 
       {/* Charts Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
         
         {/* Attendance Chart */}
-        <div className="bg-white p-6 rounded-xl shadow-sm ring-1 ring-slate-200">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-              <TrendingUp className="w-5 h-5 text-indigo-500" />
-              معدل الحضور والغياب (أسبوعي)
-            </h3>
+        <div className="glass-card p-10 rounded-4xl border border-slate-200/60 shadow-2xl shadow-slate-200/50 hover:shadow-indigo-100 transition-all duration-500">
+          <div className="flex items-center justify-between mb-10">
+            <div className="flex items-center gap-4">
+              <div className="h-12 w-12 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600 shadow-sm">
+                <TrendingUp className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-xl font-black text-slate-900 tracking-tight">معدل الحضور والغياب</h3>
+                <p className="text-xs text-slate-400 font-black uppercase tracking-widest">إحصائيات الأسبوع الأخير</p>
+              </div>
+            </div>
           </div>
-          <div className="h-72 w-full" dir="ltr">
+          <div className="h-80 w-full" dir="ltr">
               {attendanceData.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={attendanceData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748b' }} />
-                    <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b' }} />
-                    <Tooltip 
-                      contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                      itemStyle={{ textAlign: 'right' }}
+                  <LineChart data={attendanceData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                    <XAxis 
+                      dataKey="name" 
+                      axisLine={false} 
+                      tickLine={false} 
+                      tick={{ fill: '#94a3b8', fontSize: 12, fontWeight: 700 }} 
+                      dy={10}
                     />
-                    <Legend wrapperStyle={{ paddingTop: '20px' }} />
-                    <Line type="monotone" dataKey="present" name="حضور" stroke="#10b981" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
-                    <Line type="monotone" dataKey="absent" name="غياب" stroke="#f43f5e" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                    <YAxis 
+                      axisLine={false} 
+                      tickLine={false} 
+                      tick={{ fill: '#94a3b8', fontSize: 12, fontWeight: 700 }} 
+                    />
+                    <Tooltip 
+                      contentStyle={{ 
+                        borderRadius: '24px', 
+                        border: 'none', 
+                        boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)',
+                        padding: '16px',
+                        backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                        backdropFilter: 'blur(8px)'
+                      }}
+                      itemStyle={{ textAlign: 'right', fontWeight: 800 }}
+                    />
+                    <Legend 
+                      verticalAlign="top" 
+                      align="right" 
+                      iconType="circle"
+                      wrapperStyle={{ paddingBottom: '40px', fontSize: '12px', fontWeight: 800 }} 
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="present" 
+                      name="حضور" 
+                      stroke="#10b981" 
+                      strokeWidth={4} 
+                      dot={{ r: 6, fill: '#10b981', strokeWidth: 2, stroke: '#fff' }} 
+                      activeDot={{ r: 8, strokeWidth: 0 }} 
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="absent" 
+                      name="غياب" 
+                      stroke="#f43f5e" 
+                      strokeWidth={4} 
+                      dot={{ r: 6, fill: '#f43f5e', strokeWidth: 2, stroke: '#fff' }} 
+                      activeDot={{ r: 8, strokeWidth: 0 }} 
+                    />
                   </LineChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="flex items-center justify-center h-full text-slate-400">لا توجد بيانات كافية</div>
+                <div className="flex flex-col items-center justify-center h-full text-slate-400 gap-4">
+                  <div className="h-16 w-16 rounded-3xl bg-slate-50 flex items-center justify-center">
+                    <TrendingUp className="w-8 h-8 text-slate-200" />
+                  </div>
+                  <p className="font-bold italic">لا توجد بيانات كافية للعرض</p>
+                </div>
               )}
           </div>
         </div>
 
         {/* Grades Chart */}
-        <div className="bg-white p-6 rounded-xl shadow-sm ring-1 ring-slate-200">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-              <Award className="w-5 h-5 text-amber-500" />
-              متوسط الدرجات حسب المادة
-            </h3>
+        <div className="glass-card p-10 rounded-4xl border border-slate-200/60 shadow-2xl shadow-slate-200/50 hover:shadow-amber-100 transition-all duration-500">
+          <div className="flex items-center justify-between mb-10">
+            <div className="flex items-center gap-4">
+              <div className="h-12 w-12 rounded-2xl bg-amber-50 flex items-center justify-center text-amber-600 shadow-sm">
+                <Award className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-xl font-black text-slate-900 tracking-tight">متوسط الدرجات</h3>
+                <p className="text-xs text-slate-400 font-black uppercase tracking-widest">تحليل الأداء حسب المادة</p>
+              </div>
+            </div>
           </div>
-          <div className="h-72 w-full" dir="ltr">
+          <div className="h-80 w-full" dir="ltr">
               {gradesData.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={gradesData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                    <XAxis dataKey="subject" axisLine={false} tickLine={false} tick={{ fill: '#64748b' }} />
-                    <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748b' }} domain={[0, 100]} />
-                    <Tooltip 
-                      cursor={{ fill: '#f8fafc' }}
-                      contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                  <BarChart data={gradesData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                    <XAxis 
+                      dataKey="subject" 
+                      axisLine={false} 
+                      tickLine={false} 
+                      tick={{ fill: '#94a3b8', fontSize: 12, fontWeight: 700 }} 
+                      dy={10}
                     />
-                    <Bar dataKey="average" name="متوسط الدرجة" fill="#4f46e5" radius={[4, 4, 0, 0]} barSize={40} />
+                    <YAxis 
+                      axisLine={false} 
+                      tickLine={false} 
+                      tick={{ fill: '#94a3b8', fontSize: 12, fontWeight: 700 }} 
+                      domain={[0, 100]} 
+                    />
+                    <Tooltip 
+                      cursor={{ fill: 'rgba(241, 245, 249, 0.5)', radius: 12 }}
+                      contentStyle={{ 
+                        borderRadius: '24px', 
+                        border: 'none', 
+                        boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)',
+                        padding: '16px',
+                        backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                        backdropFilter: 'blur(8px)'
+                      }}
+                    />
+                    <Bar 
+                      dataKey="average" 
+                      name="متوسط الدرجة" 
+                      fill="#4f46e5" 
+                      radius={[12, 12, 4, 4]} 
+                      barSize={40} 
+                    />
                   </BarChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="flex items-center justify-center h-full text-slate-400">لا توجد بيانات كافية</div>
+                <div className="flex flex-col items-center justify-center h-full text-slate-400 gap-4">
+                  <div className="h-16 w-16 rounded-3xl bg-slate-50 flex items-center justify-center">
+                    <Award className="w-8 h-8 text-slate-200" />
+                  </div>
+                  <p className="font-bold italic">لا توجد بيانات كافية للعرض</p>
+                </div>
               )}
           </div>
         </div>
 
         {/* Distribution Chart */}
-        <div className="bg-white p-6 rounded-xl shadow-sm ring-1 ring-slate-200 lg:col-span-2">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-              <Users className="w-5 h-5 text-sky-500" />
-              توزيع الطلاب حسب المراحل الدراسية
-            </h3>
+        <div className="glass-card p-10 rounded-4xl border border-slate-200/60 shadow-2xl shadow-slate-200/50 hover:shadow-sky-100 transition-all duration-500 lg:col-span-2">
+          <div className="flex items-center justify-between mb-10">
+            <div className="flex items-center gap-4">
+              <div className="h-12 w-12 rounded-2xl bg-sky-50 flex items-center justify-center text-sky-600 shadow-sm">
+                <Users className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-xl font-black text-slate-900 tracking-tight">توزيع الطلاب</h3>
+                <p className="text-xs text-slate-400 font-black uppercase tracking-widest">حسب المراحل الدراسية</p>
+              </div>
+            </div>
           </div>
-          <div className="h-80 w-full flex flex-col md:flex-row items-center justify-center" dir="ltr">
+          <div className="h-96 w-full flex flex-col md:flex-row items-center justify-center" dir="ltr">
             {distributionData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
@@ -244,24 +335,40 @@ export default function ReportsPage() {
                     data={distributionData}
                     cx="50%"
                     cy="50%"
-                    innerRadius={80}
-                    outerRadius={120}
-                    paddingAngle={5}
+                    innerRadius={100}
+                    outerRadius={140}
+                    paddingAngle={8}
                     dataKey="value"
                     label={({ name, percent }) => `${name} (${((percent || 0) * 100).toFixed(0)}%)`}
                     labelLine={false}
                   >
                     {distributionData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      <Cell 
+                        key={`cell-${index}`} 
+                        fill={COLORS[index % COLORS.length]} 
+                        strokeWidth={0}
+                      />
                     ))}
                   </Pie>
                   <Tooltip 
-                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                    contentStyle={{ 
+                      borderRadius: '24px', 
+                      border: 'none', 
+                      boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)',
+                      padding: '16px',
+                      backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                      backdropFilter: 'blur(8px)'
+                    }}
                   />
                 </PieChart>
               </ResponsiveContainer>
             ) : (
-              <div className="flex items-center justify-center h-full text-slate-400">لا توجد بيانات كافية</div>
+              <div className="flex flex-col items-center justify-center h-full text-slate-400 gap-4">
+                <div className="h-16 w-16 rounded-3xl bg-slate-50 flex items-center justify-center">
+                  <Users className="w-8 h-8 text-slate-200" />
+                </div>
+                <p className="font-bold italic">لا توجد بيانات كافية للعرض</p>
+              </div>
             )}
           </div>
         </div>

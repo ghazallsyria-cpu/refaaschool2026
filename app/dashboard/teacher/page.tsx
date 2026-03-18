@@ -43,11 +43,11 @@ export default function TeacherDashboard() {
           .select('section_id, section:sections(*, classes(*), students(count))')
           .eq('teacher_id', user.id);
         
-        const sectionsData = teacherSections?.map(ts => ts.section) || [];
+        const sectionsData = (teacherSections?.map(ts => ts.section) || []) as any[];
         setSections(sectionsData);
 
         // Fetch exams for the teacher's sections
-        const sectionIds = sectionsData.map(s => s.id);
+        const sectionIds = sectionsData.map((s: any) => s.id);
         const { data: exams } = await supabase
           .from('exams')
           .select('*, subject:subjects(name), section:sections(name)')

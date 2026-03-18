@@ -78,7 +78,7 @@ export default function AdminDashboardHome() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-slate-900">لوحة تحكم الإدارة</h1>
+        <h1 className="text-2xl font-bold text-slate-900">لوحة تحكم الإدارة (تم التحديث)</h1>
         <div className="flex items-center gap-2 text-sm text-slate-500">
           <Activity className="h-4 w-4" />
           <span>محدث الآن</span>

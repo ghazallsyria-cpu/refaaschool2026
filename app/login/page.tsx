@@ -133,7 +133,7 @@ export default function LoginPage() {
           </div>
         </div>
         <h2 className="mt-6 text-center text-2xl font-bold leading-9 tracking-tight text-slate-900">
-          مدرسة الرفعة النموذجية
+          مدرسة الرفعة النموذجية (تم التحديث)
         </h2>
         <p className="mt-2 text-center text-sm text-slate-600">
           تسجيل الدخول للنظام
@@ -215,36 +215,6 @@ export default function LoginPage() {
             </button>
           </div>
         </form>
-
-        <div className="mt-8 bg-white p-6 rounded-xl shadow-sm ring-1 ring-slate-200">
-          <h4 className="font-bold mb-4 text-slate-900 border-b pb-2">الدخول السريع (للتجربة):</h4>
-          <div className="grid grid-cols-1 gap-3">
-            <button
-              onClick={() => handleDemoLogin('admin')}
-              className="flex items-center justify-between p-3 rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors group"
-            >
-              <span className="text-sm font-medium text-slate-700">مدير النظام</span>
-              <span className="text-xs text-slate-400 group-hover:text-indigo-600">اضغط للدخول</span>
-            </button>
-            <button
-              onClick={() => handleDemoLogin('teacher')}
-              className="flex items-center justify-between p-3 rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors group"
-            >
-              <span className="text-sm font-medium text-slate-700">معلم</span>
-              <span className="text-xs text-slate-400 group-hover:text-indigo-600">اضغط للدخول</span>
-            </button>
-            <button
-              onClick={() => handleDemoLogin('student')}
-              className="flex items-center justify-between p-3 rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors group"
-            >
-              <span className="text-sm font-medium text-slate-700">طالب</span>
-              <span className="text-xs text-slate-400 group-hover:text-indigo-600">اضغط للدخول</span>
-            </button>
-          </div>
-          <p className="mt-4 text-[10px] text-slate-400 text-center">
-            * ملاحظة: يتطلب الدخول التجريبي وجود الحسابات مسبقاً في قاعدة البيانات.
-          </p>
-        </div>
       </div>
     </div>
   );

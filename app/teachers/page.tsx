@@ -179,6 +179,43 @@ export default function TeachersPage() {
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [teacherToDelete, setTeacherToDelete] = useState<string | null>(null);
+  const [showAssignmentModal, setShowAssignmentModal] = useState(false);
+  const [selectedTeacher, setSelectedTeacher] = useState<any>(null);
+  const [sections, setSections] = useState<any[]>([]);
+  const [subjects, setSubjects] = useState<any[]>([]);
+  const [teacherSections, setTeacherSections] = useState<any[]>([]);
+
+  const handleAssignmentClick = async (teacher: any) => {
+    setSelectedTeacher(teacher);
+    const [sRes, subRes, tsRes] = await Promise.all([
+      supabase.from('sections').select('id, name, classes(name)'),
+      supabase.from('subjects').select('id, name'),
+      supabase.from('teacher_sections').select('id, section_id, subject_id').eq('teacher_id', teacher.id)
+    ]);
+    if (sRes.data) setSections(sRes.data);
+    if (subRes.data) setSubjects(subRes.data);
+    if (tsRes.data) setTeacherSections(tsRes.data);
+    setShowAssignmentModal(true);
+  };
+
+  const toggleAssignment = async (sectionId: string, subjectId: string) => {
+    const existing = teacherSections.find(ts => ts.section_id === sectionId && ts.subject_id === subjectId);
+    if (existing) {
+      await supabase.from('teacher_sections').delete().eq('id', existing.id);
+      setTeacherSections(teacherSections.filter(ts => ts.id !== existing.id));
+      showNotification('success', 'تم إزالة التعيين بنجاح');
+    } else {
+      const { data, error } = await supabase.from('teacher_sections').insert({
+        teacher_id: selectedTeacher.id,
+        section_id: sectionId,
+        subject_id: subjectId
+      }).select().single();
+      if (data) {
+        setTeacherSections([...teacherSections, data]);
+        showNotification('success', 'تم إضافة التعيين بنجاح');
+      }
+    }
+  };
 
   const handleDeleteClick = (id: string) => {
     setTeacherToDelete(id);
@@ -308,6 +345,13 @@ export default function TeachersPage() {
                     </td>
                     <td className="relative whitespace-nowrap py-4 pl-6 pr-4 text-left text-sm font-medium">
                       <div className="flex items-center justify-end gap-2">
+                        <button 
+                          onClick={() => handleAssignmentClick(teacher)}
+                          className="text-slate-400 hover:text-emerald-600"
+                          title="تعيين الفصول والمواد"
+                        >
+                          <BookOpen className="h-4 w-4" />
+                        </button>
                         <button 
                           onClick={() => handleResetPasswordClick(teacher)}
                           className="text-slate-400 hover:text-indigo-600"
@@ -591,6 +635,48 @@ export default function TeachersPage() {
                   onClick={() => setShowDeleteModal(false)}
                 >
                   إلغاء
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {showAssignmentModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+            <div className="fixed inset-0 bg-slate-900/75 transition-opacity" onClick={() => setShowAssignmentModal(false)}></div>
+            <div className="relative transform overflow-hidden rounded-xl bg-white text-right shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-2xl">
+              <div className="bg-white px-4 pb-4 pt-5 sm:p-6 sm:pb-4">
+                <h3 className="text-xl font-semibold leading-6 text-slate-900 mb-6">تعيين فصول ومواد لـ {selectedTeacher?.users?.full_name}</h3>
+                <div className="space-y-4">
+                  {sections.map(section => (
+                    <div key={section.id} className="border p-4 rounded-lg">
+                      <h4 className="font-bold mb-2">{section.classes?.name} - {section.name}</h4>
+                      <div className="grid grid-cols-2 gap-2">
+                        {subjects.map(subject => {
+                          const isAssigned = teacherSections.some(ts => ts.section_id === section.id && ts.subject_id === subject.id);
+                          return (
+                            <button 
+                              key={subject.id}
+                              onClick={() => toggleAssignment(section.id, subject.id)}
+                              className={`p-2 rounded text-sm ${isAssigned ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-700'}`}
+                            >
+                              {subject.name} {isAssigned && '✓'}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="bg-slate-50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6">
+                <button
+                  type="button"
+                  className="inline-flex w-full justify-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 sm:ml-3 sm:w-auto"
+                  onClick={() => setShowAssignmentModal(false)}
+                >
+                  إغلاق
                 </button>
               </div>
             </div>

@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Plus, Search, Edit2, Trash2, FileText, Calendar, Clock, Link as LinkIcon, X, BookOpen, Users, User, AlertCircle } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
-import { useNotifications } from '@/context/notification-context';
 
 type Assignment = {
   id: string;
@@ -35,7 +34,6 @@ export default function AssignmentsPage() {
   const [currentAssignment, setCurrentAssignment] = useState<Partial<Assignment>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const { sendNotification } = useNotifications();
   const [notification, setNotification] = useState<{type: 'success' | 'error', message: string} | null>(null);
   const [assignmentToDelete, setAssignmentToDelete] = useState<string | null>(null);
 
@@ -139,15 +137,9 @@ export default function AssignmentsPage() {
 
           if (students && students.length > 0) {
             const subjectName = subjects.find(s => s.id === payload.subject_id)?.name || 'المادة';
-            const notificationPromises = students.map(student => 
-              sendNotification(
-                student.id,
-                'واجب جديد',
-                `تمت إضافة واجب جديد في مادة ${subjectName}: ${payload.title}`,
-                'assignment',
-                '/dashboard/student' // Link to student dashboard or assignments list
-              )
-            );
+            const notificationPromises = students.map(student => {
+              console.log(`Notification: ${student.id} - واجب جديد - تمت إضافة واجب جديد في مادة ${subjectName}: ${payload.title}`);
+            });
             await Promise.all(notificationPromises);
           }
         } catch (notifErr) {

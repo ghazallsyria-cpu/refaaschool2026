@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { motion } from 'motion/react';
 import { cn } from '@/lib/utils';
 import {
   LayoutDashboard,

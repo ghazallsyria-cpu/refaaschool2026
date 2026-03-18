@@ -6,7 +6,7 @@ import { Users, GraduationCap, BookOpen, CalendarDays, Plus, Bell, School, Arrow
 import Link from 'next/link';
 import { motion } from 'motion/react';
 
-const containerVariants = {
+const containerVariants: any = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
@@ -16,7 +16,7 @@ const containerVariants = {
   }
 };
 
-const itemVariants = {
+const itemVariants: any = {
   hidden: { y: 20, opacity: 0 },
   visible: {
     y: 0,

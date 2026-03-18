@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Calendar, Save, CheckCircle2, XCircle, Clock, AlertCircle, Users } from 'lucide-react';
-import { useNotifications } from '@/context/notification-context';
 
 type AttendanceStatus = 'present' | 'absent' | 'late' | 'excused';
 
@@ -15,7 +14,6 @@ export default function AttendancePage() {
   const [attendance, setAttendance] = useState<Record<string, AttendanceStatus>>({});
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const { sendNotification } = useNotifications();
   const [message, setMessage] = useState({ text: '', type: '' });
 
   const fetchSections = useCallback(async () => {
@@ -122,13 +120,7 @@ export default function AttendancePage() {
             const student = students.find(s => s.id === record.student_id);
             if (student && student.users) {
               const statusText = record.status === 'absent' ? 'غائب' : 'متأخر';
-              return sendNotification(
-                student.id,
-                'تنبيه حضور',
-                `تم تسجيلك كـ ${statusText} بتاريخ ${record.date}`,
-                'attendance',
-                '/attendance/report'
-              );
+              console.log(`Notification: ${student.id} - تنبيه حضور - تم تسجيلك كـ ${statusText} بتاريخ ${record.date}`);
             }
           });
         await Promise.all(notificationPromises);

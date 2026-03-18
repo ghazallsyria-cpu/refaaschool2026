@@ -29,7 +29,13 @@ const getBgColor = (type: NotificationType) => {
 };
 
 export function NotificationsBell() {
-  const { notifications, unreadCount, markAsRead, markAllAsRead, deleteNotification, loading } = useNotifications();
+  const context = useNotifications();
+  const notifications = context?.notifications || [];
+  const unreadCount = context?.unreadCount || 0;
+  const markAsRead = context?.markAsRead || (async () => {});
+  const markAllAsRead = context?.markAllAsRead || (async () => {});
+  const deleteNotification = context?.deleteNotification || (async () => {});
+  const loading = context?.loading || false;
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 

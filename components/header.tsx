@@ -1,6 +1,7 @@
 'use client';
 
 import { Search, User, LogOut, Menu } from 'lucide-react';
+import { motion } from 'motion/react';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';

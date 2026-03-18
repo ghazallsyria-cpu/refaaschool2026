@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Plus, Search, Edit2, Trash2, Megaphone, Bell, X, Users, Calendar, Filter, AlertCircle, ArrowRight } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
-import { useNotifications } from '@/context/notification-context';
 import { motion, AnimatePresence } from 'motion/react';
 
 type Announcement = {
@@ -35,7 +34,6 @@ export default function AnnouncementsPage() {
   const [currentAnnouncement, setCurrentAnnouncement] = useState<Partial<Announcement>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const { sendNotification } = useNotifications();
   const [notification, setNotification] = useState<{type: 'success' | 'error', message: string} | null>(null);
   const [announcementToDelete, setAnnouncementToDelete] = useState<string | null>(null);
 
@@ -119,15 +117,9 @@ export default function AnnouncementsPage() {
           const { data: targetUsers } = await usersQuery;
 
           if (targetUsers && targetUsers.length > 0) {
-            const notificationPromises = targetUsers.map(user => 
-              sendNotification(
-                user.id,
-                'إعلان جديد',
-                payload.title as string,
-                'announcement',
-                '/'
-              )
-            );
+            const notificationPromises = targetUsers.map(user => {
+              console.log(`Notification: ${user.id} - إعلان جديد - ${payload.title}`);
+            });
             await Promise.all(notificationPromises);
           }
         } catch (notifErr) {

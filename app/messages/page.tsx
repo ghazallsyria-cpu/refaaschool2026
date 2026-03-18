@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { MessageSquare, Megaphone, Plus, Search, Send, User, Clock, Check, CheckCheck, X, UserPlus, Filter, Mail, Bell } from 'lucide-react';
-import { useNotifications } from '@/context/notification-context';
 import { motion, AnimatePresence } from 'motion/react';
 
 type Tab = 'messages' | 'announcements';
@@ -18,7 +17,6 @@ export default function MessagesPage() {
   // Modals state
   const [showNewMessage, setShowNewMessage] = useState(false);
   const [showNewAnnouncement, setShowNewAnnouncement] = useState(false);
-  const { sendNotification } = useNotifications();
   const [notification, setNotification] = useState<{type: 'success' | 'error', message: string} | null>(null);
   
   const [users, setUsers] = useState<any[]>([]);
@@ -129,13 +127,7 @@ export default function MessagesPage() {
       if (error) throw error;
       
       try {
-        await sendNotification(
-          newMessage.receiver_id,
-          'رسالة جديدة',
-          newMessage.subject,
-          'message',
-          '/messages'
-        );
+        console.log(`Notification: ${newMessage.receiver_id} - رسالة جديدة - ${newMessage.subject}`);
       } catch (notifErr) {
         console.error('Error sending message notification:', notifErr);
       }
@@ -183,15 +175,9 @@ export default function MessagesPage() {
         const { data: targetUsers } = await usersQuery;
 
         if (targetUsers && targetUsers.length > 0) {
-          const notificationPromises = targetUsers.map(u => 
-            sendNotification(
-              u.id,
-              'إعلان جديد',
-              newAnnouncement.title,
-              'announcement',
-              '/messages'
-            )
-          );
+          const notificationPromises = targetUsers.map(u => {
+            console.log(`Notification: ${u.id} - إعلان جديد - ${newAnnouncement.title}`);
+          });
           await Promise.all(notificationPromises);
         }
       } catch (notifErr) {

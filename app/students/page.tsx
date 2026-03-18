@@ -5,10 +5,8 @@ import { supabase } from '@/lib/supabase';
 import { Plus, Search, MoreHorizontal, Edit, Trash2, X, Key, Filter, Download, UserPlus, Users, ArrowRight, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import * as Dialog from '@radix-ui/react-dialog';
-import { useNotifications } from '@/context/notification-context';
 
 export default function StudentsPage() {
-  const { sendNotification } = useNotifications();
   const [students, setStudents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -32,6 +30,7 @@ export default function StudentsPage() {
   });
   const [sections, setSections] = useState<any[]>([]);
   const [parents, setParents] = useState<any[]>([]);
+  const [selectedSection, setSelectedSection] = useState('all');
 
   useEffect(() => {
     fetchStudents();
@@ -66,7 +65,7 @@ export default function StudentsPage() {
   const handleAddSubmit = async () => {
     try {
       if (!addForm.full_name || !addForm.national_id) {
-        showNotification('error', 'يرجى تعبئة الحقول الإلزامية (الاسم والرقم المدني)');
+        alert('يرجى تعبئة الحقول الإلزامية (الاسم والرقم المدني)');
         return;
       }
 
@@ -96,17 +95,13 @@ export default function StudentsPage() {
         throw new Error(data.error || 'فشل إنشاء حساب الطالب');
       }
 
-      sendNotification({
-        title: 'تمت الإضافة بنجاح',
-        message: `تم إضافة الطالب بنجاح (كلمة المرور: ${data.password})`,
-        type: 'success'
-      });
+      alert('تمت الإضافة بنجاح');
       setShowAddModal(false);
       setAddForm({ full_name: '', national_id: '', email: '', phone: '', section_id: '', parent_id: '' });
       fetchStudents();
     } catch (error: any) {
       console.error('Error adding student:', error);
-      showNotification('error', error.message || 'حدث خطأ أثناء إضافة الطالب');
+      alert(error.message || 'حدث خطأ أثناء إضافة الطالب');
     }
   };
 
@@ -147,20 +142,12 @@ export default function StudentsPage() {
 
       if (studentError) throw studentError;
 
-      sendNotification({
-        title: 'تم التحديث',
-        message: 'تم تحديث بيانات الطالب بنجاح',
-        type: 'success'
-      });
+      alert('تم تحديث بيانات الطالب بنجاح');
       setShowEditModal(false);
       fetchStudents();
     } catch (error: any) {
       console.error('Error updating student:', error);
-      sendNotification({
-        title: 'خطأ',
-        message: error.message || 'حدث خطأ أثناء تحديث بيانات الطالب',
-        type: 'error'
-      });
+      alert(error.message || 'حدث خطأ أثناء تحديث بيانات الطالب');
     }
   };
   const [showPasswordResetModal, setShowPasswordResetModal] = useState(false);
@@ -187,19 +174,11 @@ export default function StudentsPage() {
       
       if (!response.ok) throw new Error(data.error || 'فشل تغيير كلمة المرور');
       
-      sendNotification({
-        title: 'تم تغيير كلمة المرور',
-        message: `تم تغيير كلمة المرور بنجاح. كلمة المرور الجديدة: ${data.newPassword || resetPasswordForm.newPassword}`,
-        type: 'success'
-      });
+      alert(`تم تغيير كلمة المرور بنجاح. كلمة المرور الجديدة: ${data.newPassword || resetPasswordForm.newPassword}`);
       setShowPasswordResetModal(false);
     } catch (error: any) {
       console.error('Error resetting password:', error);
-      sendNotification({
-        title: 'خطأ',
-        message: error.message || 'حدث خطأ أثناء تغيير كلمة المرور',
-        type: 'error'
-      });
+      alert(error.message || 'حدث خطأ أثناء تغيير كلمة المرور');
     }
   };
 
@@ -255,21 +234,13 @@ export default function StudentsPage() {
         throw new Error(data.error || 'فشل حذف الطالب');
       }
       
-      sendNotification({
-        title: 'تم الحذف',
-        message: 'تم حذف الطالب بنجاح',
-        type: 'success'
-      });
+      alert('تم حذف الطالب بنجاح');
       setShowDeleteModal(false);
       setStudentToDelete(null);
       fetchStudents();
     } catch (error: any) {
       console.error('Error deleting student:', error);
-      sendNotification({
-        title: 'خطأ',
-        message: error.message || 'حدث خطأ أثناء حذف الطالب',
-        type: 'error'
-      });
+      alert(error.message || 'حدث خطأ أثناء حذف الطالب');
     }
   };
 

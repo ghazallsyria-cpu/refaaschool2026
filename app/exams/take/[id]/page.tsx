@@ -11,7 +11,6 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/lib/utils';
-import { useNotifications } from '@/context/notification-context';
 
 type Question = {
   id: string;
@@ -43,7 +42,6 @@ export default function TakeQuiz() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isFinished, setIsFinished] = useState(false);
   const [attemptId, setAttemptId] = useState<string | null>(null);
-  const { sendNotification } = useNotifications();
   const [notification, setNotification] = useState<{type: 'success' | 'error', message: string} | null>(null);
 
   const showNotification = (type: 'success' | 'error', message: string) => {
@@ -173,13 +171,7 @@ export default function TakeQuiz() {
           const studentName = userData.user?.user_metadata?.full_name || 'طالب';
 
           if (examInfo?.teacher_id) {
-            await sendNotification(
-              examInfo.teacher_id,
-              'تسليم اختبار جديد',
-              `قام الطالب ${studentName} بتسليم اختبار: ${examInfo.title}`,
-              'exam',
-              `/exams/results/${params.id}`
-            );
+            console.log(`Notification: ${examInfo.teacher_id} - تسليم اختبار جديد - قام الطالب ${studentName} بتسليم اختبار: ${examInfo.title}`);
           }
         } catch (notifErr) {
           console.error('Error sending teacher notification:', notifErr);
@@ -193,7 +185,7 @@ export default function TakeQuiz() {
     } finally {
       setIsSubmitting(false);
     }
-  }, [isSubmitting, questions, answers, attemptId, params.id, sendNotification]);
+  }, [isSubmitting, questions, answers, attemptId, params.id]);
 
   useEffect(() => {
     if (timeLeft !== null && timeLeft > 0 && !isFinished) {

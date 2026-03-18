@@ -29,7 +29,12 @@ const getBgColor = (type: NotificationType) => {
 };
 
 export default function NotificationsPage() {
-  const { notifications, markAsRead, markAllAsRead, deleteNotification, loading } = useNotifications();
+  const context = useNotifications();
+  const notifications = context?.notifications || [];
+  const markAsRead = context?.markAsRead || (async () => {});
+  const markAllAsRead = context?.markAllAsRead || (async () => {});
+  const deleteNotification = context?.deleteNotification || (async () => {});
+  const loading = context?.loading || false;
   const [filter, setFilter] = React.useState<NotificationType | 'all'>('all');
 
   const filteredNotifications = filter === 'all' 

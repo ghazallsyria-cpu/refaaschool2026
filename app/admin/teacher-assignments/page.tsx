@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Plus, Trash2, BookOpen, Users } from 'lucide-react';
+import { Plus, Trash2, Save } from 'lucide-react';
 
 export default function TeacherAssignmentsPage() {
   const [teachers, setTeachers] = useState<any[]>([]);
@@ -11,7 +11,7 @@ export default function TeacherAssignmentsPage() {
   const [assignments, setAssignments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const [newAssignment, setNewAssignment] = useState({ teacher_id: '', section_id: '', subject_id: '' });
+  const [newAssignments, setNewAssignments] = useState<{ teacher_id: string; section_id: string; subject_id: string }[]>([]);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -34,15 +34,31 @@ export default function TeacherAssignmentsPage() {
     fetchData();
   }, [fetchData]);
 
-  const handleAddAssignment = async () => {
-    if (!newAssignment.teacher_id || !newAssignment.section_id || !newAssignment.subject_id) return;
-    
-    const { error } = await supabase.from('teacher_sections').insert(newAssignment);
+  const addRow = () => {
+    setNewAssignments([...newAssignments, { teacher_id: '', section_id: '', subject_id: '' }]);
+  };
+
+  const updateRow = (index: number, field: string, value: string) => {
+    const updated = [...newAssignments];
+    updated[index] = { ...updated[index], [field]: value };
+    setNewAssignments(updated);
+  };
+
+  const removeRow = (index: number) => {
+    setNewAssignments(newAssignments.filter((_, i) => i !== index));
+  };
+
+  const handleSaveAll = async () => {
+    const validAssignments = newAssignments.filter(a => a.teacher_id && a.section_id && a.subject_id);
+    if (validAssignments.length === 0) return;
+
+    const { error } = await supabase.from('teacher_sections').insert(validAssignments);
     if (!error) {
-      setNewAssignment({ teacher_id: '', section_id: '', subject_id: '' });
+      setNewAssignments([]);
       fetchData();
+      alert('تم حفظ التعيينات بنجاح');
     } else {
-      alert('فشل إضافة التعيين: ' + error.message);
+      alert('فشل حفظ التعيينات: ' + error.message);
     }
   };
 
@@ -56,24 +72,36 @@ export default function TeacherAssignmentsPage() {
       <h1 className="text-2xl font-bold">إدارة تعيينات المعلمين</h1>
       
       <div className="bg-white p-6 rounded-xl shadow-sm ring-1 ring-slate-200 space-y-4">
-        <h2 className="font-bold">إضافة تعيين جديد</h2>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <select className="p-2 border rounded" value={newAssignment.teacher_id} onChange={e => setNewAssignment({...newAssignment, teacher_id: e.target.value})}>
-            <option value="">اختر المعلم</option>
-            {teachers.map(t => <option key={t.id} value={t.id}>{t.users?.full_name}</option>)}
-          </select>
-          <select className="p-2 border rounded" value={newAssignment.section_id} onChange={e => setNewAssignment({...newAssignment, section_id: e.target.value})}>
-            <option value="">اختر الفصل</option>
-            {sections.map(s => <option key={s.id} value={s.id}>{s.name} ({s.classes?.name})</option>)}
-          </select>
-          <select className="p-2 border rounded" value={newAssignment.subject_id} onChange={e => setNewAssignment({...newAssignment, subject_id: e.target.value})}>
-            <option value="">اختر المادة</option>
-            {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-          </select>
-          <button onClick={handleAddAssignment} className="bg-indigo-600 text-white p-2 rounded flex items-center justify-center gap-2">
-            <Plus className="h-4 w-4" /> إضافة
+        <div className="flex justify-between items-center">
+          <h2 className="font-bold">إضافة تعيينات متعددة</h2>
+          <button onClick={addRow} className="bg-slate-100 text-slate-700 p-2 rounded flex items-center gap-2">
+            <Plus className="h-4 w-4" /> إضافة صف
           </button>
         </div>
+        
+        {newAssignments.map((assignment, index) => (
+          <div key={index} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
+            <select className="p-2 border rounded" value={assignment.teacher_id} onChange={e => updateRow(index, 'teacher_id', e.target.value)}>
+              <option value="">اختر المعلم</option>
+              {teachers.map(t => <option key={t.id} value={t.id}>{t.users?.full_name}</option>)}
+            </select>
+            <select className="p-2 border rounded" value={assignment.section_id} onChange={e => updateRow(index, 'section_id', e.target.value)}>
+              <option value="">اختر الفصل</option>
+              {sections.map(s => <option key={s.id} value={s.id}>{s.name} ({s.classes?.name})</option>)}
+            </select>
+            <select className="p-2 border rounded" value={assignment.subject_id} onChange={e => updateRow(index, 'subject_id', e.target.value)}>
+              <option value="">اختر المادة</option>
+              {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+            <button onClick={() => removeRow(index)} className="text-red-600 p-2"><Trash2 className="h-4 w-4" /></button>
+          </div>
+        ))}
+        
+        {newAssignments.length > 0 && (
+          <button onClick={handleSaveAll} className="bg-indigo-600 text-white px-6 py-2 rounded flex items-center gap-2">
+            <Save className="h-4 w-4" /> حفظ الكل
+          </button>
+        )}
       </div>
 
       <div className="bg-white rounded-xl shadow-sm ring-1 ring-slate-200">

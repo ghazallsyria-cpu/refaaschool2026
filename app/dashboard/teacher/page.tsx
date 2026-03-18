@@ -37,20 +37,21 @@ export default function TeacherDashboard() {
       setTeacherData(teacher);
 
       if (teacher) {
-        // Fetch teacher's sections (this might need a join table or a direct link)
-        // For now, let's assume teachers are linked to sections via subjects or a direct link
-        // If the schema doesn't have a direct link, we'll fetch all sections for now
-        const { data: sectionsData } = await supabase
-          .from('sections')
-          .select('*, classes(*), students(count)');
+        // Fetch teacher's sections assigned to this teacher
+        const { data: teacherSections } = await supabase
+          .from('teacher_sections')
+          .select('section_id, section:sections(*, classes(*), students(count))')
+          .eq('teacher_id', user.id);
         
-        setSections(sectionsData || []);
+        const sectionsData = teacherSections?.map(ts => ts.section) || [];
+        setSections(sectionsData);
 
-        // Fetch exams created by this teacher
+        // Fetch exams for the teacher's sections
+        const sectionIds = sectionsData.map(s => s.id);
         const { data: exams } = await supabase
           .from('exams')
           .select('*, subject:subjects(name), section:sections(name)')
-          // .eq('created_by', user.id) // Assuming there's a created_by field
+          .in('section_id', sectionIds)
           .order('created_at', { ascending: false })
           .limit(5);
         

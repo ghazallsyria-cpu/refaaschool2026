@@ -1,0 +1,104 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabase';
+import { Plus, Trash2, BookOpen, Users } from 'lucide-react';
+
+export default function TeacherAssignmentsPage() {
+  const [teachers, setTeachers] = useState<any[]>([]);
+  const [sections, setSections] = useState<any[]>([]);
+  const [subjects, setSubjects] = useState<any[]>([]);
+  const [assignments, setAssignments] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const [newAssignment, setNewAssignment] = useState({ teacher_id: '', section_id: '', subject_id: '' });
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    setLoading(true);
+    const [tRes, sRes, subRes, aRes] = await Promise.all([
+      supabase.from('teachers').select('id, users(full_name)'),
+      supabase.from('sections').select('id, name, classes(name)'),
+      supabase.from('subjects').select('id, name'),
+      supabase.from('teacher_sections').select('id, teacher_id, section_id, subject_id, teacher:teachers(users(full_name)), section:sections(name), subject:subjects(name)')
+    ]);
+
+    if (tRes.data) setTeachers(tRes.data);
+    if (sRes.data) setSections(sRes.data);
+    if (subRes.data) setSubjects(subRes.data);
+    if (aRes.data) setAssignments(aRes.data);
+    setLoading(false);
+  };
+
+  const handleAddAssignment = async () => {
+    if (!newAssignment.teacher_id || !newAssignment.section_id || !newAssignment.subject_id) return;
+    
+    const { error } = await supabase.from('teacher_sections').insert(newAssignment);
+    if (!error) {
+      setNewAssignment({ teacher_id: '', section_id: '', subject_id: '' });
+      fetchData();
+    } else {
+      alert('فشل إضافة التعيين: ' + error.message);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    await supabase.from('teacher_sections').delete().eq('id', id);
+    fetchData();
+  };
+
+  return (
+    <div className="p-8 space-y-8">
+      <h1 className="text-2xl font-bold">إدارة تعيينات المعلمين</h1>
+      
+      <div className="bg-white p-6 rounded-xl shadow-sm ring-1 ring-slate-200 space-y-4">
+        <h2 className="font-bold">إضافة تعيين جديد</h2>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <select className="p-2 border rounded" value={newAssignment.teacher_id} onChange={e => setNewAssignment({...newAssignment, teacher_id: e.target.value})}>
+            <option value="">اختر المعلم</option>
+            {teachers.map(t => <option key={t.id} value={t.id}>{t.users?.full_name}</option>)}
+          </select>
+          <select className="p-2 border rounded" value={newAssignment.section_id} onChange={e => setNewAssignment({...newAssignment, section_id: e.target.value})}>
+            <option value="">اختر الفصل</option>
+            {sections.map(s => <option key={s.id} value={s.id}>{s.name} ({s.classes?.name})</option>)}
+          </select>
+          <select className="p-2 border rounded" value={newAssignment.subject_id} onChange={e => setNewAssignment({...newAssignment, subject_id: e.target.value})}>
+            <option value="">اختر المادة</option>
+            {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+          <button onClick={handleAddAssignment} className="bg-indigo-600 text-white p-2 rounded flex items-center justify-center gap-2">
+            <Plus className="h-4 w-4" /> إضافة
+          </button>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-xl shadow-sm ring-1 ring-slate-200">
+        <table className="w-full text-right">
+          <thead className="bg-slate-50 border-b">
+            <tr>
+              <th className="p-4">المعلم</th>
+              <th className="p-4">الفصل</th>
+              <th className="p-4">المادة</th>
+              <th className="p-4">إجراءات</th>
+            </tr>
+          </thead>
+          <tbody>
+            {assignments.map(a => (
+              <tr key={a.id} className="border-b">
+                <td className="p-4">{a.teacher?.users?.full_name}</td>
+                <td className="p-4">{a.section?.name}</td>
+                <td className="p-4">{a.subject?.name}</td>
+                <td className="p-4">
+                  <button onClick={() => handleDelete(a.id)} className="text-red-600"><Trash2 className="h-4 w-4" /></button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}

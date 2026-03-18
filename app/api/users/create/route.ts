@@ -59,10 +59,14 @@ export async function POST(request: Request) {
       email_confirm: true,
     });
 
-    if (authError) throw authError;
+    if (authError) {
+      console.error('Auth creation error:', authError);
+      throw authError;
+    }
     if (!authData.user) throw new Error('Failed to create user');
 
     const userId = authData.user.id;
+    console.log('Auth user created:', userId);
 
     // 2. Insert into users table
     const { error: userError } = await supabaseAdmin
@@ -77,10 +81,13 @@ export async function POST(request: Request) {
       });
 
     if (userError) {
+      console.error('Users table insertion error:', userError);
       // Rollback auth user creation
       await supabaseAdmin.auth.admin.deleteUser(userId);
       throw userError;
     }
+
+    console.log('Users table insertion successful');
 
     // 3. Insert into specific role table
     if (role === 'student') {
@@ -92,6 +99,7 @@ export async function POST(request: Request) {
           section_id: section_id || null,
         });
       if (studentError) {
+        console.error('Students table insertion error:', studentError);
         await supabaseAdmin.auth.admin.deleteUser(userId);
         throw studentError;
       }
@@ -105,10 +113,12 @@ export async function POST(request: Request) {
           zoom_link,
         });
       if (teacherError) {
+        console.error('Teachers table insertion error:', teacherError);
         await supabaseAdmin.auth.admin.deleteUser(userId);
         throw teacherError;
       }
-    } else if (role === 'parent') {
+    }
+ else if (role === 'parent') {
       const { error: parentError } = await supabaseAdmin
         .from('parents')
         .insert({

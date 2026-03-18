@@ -70,21 +70,36 @@ export default function TeachersPage() {
     }
   };
 
+  const [submitting, setSubmitting] = useState(false);
+
   const handleAddSubmit = async () => {
+    console.log('handleAddSubmit triggered');
+    if (submitting) return;
     try {
+      setSubmitting(true);
+      console.log('Form data:', addForm);
       if (!addForm.full_name || !addForm.national_id) {
+        console.log('Validation failed: missing full_name or national_id');
         showNotification('error', 'يرجى تعبئة الحقول الإلزامية (الاسم والرقم المدني)');
         return;
       }
 
-      const { data: { session } } = await supabase.auth.getSession();
+      console.log('Getting session...');
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) {
+        console.error('Session error:', sessionError);
+        throw sessionError;
+      }
+      
       const token = session?.access_token;
+      console.log('Token obtained:', token ? 'Yes' : 'No');
 
       if (!token) {
         showNotification('error', 'انتهت صلاحية الجلسة، يرجى تسجيل الدخول مرة أخرى');
         return;
       }
 
+      console.log('Sending request to /api/users/create...');
       const response = await fetch('/api/users/create', {
         method: 'POST',
         headers: {
@@ -102,7 +117,9 @@ export default function TeachersPage() {
         }),
       });
 
+      console.log('Response status:', response.status);
       const data = await response.json();
+      console.log('Response data:', data);
 
       if (!response.ok) {
         throw new Error(data.error || 'فشل إنشاء حساب المعلم');
@@ -115,6 +132,8 @@ export default function TeachersPage() {
     } catch (error: any) {
       console.error('Error adding teacher:', error);
       showNotification('error', error.message || 'حدث خطأ أثناء إضافة المعلم');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -131,8 +150,12 @@ export default function TeachersPage() {
     setShowEditModal(true);
   };
 
+  const [submittingEdit, setSubmittingEdit] = useState(false);
+
   const handleEditSubmit = async () => {
+    if (submittingEdit) return;
     try {
+      setSubmittingEdit(true);
       // Update users table
       const { error: userError } = await supabase
         .from('users')
@@ -163,6 +186,8 @@ export default function TeachersPage() {
     } catch (error: any) {
       console.error('Error updating teacher:', error);
       showNotification('error', error.message || 'حدث خطأ أثناء تحديث بيانات المعلم');
+    } finally {
+      setSubmittingEdit(false);
     }
   };
 
@@ -729,10 +754,20 @@ export default function TeachersPage() {
               <div className="bg-slate-50/50 px-8 py-6 sm:flex sm:flex-row-reverse sm:px-10 gap-3">
                 <button
                   type="button"
-                  className="inline-flex w-full justify-center rounded-2xl bg-indigo-600 px-8 py-3 text-sm font-bold text-white shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all active:scale-95 sm:w-auto"
+                  disabled={submittingEdit}
+                  className={`inline-flex w-full justify-center rounded-2xl px-8 py-3 text-sm font-bold text-white shadow-lg transition-all active:scale-95 sm:w-auto ${
+                    submittingEdit 
+                    ? 'bg-indigo-400 cursor-not-allowed' 
+                    : 'bg-indigo-600 shadow-indigo-200 hover:bg-indigo-700'
+                  }`}
                   onClick={handleEditSubmit}
                 >
-                  حفظ التعديلات
+                  {submittingEdit ? (
+                    <div className="flex items-center gap-2">
+                      <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                      جاري الحفظ...
+                    </div>
+                  ) : 'حفظ التعديلات'}
                 </button>
                 <button
                   type="button"
@@ -761,7 +796,7 @@ export default function TeachersPage() {
                   </button>
                 </div>
                 
-                <form className="space-y-6">
+                <form className="space-y-6" onSubmit={(e) => e.preventDefault()}>
                   <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                     <div className="space-y-2">
                       <label className="text-sm font-bold text-slate-700 mr-1">الاسم الرباعي</label>
@@ -833,10 +868,20 @@ export default function TeachersPage() {
               <div className="bg-slate-50/50 px-8 py-6 sm:flex sm:flex-row-reverse sm:px-10 gap-3">
                 <button
                   type="button"
-                  className="inline-flex w-full justify-center rounded-2xl bg-indigo-600 px-8 py-3 text-sm font-bold text-white shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all active:scale-95 sm:w-auto"
+                  disabled={submitting}
+                  className={`inline-flex w-full justify-center rounded-2xl px-8 py-3 text-sm font-bold text-white shadow-lg transition-all active:scale-95 sm:w-auto ${
+                    submitting 
+                    ? 'bg-indigo-400 cursor-not-allowed' 
+                    : 'bg-indigo-600 shadow-indigo-200 hover:bg-indigo-700'
+                  }`}
                   onClick={handleAddSubmit}
                 >
-                  حفظ البيانات
+                  {submitting ? (
+                    <div className="flex items-center gap-2">
+                      <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                      جاري الحفظ...
+                    </div>
+                  ) : 'حفظ البيانات'}
                 </button>
                 <button
                   type="button"

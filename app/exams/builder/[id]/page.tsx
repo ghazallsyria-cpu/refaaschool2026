@@ -15,6 +15,7 @@ import { motion, Reorder, AnimatePresence } from 'motion/react';
 import * as Dialog from '@radix-ui/react-dialog';
 import * as Tabs from '@radix-ui/react-tabs';
 import * as Switch from '@radix-ui/react-switch';
+import { useNotifications } from '@/context/notification-context';
 
 type QuestionType = 'multiple_choice' | 'true_false' | 'multi_select' | 'essay' | 'fill_in_blank' | 'matching' | 'ordering';
 
@@ -82,6 +83,7 @@ export default function QuizBuilder() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [activeTab, setActiveTab] = useState('questions');
   const [notification, setNotification] = useState<{type: 'success' | 'error', message: string} | null>(null);
+  const { sendNotification } = useNotifications();
 
   const showNotification = (type: 'success' | 'error', message: string) => {
     setNotification({ type, message });
@@ -292,7 +294,7 @@ export default function QuizBuilder() {
 
         if (qError) throw qError;
 
-        if (q.options.length > 0) {
+      if (q.options.length > 0) {
           const optionsPayload = q.options.map((o, idx) => ({
             question_id: newQ.id,
             content: o.content,
@@ -300,6 +302,34 @@ export default function QuizBuilder() {
             order_index: idx
           }));
           await supabase.from('question_options').insert(optionsPayload);
+        }
+      }
+
+      // 3. Send Notifications if Published
+      if (exam.status === 'published') {
+        try {
+          let studentsQuery = supabase.from('students').select('id');
+          if (exam.section_id) {
+            studentsQuery = studentsQuery.eq('section_id', exam.section_id);
+          }
+          const { data: students } = await studentsQuery;
+
+          if (students && students.length > 0) {
+            const subjectName = subjects.find(s => s.id === exam.subject_id)?.name || 'المادة';
+            const notificationPromises = students.map(student => 
+              sendNotification(
+                student.id,
+                'اختبار جديد متاح',
+                `تم نشر اختبار جديد في مادة ${subjectName}: ${exam.title}`,
+                'exam',
+                `/exams/take/${examId}`
+              )
+            );
+            await Promise.all(notificationPromises);
+          }
+        } catch (notifErr) {
+          console.error('Error sending exam notifications:', notifErr);
+          // Don't fail the whole save if notifications fail
         }
       }
 

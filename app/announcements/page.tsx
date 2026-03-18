@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Plus, Search, Edit2, Trash2, Megaphone, Bell, X, Users, Calendar, Filter } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
+import { useNotifications } from '@/context/notification-context';
 
 type Announcement = {
   id: string;
@@ -33,6 +34,7 @@ export default function AnnouncementsPage() {
   const [currentAnnouncement, setCurrentAnnouncement] = useState<Partial<Announcement>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const { sendNotification } = useNotifications();
   const [notification, setNotification] = useState<{type: 'success' | 'error', message: string} | null>(null);
   const [announcementToDelete, setAnnouncementToDelete] = useState<string | null>(null);
 
@@ -103,14 +105,39 @@ export default function AnnouncementsPage() {
         }
       } else {
         // Insert
-        const { data, error } = await supabase
+        const { data: newAnn, error } = await supabase
           .from('announcements')
           .insert([payload])
-          .select();
+          .select()
+          .single();
           
         if (error) {
           console.error('Supabase Insert Error Details:', JSON.stringify(error, null, 2));
           throw error;
+        }
+
+        // Send Notifications to target audience
+        try {
+          let usersQuery = supabase.from('users').select('id');
+          if (payload.target_role) {
+            usersQuery = usersQuery.eq('role', payload.target_role);
+          }
+          const { data: targetUsers } = await usersQuery;
+
+          if (targetUsers && targetUsers.length > 0) {
+            const notificationPromises = targetUsers.map(user => 
+              sendNotification(
+                user.id,
+                'إعلان جديد',
+                payload.title,
+                'announcement',
+                '/' // Link to home or announcements page
+              )
+            );
+            await Promise.all(notificationPromises);
+          }
+        } catch (notifErr) {
+          console.error('Error sending announcement notifications:', notifErr);
         }
       }
 

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { MessageSquare, Megaphone, Plus, Search, Send, User, Clock, Check, CheckCheck, X } from 'lucide-react';
+import { useNotifications } from '@/context/notification-context';
 
 type Tab = 'messages' | 'announcements';
 
@@ -16,6 +17,7 @@ export default function MessagesPage() {
   // Modals state
   const [showNewMessage, setShowNewMessage] = useState(false);
   const [showNewAnnouncement, setShowNewAnnouncement] = useState(false);
+  const { sendNotification } = useNotifications();
   const [notification, setNotification] = useState<{type: 'success' | 'error', message: string} | null>(null);
   
   const [users, setUsers] = useState<any[]>([]);
@@ -127,6 +129,19 @@ export default function MessagesPage() {
 
       if (error) throw error;
       
+      // Send Notification to receiver
+      try {
+        await sendNotification(
+          newMessage.receiver_id,
+          'رسالة جديدة',
+          newMessage.subject,
+          'message',
+          '/messages'
+        );
+      } catch (notifErr) {
+        console.error('Error sending message notification:', notifErr);
+      }
+
       showNotification('success', 'تم إرسال الرسالة بنجاح');
       setShowNewMessage(false);
       setNewMessage({ receiver_id: '', subject: '', content: '' });
@@ -162,6 +177,30 @@ export default function MessagesPage() {
 
       if (error) throw error;
       
+      // Send Notifications to target audience
+      try {
+        let usersQuery = supabase.from('users').select('id');
+        if (newAnnouncement.target_role !== 'all') {
+          usersQuery = usersQuery.eq('role', newAnnouncement.target_role);
+        }
+        const { data: targetUsers } = await usersQuery;
+
+        if (targetUsers && targetUsers.length > 0) {
+          const notificationPromises = targetUsers.map(user => 
+            sendNotification(
+              user.id,
+              'إعلان جديد',
+              newAnnouncement.title,
+              'announcement',
+              '/messages'
+            )
+          );
+          await Promise.all(notificationPromises);
+        }
+      } catch (notifErr) {
+        console.error('Error sending announcement notifications:', notifErr);
+      }
+
       showNotification('success', 'تم نشر الإعلان بنجاح');
       setShowNewAnnouncement(false);
       setNewAnnouncement({ title: '', target_role: 'all', content: '' });

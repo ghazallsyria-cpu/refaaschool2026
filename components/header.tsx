@@ -1,9 +1,10 @@
 'use client';
 
-import { Bell, Search, User, LogOut, Menu } from 'lucide-react';
+import { Search, User, LogOut, Menu } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
+import { NotificationsBell } from '@/components/notifications-bell';
 
 export function Header({ onMenuClick, showMenuButton = true }: { onMenuClick?: () => void, showMenuButton?: boolean }) {
   const [user, setUser] = useState<any>(null);
@@ -56,15 +57,7 @@ export function Header({ onMenuClick, showMenuButton = true }: { onMenuClick?: (
         </div>
       </div>
       <div className="flex items-center gap-2 sm:gap-4">
-        <button
-          type="button"
-          className="relative rounded-full bg-white p-1 text-slate-400 hover:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-        >
-          <span className="absolute -inset-1.5" />
-          <span className="sr-only">عرض الإشعارات</span>
-          <Bell className="h-6 w-6" aria-hidden="true" />
-          <span className="absolute top-1 right-1 block h-2 w-2 rounded-full bg-red-500 ring-2 ring-white" />
-        </button>
+        <NotificationsBell />
 
         {/* Profile dropdown */}
         <div className="relative ml-1 sm:ml-3">

@@ -133,7 +133,7 @@ export default function LoginPage() {
           </div>
         </div>
         <h2 className="mt-6 text-center text-2xl font-bold leading-9 tracking-tight text-slate-900">
-          مدرسة الرفعة النموذجية (تم التحديث)
+          مدرسة الرفعة النموذجية
         </h2>
         <p className="mt-2 text-center text-sm text-slate-600">
           تسجيل الدخول للنظام

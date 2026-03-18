@@ -14,9 +14,11 @@ export default function TeacherDashboard() {
   const [teacherData, setTeacherData] = useState<any>(null);
   const [sections, setSections] = useState<any[]>([]);
   const [recentExams, setRecentExams] = useState<any[]>([]);
+  const [recentAssignments, setRecentAssignments] = useState<any[]>([]);
   const [stats, setStats] = useState({
     totalStudents: 0,
     totalExams: 0,
+    totalAssignments: 0,
     avgAttendance: 0
   });
   const [loading, setLoading] = useState(true);
@@ -48,20 +50,31 @@ export default function TeacherDashboard() {
 
         // Fetch exams for the teacher's sections
         const sectionIds = sectionsData.map((s: any) => s.id);
-        const { data: exams } = await supabase
-          .from('exams')
-          .select('*, subject:subjects(name), section:sections(name)')
-          .in('section_id', sectionIds)
-          .order('created_at', { ascending: false })
-          .limit(5);
         
-        setRecentExams(exams || []);
+        const [examsRes, assignmentsRes] = await Promise.all([
+          supabase
+            .from('exams')
+            .select('*, subject:subjects(name), section:sections(name)')
+            .in('section_id', sectionIds)
+            .order('created_at', { ascending: false })
+            .limit(5),
+          supabase
+            .from('assignments')
+            .select('*, subjects(name), sections(name, classes(name))')
+            .in('section_id', sectionIds)
+            .order('due_date', { ascending: true })
+            .limit(5)
+        ]);
+        
+        setRecentExams(examsRes.data || []);
+        setRecentAssignments(assignmentsRes.data || []);
 
         // Calculate stats
         const totalStudents = sectionsData?.reduce((acc, s) => acc + (s.students?.[0]?.count || 0), 0) || 0;
         setStats({
           totalStudents,
-          totalExams: exams?.length || 0,
+          totalExams: examsRes.data?.length || 0,
+          totalAssignments: assignmentsRes.data?.length || 0,
           avgAttendance: 94 // Mock for now
         });
       }
@@ -108,10 +121,8 @@ export default function TeacherDashboard() {
             إنشاء اختبار
           </Link>
         </div>
-      </div>
-
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
+      </div>      {/* Stats Grid */}
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-4">
         <div className="bg-white p-6 rounded-3xl shadow-sm ring-1 ring-slate-200 flex items-center gap-6">
           <div className="h-14 w-14 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600">
             <Users className="h-7 w-7" />
@@ -126,12 +137,21 @@ export default function TeacherDashboard() {
             <FileText className="h-7 w-7" />
           </div>
           <div>
-            <p className="text-sm font-medium text-slate-500">الاختبارات النشطة</p>
+            <p className="text-sm font-medium text-slate-500">الاختبارات</p>
             <p className="text-2xl font-bold text-slate-900">{stats.totalExams}</p>
           </div>
         </div>
         <div className="bg-white p-6 rounded-3xl shadow-sm ring-1 ring-slate-200 flex items-center gap-6">
           <div className="h-14 w-14 rounded-2xl bg-amber-50 flex items-center justify-center text-amber-600">
+            <BookOpen className="h-7 w-7" />
+          </div>
+          <div>
+            <p className="text-sm font-medium text-slate-500">الواجبات</p>
+            <p className="text-2xl font-bold text-slate-900">{stats.totalAssignments}</p>
+          </div>
+        </div>
+        <div className="bg-white p-6 rounded-3xl shadow-sm ring-1 ring-slate-200 flex items-center gap-6">
+          <div className="h-14 w-14 rounded-2xl bg-sky-50 flex items-center justify-center text-sky-600">
             <BarChart2 className="h-7 w-7" />
           </div>
           <div>
@@ -142,8 +162,9 @@ export default function TeacherDashboard() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* My Sections - Left 2 Columns */}
+        {/* Main Content - Left 2 Columns */}
         <div className="lg:col-span-2 space-y-8">
+          {/* My Sections */}
           <div className="bg-white rounded-3xl shadow-sm ring-1 ring-slate-200 overflow-hidden">
             <div className="p-6 border-b border-slate-100 flex items-center justify-between">
               <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
@@ -154,36 +175,78 @@ export default function TeacherDashboard() {
             </div>
             <div className="p-6">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {sections.map((section) => (
-                  <div key={section.id} className="p-5 rounded-2xl bg-slate-50 border border-slate-100 hover:border-indigo-200 transition-all group">
-                    <div className="flex justify-between items-start mb-4">
-                      <div>
-                        <h3 className="font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">{section.classes?.name}</h3>
-                        <p className="text-sm text-slate-500">{section.name}</p>
+                {sections.length > 0 ? (
+                  sections.map((section) => (
+                    <div key={section.id} className="p-5 rounded-2xl bg-slate-50 border border-slate-100 hover:border-indigo-200 transition-all group">
+                      <div className="flex justify-between items-start mb-4">
+                        <div>
+                          <h3 className="font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">{section.classes?.name}</h3>
+                          <p className="text-sm text-slate-500">{section.name}</p>
+                        </div>
+                        <div className="h-10 w-10 rounded-xl bg-white flex items-center justify-center shadow-sm text-slate-400 group-hover:text-indigo-600 transition-colors">
+                          <Users className="h-5 w-5" />
+                        </div>
                       </div>
-                      <div className="h-10 w-10 rounded-xl bg-white flex items-center justify-center shadow-sm text-slate-400 group-hover:text-indigo-600 transition-colors">
-                        <Users className="h-5 w-5" />
+                      <div className="flex items-center justify-between text-xs text-slate-500">
+                        <span>{section.students?.[0]?.count || 0} طالب</span>
+                        <div className="flex items-center gap-1 text-emerald-600 font-bold">
+                          <div className="h-1.5 w-1.5 rounded-full bg-emerald-600"></div>
+                          نشط حالياً
+                        </div>
                       </div>
                     </div>
-                    <div className="flex items-center justify-between text-xs text-slate-500">
-                      <span>{section.students?.[0]?.count || 0} طالب</span>
-                      <div className="flex items-center gap-1 text-emerald-600 font-bold">
-                        <div className="h-1.5 w-1.5 rounded-full bg-emerald-600"></div>
-                        نشط حالياً
-                      </div>
-                    </div>
+                  ))
+                ) : (
+                  <div className="col-span-2 p-8 text-center text-slate-500">
+                    لا توجد فصول مسجلة حالياً
                   </div>
-                ))}
+                )}
               </div>
             </div>
           </div>
 
-          {/* Recent Exams Created */}
+          {/* Recent Assignments */}
+          <div className="bg-white rounded-3xl shadow-sm ring-1 ring-slate-200 overflow-hidden">
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+              <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                <Plus className="h-5 w-5 text-amber-600" />
+                آخر الواجبات
+              </h2>
+              <Link href="/assignments" className="text-sm font-bold text-indigo-600 hover:underline">إدارة الواجبات</Link>
+            </div>
+            <div className="divide-y divide-slate-100">
+              {recentAssignments.length > 0 ? (
+                recentAssignments.map((assignment) => (
+                  <div key={assignment.id} className="p-6 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                    <div className="flex items-center gap-4">
+                      <div className="h-12 w-12 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600">
+                        <BookOpen className="h-6 w-6" />
+                      </div>
+                      <div>
+                        <p className="font-bold text-slate-900">{assignment.title}</p>
+                        <p className="text-sm text-slate-500">{assignment.subjects?.name} • {assignment.sections?.classes?.name} - {assignment.sections?.name}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-bold text-slate-900">موعد التسليم</p>
+                      <p className="text-xs text-slate-400">{new Date(assignment.due_date).toLocaleDateString('ar-SA')}</p>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="p-12 text-center text-slate-500">
+                  لا توجد واجبات منشورة حالياً
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Recent Exams */}
           <div className="bg-white rounded-3xl shadow-sm ring-1 ring-slate-200 overflow-hidden">
             <div className="p-6 border-b border-slate-100 flex items-center justify-between">
               <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
                 <FileText className="h-5 w-5 text-indigo-600" />
-                آخر الاختبارات المنشأة
+                آخر الاختبارات
               </h2>
               <Link href="/exams" className="text-sm font-bold text-indigo-600 hover:underline">إدارة الاختبارات</Link>
             </div>
@@ -222,8 +285,6 @@ export default function TeacherDashboard() {
             </div>
           </div>
         </div>
-
-        {/* Sidebar - Right 1 Column */}
         <div className="space-y-8">
           {/* Calendar / Schedule Widget */}
           <div className="bg-white rounded-3xl shadow-sm ring-1 ring-slate-200 p-6">

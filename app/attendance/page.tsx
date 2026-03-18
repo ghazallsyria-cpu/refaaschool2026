@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Calendar, Save, CheckCircle2, XCircle, Clock, AlertCircle } from 'lucide-react';
+import { useNotifications } from '@/context/notification-context';
 
 type AttendanceStatus = 'present' | 'absent' | 'late' | 'excused';
 
@@ -14,6 +15,7 @@ export default function AttendancePage() {
   const [attendance, setAttendance] = useState<Record<string, AttendanceStatus>>({});
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const { sendNotification } = useNotifications();
   const [message, setMessage] = useState({ text: '', type: '' });
 
   const fetchSections = useCallback(async () => {
@@ -111,6 +113,29 @@ export default function AttendancePage() {
 
       if (error) throw error;
       
+      // Send Notifications for absent/late students
+      try {
+        const notificationPromises = records
+          .filter(r => r.status === 'absent' || r.status === 'late')
+          .map(async (record) => {
+            // Get user_id for the student
+            const student = students.find(s => s.id === record.student_id);
+            if (student && student.users) {
+              const statusText = record.status === 'absent' ? 'غائب' : 'متأخر';
+              return sendNotification(
+                student.id,
+                'تنبيه حضور',
+                `تم تسجيلك كـ ${statusText} بتاريخ ${record.date}`,
+                'attendance',
+                '/attendance/report'
+              );
+            }
+          });
+        await Promise.all(notificationPromises);
+      } catch (notifErr) {
+        console.error('Error sending attendance notifications:', notifErr);
+      }
+
       setMessage({ text: 'تم حفظ الغياب والحضور بنجاح', type: 'success' });
       setTimeout(() => setMessage({ text: '', type: '' }), 3000);
     } catch (error: any) {

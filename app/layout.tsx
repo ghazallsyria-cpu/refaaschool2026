@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { AppLayout } from "@/components/app-layout";
+import { NotificationProvider } from "@/context/notification-context";
 
 export const metadata: Metadata = {
   title: "Digital School Platform",
@@ -15,9 +16,11 @@ export default function RootLayout({
   return (
     <html lang="ar" dir="rtl" suppressHydrationWarning>
       <body className="antialiased bg-stone-50 text-stone-900" suppressHydrationWarning>
-        <AppLayout>
-          {children}
-        </AppLayout>
+        <NotificationProvider>
+          <AppLayout>
+            {children}
+          </AppLayout>
+        </NotificationProvider>
       </body>
     </html>
   );

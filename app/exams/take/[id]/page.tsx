@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/lib/utils';
+import { useNotifications } from '@/context/notification-context';
 
 type Question = {
   id: string;
@@ -42,6 +43,7 @@ export default function TakeQuiz() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isFinished, setIsFinished] = useState(false);
   const [attemptId, setAttemptId] = useState<string | null>(null);
+  const { sendNotification } = useNotifications();
   const [notification, setNotification] = useState<{type: 'success' | 'error', message: string} | null>(null);
 
   const showNotification = (type: 'success' | 'error', message: string) => {
@@ -158,6 +160,30 @@ export default function TakeQuiz() {
 
         // 3. Save Answers
         await supabase.from('student_answers').insert(studentAnswersPayload);
+
+        // 4. Notify Teacher
+        try {
+          const { data: examInfo } = await supabase
+            .from('exams')
+            .select('title, teacher_id')
+            .eq('id', params.id)
+            .single();
+          
+          const { data: userData } = await supabase.auth.getUser();
+          const studentName = userData.user?.user_metadata?.full_name || 'طالب';
+
+          if (examInfo?.teacher_id) {
+            await sendNotification(
+              examInfo.teacher_id,
+              'تسليم اختبار جديد',
+              `قام الطالب ${studentName} بتسليم اختبار: ${examInfo.title}`,
+              'exam',
+              `/exams/results/${params.id}`
+            );
+          }
+        } catch (notifErr) {
+          console.error('Error sending teacher notification:', notifErr);
+        }
       }
 
       setIsFinished(true);
@@ -167,7 +193,7 @@ export default function TakeQuiz() {
     } finally {
       setIsSubmitting(false);
     }
-  }, [isSubmitting, questions, answers, attemptId]);
+  }, [isSubmitting, questions, answers, attemptId, params.id, sendNotification]);
 
   useEffect(() => {
     if (timeLeft !== null && timeLeft > 0 && !isFinished) {

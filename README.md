@@ -1,20 +1,44 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# نظام إدارة مدرسة الرفعة النموذجية (Digital School Platform)
 
-# Run and deploy your AI Studio app
+نظام متكامل لإدارة المدارس مبني باستخدام تقنيات حديثة لضمان السرعة، الأمان، وسهولة الاستخدام.
 
-This contains everything you need to run your app locally.
+## 🚀 التقنيات المستخدمة
+- **Frontend:** Next.js 15, React, TailwindCSS
+- **Backend/Database:** Supabase (PostgreSQL)
+- **Authentication:** Supabase Auth
+- **Real-time:** PostgreSQL Filters & Triggers
 
-View your app in AI Studio: https://ai.studio/apps/71f471cd-6f55-4113-b279-fdfa345b192b
+## 🛠 إعداد قاعدة البيانات (Supabase)
+لإعداد النظام بالكامل، يرجى اتباع الخطوات التالية داخل **SQL Editor** في Supabase بالترتيب:
 
-## Run Locally
+1. **إنشاء الهيكل (Schema):**
+   نفذ محتوى ملف `complete_system_schema.sql`. هذا الملف ينشئ الجداول، الصلاحيات (RLS)، والوظائف التلقائية.
 
-**Prerequisites:**  Node.js
+2. **إضافة المعلمين والمواد:**
+   نفذ محتوى ملف `seed_teachers.sql`. يحتوي على قائمة المواد و72 معلماً مع تخصصاتهم وروابط زوم الخاصة بهم.
 
+3. **إضافة الطلاب والصفوف:**
+   نفذ محتوى ملف `seed_students.sql`. يحتوي على الصفوف (العاشر، الحادي عشر، الثاني عشر) وتوزيع الطلاب على الشعب.
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+## 🔑 صلاحيات الوصول (RLS)
+النظام محمي بالكامل باستخدام **Row Level Security**:
+- **المدير (Admin):** صلاحيات كاملة لإدارة المستخدمين، الجداول، والبيانات.
+- **المعلم (Teacher):** إدارة الاختبارات، الحضور، والجداول الخاصة بفصوله فقط.
+- **الطالب (Student):** عرض الجدول الدراسي، الاختبارات، والنتائج الخاصة به.
+- **ولي الأمر (Parent):** متابعة أبنائه فقط (الحضور والنتائج).
+
+## 💻 التشغيل المحلي
+```bash
+# تثبيت المكتبات
+npm install
+
+# تشغيل مشروع التطوير
+npm run dev
+```
+
+## 📝 ملاحظات هامة
+- تأكد من إعداد متغيرات البيئة في ملف `.env.local` (SUPABASE_URL, SUPABASE_ANON_KEY).
+- جميع كلمات المرور الافتراضية للحسابات التجريبية هي `123456` أو كما هو محدد في ملفات الـ Seed.
+
+---
+تم التطوير بواسطة فريق مدرسة الرفعة النموذجية.

@@ -3,6 +3,7 @@
 import { usePathname, useRouter } from 'next/navigation';
 import { Sidebar } from '@/components/sidebar';
 import { Header } from '@/components/header';
+import { Footer } from '@/components/footer';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { School, AlertTriangle } from 'lucide-react';
@@ -158,7 +159,14 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   }
 
   if (isPublicPage) {
-    return <main className="flex-1 h-full">{children}</main>;
+    return (
+      <main className="flex-1 h-full flex flex-col overflow-y-auto">
+        <div className="flex-1">
+          {children}
+        </div>
+        <Footer />
+      </main>
+    );
   }
 
   // If user is not admin/management, don't show the admin sidebar
@@ -184,8 +192,11 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         <div className="print:hidden">
           <Header onMenuClick={() => setIsSidebarOpen(true)} showMenuButton={showAdminSidebar} />
         </div>
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 print:p-0 print:overflow-visible">
-          {children}
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 print:p-0 print:overflow-visible flex flex-col">
+          <div className="flex-1">
+            {children}
+          </div>
+          <Footer />
         </main>
       </div>
     </div>

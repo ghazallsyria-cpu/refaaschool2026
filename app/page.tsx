@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { 
   Users, GraduationCap, School, BookOpen, 
   CalendarCheck, FileText, Activity, ArrowUpRight,
-  Plus, Settings, Bell, MessageSquare
+  Bell, MessageSquare
 } from 'lucide-react';
 import Link from 'next/link';
 import { motion } from 'motion/react';
@@ -67,13 +67,6 @@ export default function AdminDashboardHome() {
     { name: 'الاختبارات', value: stats.exams, icon: FileText, color: 'bg-purple-500', href: '/exams' },
   ];
 
-  const quickActions = [
-    { name: 'إضافة طالب', icon: Plus, href: '/students' },
-    { name: 'إضافة معلم', icon: Plus, href: '/teachers' },
-    { name: 'إرسال إعلان', icon: Bell, href: '/announcements' },
-    { name: 'إعدادات المنصة', icon: Settings, href: '/settings' },
-  ];
-
   if (loading) {
     return (
       <div className="flex h-[calc(100vh-4rem)] items-center justify-center">
@@ -116,26 +109,7 @@ export default function AdminDashboardHome() {
         ))}
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* Quick Actions */}
-        <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
-          <h2 className="text-lg font-semibold text-slate-900 mb-4">إجراءات سريعة</h2>
-          <div className="grid grid-cols-2 gap-4">
-            {quickActions.map((action) => (
-              <Link
-                key={action.name}
-                href={action.href}
-                className="flex items-center gap-3 rounded-xl border border-slate-200 p-4 hover:border-indigo-600 hover:bg-indigo-50 transition-colors"
-              >
-                <div className="rounded-lg bg-indigo-100 p-2 text-indigo-600">
-                  <action.icon className="h-5 w-5" />
-                </div>
-                <span className="font-medium text-slate-700">{action.name}</span>
-              </Link>
-            ))}
-          </div>
-        </div>
-
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-1">
         {/* Recent Announcements */}
         <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
           <div className="flex items-center justify-between mb-4">

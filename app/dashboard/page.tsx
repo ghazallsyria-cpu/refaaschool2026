@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Users, GraduationCap, BookOpen, CalendarDays, Plus, Bell } from 'lucide-react';
+import Link from 'next/link';
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState([
@@ -55,10 +56,10 @@ export default function AdminDashboard() {
             <Bell className="h-4 w-4" />
             التنبيهات
           </button>
-          <button className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700">
+          <Link href="/admin/teacher-assignments" className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700">
             <Plus className="h-4 w-4" />
-            إجراء سريع
-          </button>
+            إدارة تعيينات المعلمين
+          </Link>
         </div>
       </div>
 

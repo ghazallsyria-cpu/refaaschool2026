@@ -47,6 +47,7 @@ export default function SchedulesPage() {
   const [sections, setSections] = useState<Section[]>([]);
   const [selectedSectionId, setSelectedSectionId] = useState<string>('');
   const [schedules, setSchedules] = useState<Schedule[]>([]);
+  const [teacherAssignments, setTeacherAssignments] = useState<any[]>([]); // New state
   const [loading, setLoading] = useState(true);
   
   // Modal Data
@@ -87,15 +88,17 @@ export default function SchedulesPage() {
   const fetchInitialData = async () => {
     setLoading(true);
     try {
-      const [sectionsRes, subjectsRes, teachersRes] = await Promise.all([
+      const [sectionsRes, subjectsRes, teachersRes, assignmentsRes] = await Promise.all([
         supabase.from('sections').select('id, name, classes(name)').order('name'),
         supabase.from('subjects').select('id, name').order('name'),
-        supabase.from('teachers').select('id, users(full_name)')
+        supabase.from('teachers').select('id, users(full_name)'),
+        supabase.from('teacher_sections').select('teacher_id, section_id')
       ]);
 
       if (sectionsRes.data) setSections((sectionsRes.data as unknown) as Section[]);
       if (subjectsRes.data) setSubjects((subjectsRes.data as unknown) as Subject[]);
       if (teachersRes.data) setTeachers((teachersRes.data as unknown) as Teacher[]);
+      if (assignmentsRes.data) setTeacherAssignments(assignmentsRes.data);
       
       if (sectionsRes.data && sectionsRes.data.length > 0) {
         setSelectedSectionId(sectionsRes.data[0].id);
@@ -428,7 +431,9 @@ export default function SchedulesPage() {
                   onChange={(e) => setCurrentCell({...currentCell, teacherId: e.target.value})}
                 >
                   <option value="">اختر المعلم</option>
-                  {teachers.map(t => (
+                  {teachers
+                    .filter(t => teacherAssignments.some(a => a.teacher_id === t.id && a.section_id === selectedSectionId))
+                    .map(t => (
                     <option key={t.id} value={t.id}>{t.users?.full_name}</option>
                   ))}
                 </select>

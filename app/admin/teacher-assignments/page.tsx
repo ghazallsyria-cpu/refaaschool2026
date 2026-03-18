@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Plus, Trash2, BookOpen, Users } from 'lucide-react';
 
@@ -13,11 +13,7 @@ export default function TeacherAssignmentsPage() {
 
   const [newAssignment, setNewAssignment] = useState({ teacher_id: '', section_id: '', subject_id: '' });
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     const [tRes, sRes, subRes, aRes] = await Promise.all([
       supabase.from('teachers').select('id, users(full_name)'),
@@ -31,7 +27,12 @@ export default function TeacherAssignmentsPage() {
     if (subRes.data) setSubjects(subRes.data);
     if (aRes.data) setAssignments(aRes.data);
     setLoading(false);
-  };
+  }, []);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchData();
+  }, [fetchData]);
 
   const handleAddAssignment = async () => {
     if (!newAssignment.teacher_id || !newAssignment.section_id || !newAssignment.subject_id) return;

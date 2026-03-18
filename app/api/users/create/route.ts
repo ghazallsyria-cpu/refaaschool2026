@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 
 export async function POST(request: Request) {
   try {
-    const { email, password, full_name, national_id, phone, role, specialization, section_id, address, job_title } = await request.json();
+    const { email, password, full_name, national_id, phone, role, specialization, section_id, address, job_title, zoom_link } = await request.json();
 
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -38,6 +38,19 @@ export async function POST(request: Request) {
     // Generate a default password based on national_id
     const generatedPassword = password || `${national_id}123`;
     const generatedEmail = email || `${national_id}@alrefaa.edu`;
+
+    // Check if national_id already exists in teachers table
+    if (role === 'teacher') {
+      const { data: existingTeacher } = await supabaseAdmin
+        .from('teachers')
+        .select('id')
+        .eq('national_id', national_id)
+        .maybeSingle();
+
+      if (existingTeacher) {
+        return NextResponse.json({ error: 'الرقم المدني مسجل مسبقاً لمعلم آخر' }, { status: 400 });
+      }
+    }
 
     // 1. Create user in auth
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
@@ -89,6 +102,7 @@ export async function POST(request: Request) {
           id: userId,
           national_id,
           specialization,
+          zoom_link,
         });
       if (teacherError) {
         await supabaseAdmin.auth.admin.deleteUser(userId);

@@ -78,6 +78,7 @@ CREATE TABLE public.teachers (
     national_id TEXT UNIQUE NOT NULL,
     specialization TEXT,
     hire_date DATE DEFAULT CURRENT_DATE,
+    zoom_link TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
 );

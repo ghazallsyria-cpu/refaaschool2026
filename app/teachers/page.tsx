@@ -80,6 +80,11 @@ export default function TeachersPage() {
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
 
+      if (!token) {
+        showNotification('error', 'انتهت صلاحية الجلسة، يرجى تسجيل الدخول مرة أخرى');
+        return;
+      }
+
       const response = await fetch('/api/users/create', {
         method: 'POST',
         headers: {
@@ -311,7 +316,16 @@ export default function TeachersPage() {
     }
   };
 
-  const specializations = ['الكل', ...Array.from(new Set(teachers.map(t => t.specialization).filter(Boolean))) as string[]];
+  const defaultSpecializations = [
+    'اللغة العربية', 'الرياضيات', 'العلوم', 'اللغة الإنجليزية', 
+    'التربية الإسلامية', 'الدراسات الاجتماعية', 'الحاسوب', 'التربية الفنية', 
+    'التربية البدنية', 'الموسيقى'
+  ];
+  const specializations = Array.from(new Set([
+    'الكل',
+    ...defaultSpecializations,
+    ...teachers.map(t => t.specialization).filter(Boolean)
+  ])) as string[];
 
   const filteredTeachers = teachers.filter(teacher => 
     (activeTab === 'الكل' || teacher.specialization === activeTab) &&
@@ -694,7 +708,7 @@ export default function TeachersPage() {
                         className="block w-full rounded-2xl border-0 py-3 px-4 text-slate-900 bg-slate-50 ring-1 ring-inset ring-slate-100 focus:ring-2 focus:ring-inset focus:ring-indigo-500 sm:text-sm transition-all" 
                       >
                         <option value="">اختر التخصص</option>
-                        {specializations.map(spec => (
+                        {specializations.filter(s => s !== 'الكل').map(spec => (
                           <option key={spec} value={spec}>{spec}</option>
                         ))}
                         <option value="أخرى">أخرى</option>
@@ -797,7 +811,7 @@ export default function TeachersPage() {
                         className="block w-full rounded-2xl border-0 py-3 px-4 text-slate-900 bg-slate-50 ring-1 ring-inset ring-slate-100 focus:ring-2 focus:ring-inset focus:ring-indigo-500 sm:text-sm transition-all" 
                       >
                         <option value="">اختر التخصص</option>
-                        {specializations.map(spec => (
+                        {specializations.filter(s => s !== 'الكل').map(spec => (
                           <option key={spec} value={spec}>{spec}</option>
                         ))}
                         <option value="أخرى">أخرى</option>

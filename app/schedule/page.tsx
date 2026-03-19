@@ -24,6 +24,7 @@ export default function SchedulePage() {
   const [showAllSchedules, setShowAllSchedules] = useState(true);
   const [swappingFrom, setSwappingFrom] = useState<any | null>(null);
   const [isSwapping, setIsSwapping] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
@@ -143,24 +144,34 @@ export default function SchedulePage() {
     try {
       // 1. التحقق من وجود تضارب
       // تضارب للمعلم
-      const { data: teacherConflict, error: tError } = await supabase
+      let teacherQuery = supabase
         .from('schedules')
         .select('id, sections(name, classes(name)), subjects(name)')
         .eq('day_of_week', selectedSlot.day)
         .eq('period', selectedSlot.period)
-        .eq('teacher_id', formData.teacher_id)
-        .maybeSingle();
+        .eq('teacher_id', formData.teacher_id);
+      
+      if (editingId) {
+        teacherQuery = teacherQuery.neq('id', editingId);
+      }
+      
+      const { data: teacherConflict, error: tError } = await teacherQuery.maybeSingle();
 
       if (tError) throw tError;
 
       // تضارب للفصل
-      const { data: sectionConflict, error: sError } = await supabase
+      let sectionQuery = supabase
         .from('schedules')
         .select('id, teachers(users(full_name)), subjects(name)')
         .eq('day_of_week', selectedSlot.day)
         .eq('period', selectedSlot.period)
-        .eq('section_id', formData.section_id)
-        .maybeSingle();
+        .eq('section_id', formData.section_id);
+      
+      if (editingId) {
+        sectionQuery = sectionQuery.neq('id', editingId);
+      }
+
+      const { data: sectionConflict, error: sError } = await sectionQuery.maybeSingle();
 
       if (sError) throw sError;
 
@@ -180,22 +191,35 @@ export default function SchedulePage() {
         return;
       }
 
-      // 2. الإضافة إذا لم يوجد تضارب
-      const { error } = await supabase.from('schedules').insert({
-        teacher_id: formData.teacher_id,
-        section_id: formData.section_id,
-        subject_id: formData.subject_id,
-        day_of_week: selectedSlot.day,
-        period: selectedSlot.period
-      });
-      if (error) throw error;
+      // 2. الإضافة أو التحديث إذا لم يوجد تضارب
+      if (editingId) {
+        const { error } = await supabase
+          .from('schedules')
+          .update({
+            teacher_id: formData.teacher_id,
+            section_id: formData.section_id,
+            subject_id: formData.subject_id,
+          })
+          .eq('id', editingId);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('schedules').insert({
+          teacher_id: formData.teacher_id,
+          section_id: formData.section_id,
+          subject_id: formData.subject_id,
+          day_of_week: selectedSlot.day,
+          period: selectedSlot.period
+        });
+        if (error) throw error;
+      }
       
       setIsModalOpen(false);
+      setEditingId(null);
       setFormData({ teacher_id: '', section_id: '', subject_id: '' });
       fetchSchedule(); // تحديث الجدول
     } catch (err) {
       console.error(err);
-      alert('حدث خطأ أثناء إضافة الحصة');
+      alert(`حدث خطأ أثناء ${editingId ? 'تعديل' : 'إضافة'} الحصة`);
     }
   };
 
@@ -449,8 +473,8 @@ export default function SchedulePage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
           <div className="bg-white rounded-2xl p-8 w-full max-w-lg shadow-2xl space-y-6">
             <div className="flex justify-between items-center">
-              <h2 className="text-xl font-bold text-slate-900">إضافة حصة جديدة</h2>
-              <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600">
+              <h2 className="text-xl font-bold text-slate-900">{editingId ? 'تعديل الحصة' : 'إضافة حصة جديدة'}</h2>
+              <button onClick={() => { setIsModalOpen(false); setEditingId(null); }} className="text-slate-400 hover:text-slate-600">
                 <X className="h-6 w-6" />
               </button>
             </div>
@@ -514,8 +538,8 @@ export default function SchedulePage() {
             </div>
 
             <div className="flex gap-3 justify-end pt-4">
-              <button className="px-6 py-2.5 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 font-medium" onClick={() => setIsModalOpen(false)}>إلغاء</button>
-              <button className="px-6 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium shadow-sm" onClick={handleAddSchedule}>حفظ الحصة</button>
+              <button className="px-6 py-2.5 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 font-medium" onClick={() => { setIsModalOpen(false); setEditingId(null); }}>إلغاء</button>
+              <button className="px-6 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium shadow-sm" onClick={handleAddSchedule}>{editingId ? 'تحديث الحصة' : 'حفظ الحصة'}</button>
             </div>
           </div>
         </div>
@@ -619,7 +643,7 @@ export default function SchedulePage() {
                                 <span className="text-xs text-indigo-500 mt-1 block">رابط زوم</span>
                               )}
                               {isAdmin && (
-                                <div className="mt-2 flex flex-wrap justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity no-print">
+                                <div className="mt-2 flex flex-wrap justify-center gap-1 no-print">
                                   <button 
                                     className="text-white text-[10px] bg-indigo-500 hover:bg-indigo-600 px-2 py-0.5 rounded shadow-sm transition-colors" 
                                     onClick={(e) => { 
@@ -638,6 +662,22 @@ export default function SchedulePage() {
                                     }}
                                   >
                                     تبديل
+                                  </button>
+                                  <button 
+                                    className="text-white text-[10px] bg-blue-500 hover:bg-blue-600 px-2 py-0.5 rounded shadow-sm transition-colors" 
+                                    onClick={(e) => { 
+                                      e.stopPropagation(); 
+                                      setEditingId(displaySlot.id);
+                                      setFormData({ 
+                                        teacher_id: displaySlot.teachers?.id || '', 
+                                        section_id: displaySlot.sections?.id || '', 
+                                        subject_id: displaySlot.subjects?.id || '' 
+                                      });
+                                      setSelectedSlot({day: dayIndex, period: period});
+                                      setIsModalOpen(true);
+                                    }}
+                                  >
+                                    تعديل
                                   </button>
                                   <button 
                                     className="text-white text-[10px] bg-red-500 hover:bg-red-600 px-2 py-0.5 rounded shadow-sm transition-colors" 

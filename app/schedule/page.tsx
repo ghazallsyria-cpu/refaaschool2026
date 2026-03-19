@@ -32,10 +32,12 @@ export default function SchedulePage() {
   const fetchFilters = useCallback(async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
+      let currentUserRole = null;
       if (user) {
         setUserEmail(user.email || null);
         const { data: profile } = await supabase.from('users').select('role').eq('id', user.id).single();
-        setUserRole(profile?.role || null);
+        currentUserRole = profile?.role || null;
+        setUserRole(currentUserRole);
         
         const isSystemAdmin = profile?.role === 'admin' || profile?.role === 'management' || user.email === 'ghazallsyria@gmail.com';
         setIsAdmin(isSystemAdmin);
@@ -55,7 +57,7 @@ export default function SchedulePage() {
       if (subjectsRes.data) setSubjects(subjectsRes.data);
       if (assignmentsRes.data) setAssignments(assignmentsRes.data);
 
-      if (userRole === 'teacher') {
+      if (currentUserRole === 'teacher' && user) {
         const teacherRecord = teachersRes.data?.find(t => t.id === user.id);
         if (teacherRecord) {
           setSelectedId(teacherRecord.id);

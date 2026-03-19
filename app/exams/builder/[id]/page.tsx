@@ -150,12 +150,6 @@ export default function QuizBuilder() {
           return subject;
         }).filter(Boolean);
         
-        // Fallback: if teacher has no assigned subjects, fetch all subjects
-        if (subjectsData.length === 0) {
-          const { data: allSubjects } = await supabase.from('subjects').select('id, name');
-          subjectsData = allSubjects || [];
-        }
-
         sectionsData = (sectionsRes.data || []).map((ts: any) => {
           const section = Array.isArray(ts.section) ? ts.section[0] : ts.section;
           if (!section) return null;
@@ -165,15 +159,6 @@ export default function QuizBuilder() {
             name: className ? `${className} - ${section.name}` : section.name
           };
         }).filter(Boolean);
-
-        // Fallback: if teacher has no assigned sections, fetch all sections
-        if (sectionsData.length === 0) {
-          const { data: allSections } = await supabase.from('sections').select('id, name, classes(name)');
-          sectionsData = (allSections || []).map((s: any) => ({
-            id: s.id,
-            name: `${Array.isArray(s.classes) ? s.classes[0]?.name : s.classes?.name} - ${s.name}`
-          }));
-        }
       }
       
       setSubjects(subjectsData);

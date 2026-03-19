@@ -168,21 +168,6 @@ export default function AssignmentsPage() {
           };
         }).filter(Boolean);
 
-        // Fallback: If no assigned subjects, fetch all subjects (to avoid empty dropdown)
-        if (subjectsData.length === 0) {
-          const { data: allSubjects } = await supabase.from('subjects').select('id, name').order('name');
-          subjectsData = allSubjects || [];
-        }
-
-        // Fallback: If no assigned sections, fetch all sections
-        if (sectionsData.length === 0) {
-          const { data: allSections } = await supabase.from('sections').select('id, name, classes(name)').order('name');
-          sectionsData = (allSections || []).map((s: any) => ({
-            ...s,
-            classes: Array.isArray(s.classes) ? s.classes[0] : s.classes
-          }));
-        }
-
         // Only the current teacher
         const { data: currentTeacher } = await supabase.from('teachers').select('id, users(full_name)').eq('id', user.id).single();
         teachersData = currentTeacher ? [currentTeacher] : [];

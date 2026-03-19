@@ -61,8 +61,8 @@ export default function SchedulePage() {
         const teacherRecord = teachersRes.data?.find(t => t.id === user.id);
         if (teacherRecord) {
           setSelectedId(teacherRecord.id);
-        } else if (teachersRes.data?.[0]) {
-          setSelectedId(teachersRes.data[0].id);
+          setViewType('teacher');
+          setShowAllSchedules(false);
         }
       } else if (teachersRes.data?.[0]) {
         setSelectedId(teachersRes.data[0].id);
@@ -412,61 +412,61 @@ export default function SchedulePage() {
         </div>
       )}
 
-      <div className="bg-white p-4 rounded-xl shadow-sm ring-1 ring-slate-200 print:hidden">
-        <div className="flex flex-col sm:flex-row gap-4 items-center">
-          <div className="flex rounded-md shadow-sm" role="group">
-            <button
-              type="button"
-              onClick={() => {
-                setViewType('teacher');
-                if (teachers.length > 0) setSelectedId(teachers[0].id);
-              }}
-              className={`px-4 py-2 text-sm font-medium rounded-r-lg border ${
-                viewType === 'teacher' 
-                  ? 'bg-indigo-50 text-indigo-700 border-indigo-200 z-10' 
-                  : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
-              }`}
-            >
-              <User className="inline-block w-4 h-4 ml-2" />
-              جدول المعلمين
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setViewType('section');
-                if (sections.length > 0) setSelectedId(sections[0].id);
-              }}
-              className={`px-4 py-2 text-sm font-medium rounded-l-lg border-y border-l ${
-                viewType === 'section' 
-                  ? 'bg-indigo-50 text-indigo-700 border-indigo-200 z-10' 
-                  : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
-              }`}
-            >
-              <Users className="inline-block w-4 h-4 ml-2" />
-              جدول الفصول
-            </button>
-          </div>
+      {isAdmin && (
+        <div className="bg-white p-4 rounded-xl shadow-sm ring-1 ring-slate-200 print:hidden">
+          <div className="flex flex-col sm:flex-row gap-4 items-center">
+            <div className="flex rounded-md shadow-sm" role="group">
+              <button
+                type="button"
+                onClick={() => {
+                  setViewType('teacher');
+                  if (teachers.length > 0) setSelectedId(teachers[0].id);
+                }}
+                className={`px-4 py-2 text-sm font-medium rounded-r-lg border ${
+                  viewType === 'teacher' 
+                    ? 'bg-indigo-50 text-indigo-700 border-indigo-200 z-10' 
+                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                <User className="inline-block w-4 h-4 ml-2" />
+                جدول المعلمين
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setViewType('section');
+                  if (sections.length > 0) setSelectedId(sections[0].id);
+                }}
+                className={`px-4 py-2 text-sm font-medium rounded-l-lg border-y border-l ${
+                  viewType === 'section' 
+                    ? 'bg-indigo-50 text-indigo-700 border-indigo-200 z-10' 
+                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                <Users className="inline-block w-4 h-4 ml-2" />
+                جدول الفصول
+              </button>
+            </div>
 
-          <div className="flex-1 w-full sm:max-w-xs">
-            <select
-              value={selectedId}
-              onChange={(e) => setSelectedId(e.target.value)}
-              className="block w-full rounded-md border-0 py-2 pl-3 pr-10 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-indigo-600 sm:text-sm sm:leading-6"
-            >
-              <option value="">-- اختر {viewType === 'teacher' ? 'المعلم' : 'الفصل'} --</option>
-              {viewType === 'teacher' ? (
-                teachers.map(t => (
-                  <option key={t.id} value={t.id}>{t.users?.full_name || 'معلم غير معروف'}</option>
-                ))
-              ) : (
-                sections.map(s => (
-                  <option key={s.id} value={s.id}>{s.classes?.name} - {s.name}</option>
-                ))
-              )}
-            </select>
-          </div>
+            <div className="flex-1 w-full sm:max-w-xs">
+              <select
+                value={selectedId}
+                onChange={(e) => setSelectedId(e.target.value)}
+                className="block w-full rounded-md border-0 py-2 pl-3 pr-10 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-indigo-600 sm:text-sm sm:leading-6"
+              >
+                <option value="">-- اختر {viewType === 'teacher' ? 'المعلم' : 'الفصل'} --</option>
+                {viewType === 'teacher' ? (
+                  teachers.map(t => (
+                    <option key={t.id} value={t.id}>{t.users?.full_name || 'معلم غير معروف'}</option>
+                  ))
+                ) : (
+                  sections.map(s => (
+                    <option key={s.id} value={s.id}>{s.classes?.name} - {s.name}</option>
+                  ))
+                )}
+              </select>
+            </div>
 
-          {isAdmin && (
             <div className="flex items-center gap-2">
               <input 
                 type="checkbox" 
@@ -477,9 +477,9 @@ export default function SchedulePage() {
               />
               <label htmlFor="showAll" className="text-sm font-medium text-slate-700">عرض جميع الحصص (للمدير)</label>
             </div>
-          )}
+          </div>
         </div>
-      </div>
+      )}
 
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">

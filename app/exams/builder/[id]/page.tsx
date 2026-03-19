@@ -134,7 +134,7 @@ export default function QuizBuilder() {
           supabase.from('sections').select('id, name, classes(name)')
         ]);
         subjectsData = subjectsRes.data || [];
-        sectionsData = (sectionsRes.data || []).map(s => ({
+        sectionsData = (sectionsRes.data || []).map((s: any) => ({
           id: s.id,
           name: `${Array.isArray(s.classes) ? s.classes[0]?.name : s.classes?.name} - ${s.name}`
         }));
@@ -169,7 +169,7 @@ export default function QuizBuilder() {
         // Fallback: if teacher has no assigned sections, fetch all sections
         if (sectionsData.length === 0) {
           const { data: allSections } = await supabase.from('sections').select('id, name, classes(name)');
-          sectionsData = (allSections || []).map(s => ({
+          sectionsData = (allSections || []).map((s: any) => ({
             id: s.id,
             name: `${Array.isArray(s.classes) ? s.classes[0]?.name : s.classes?.name} - ${s.name}`
           }));

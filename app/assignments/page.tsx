@@ -142,7 +142,7 @@ export default function AssignmentsPage() {
           supabase.from('teachers').select('id, users(full_name)')
         ]);
         subjectsData = subjectsRes.data || [];
-        sectionsData = (sectionsRes.data || []).map(s => ({
+        sectionsData = (sectionsRes.data || []).map((s: any) => ({
           ...s,
           classes: Array.isArray(s.classes) ? s.classes[0] : s.classes
         }));
@@ -177,7 +177,7 @@ export default function AssignmentsPage() {
         // Fallback: If no assigned sections, fetch all sections
         if (sectionsData.length === 0) {
           const { data: allSections } = await supabase.from('sections').select('id, name, classes(name)').order('name');
-          sectionsData = (allSections || []).map(s => ({
+          sectionsData = (allSections || []).map((s: any) => ({
             ...s,
             classes: Array.isArray(s.classes) ? s.classes[0] : s.classes
           }));

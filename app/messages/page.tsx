@@ -27,12 +27,14 @@ export default function MessagesPage() {
   const [selectedSectionId, setSelectedSectionId] = useState('');
   const [newMessage, setNewMessage] = useState({ receiver_id: '', subject: '', content: '' });
   const [newAnnouncement, setNewAnnouncement] = useState({ title: '', target_role: 'all', content: '' });
+  const [isGroupMessage, setIsGroupMessage] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const resetMessageForm = () => {
     setNewMessage({ receiver_id: '', subject: '', content: '' });
     setRecipientType('');
     setSelectedSectionId('');
+    setIsGroupMessage(false);
     setStep(1);
   };
 
@@ -80,10 +82,11 @@ export default function MessagesPage() {
               const s = sectionsData?.find(item => item.section_id === id);
               const section = Array.isArray(s?.section) ? s.section[0] : s?.section;
               if (!section) return null;
+              const classes = Array.isArray(section.classes) ? section.classes[0] : section.classes;
               return {
                 id: section.id,
                 name: section.name,
-                classes: Array.isArray(section.classes) ? section.classes[0] : section.classes
+                classes: classes
               };
             });
           
@@ -112,8 +115,7 @@ export default function MessagesPage() {
         return users.filter(u => u.role === 'student');
       }
       
-      // For teachers, we need to filter students by section
-      // This is handled by a separate fetch if a section is selected
+      // For teachers, we use filteredStudents which is fetched when a section is selected
       return filteredStudents;
     }
     
@@ -136,15 +138,18 @@ export default function MessagesPage() {
         .from('students')
         .select(`
           id,
-          users:id(id, full_name, role)
+          users(id, full_name, role)
         `)
         .eq('section_id', sectionId);
       
       if (error) throw error;
-      setFilteredStudents(data?.map(s => {
+      
+      const studentsList = data?.map(s => {
         const user = Array.isArray(s.users) ? s.users[0] : s.users;
         return user;
-      }).filter(Boolean) || []);
+      }).filter(Boolean) || [];
+      
+      setFilteredStudents(studentsList);
     } catch (error) {
       console.error('Error fetching students by section:', error);
     }
@@ -213,7 +218,18 @@ export default function MessagesPage() {
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMessage.receiver_id || !newMessage.subject || !newMessage.content) {
+    
+    if (isGroupMessage && !selectedSectionId) {
+      showNotification('error', 'الرجاء اختيار الصف للمراسلة الجماعية');
+      return;
+    }
+
+    if (!isGroupMessage && !newMessage.receiver_id) {
+      showNotification('error', 'الرجاء اختيار المستلم');
+      return;
+    }
+
+    if (!newMessage.subject || !newMessage.content) {
       showNotification('error', 'الرجاء تعبئة جميع الحقول المطلوبة');
       return;
     }
@@ -223,25 +239,41 @@ export default function MessagesPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('يجب تسجيل الدخول أولاً');
 
-      const { error } = await supabase
-        .from('messages')
-        .insert([{
+      if (isGroupMessage) {
+        // Send to all students in the section
+        if (filteredStudents.length === 0) {
+          throw new Error('لا يوجد طلاب في هذا الصف لإرسال الرسالة إليهم');
+        }
+
+        const messagesToInsert = filteredStudents.map(student => ({
           sender_id: user.id,
-          receiver_id: newMessage.receiver_id,
+          receiver_id: student.id,
           subject: newMessage.subject,
           content: newMessage.content,
           is_read: false
-        }]);
+        }));
 
-      if (error) throw error;
-      
-      try {
-        console.log(`Notification: ${newMessage.receiver_id} - رسالة جديدة - ${newMessage.subject}`);
-      } catch (notifErr) {
-        console.error('Error sending message notification:', notifErr);
+        const { error } = await supabase
+          .from('messages')
+          .insert(messagesToInsert);
+
+        if (error) throw error;
+      } else {
+        // Individual message
+        const { error } = await supabase
+          .from('messages')
+          .insert([{
+            sender_id: user.id,
+            receiver_id: newMessage.receiver_id,
+            subject: newMessage.subject,
+            content: newMessage.content,
+            is_read: false
+          }]);
+
+        if (error) throw error;
       }
-
-      showNotification('success', 'تم إرسال الرسالة بنجاح');
+      
+      showNotification('success', isGroupMessage ? 'تم إرسال الرسالة الجماعية بنجاح' : 'تم إرسال الرسالة بنجاح');
       setShowNewMessage(false);
       resetMessageForm();
       fetchMessages();
@@ -367,7 +399,7 @@ export default function MessagesPage() {
               <Plus className="ml-2 h-5 w-5" />
               رسالة جديدة
             </button>
-          ) : (
+          ) : currentUser?.role !== 'teacher' ? (
             <button 
               onClick={() => setShowNewAnnouncement(true)}
               className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 px-8 py-3.5 text-sm font-bold text-white shadow-xl shadow-emerald-200 hover:shadow-emerald-300 transition-all active:scale-95"
@@ -375,7 +407,7 @@ export default function MessagesPage() {
               <Plus className="ml-2 h-5 w-5" />
               نشر إعلان جديد
             </button>
-          )}
+          ) : null}
         </div>
       </div>
 
@@ -398,17 +430,19 @@ export default function MessagesPage() {
             <MessageSquare className="h-4 w-4" />
             صندوق الوارد
           </button>
-          <button
-            onClick={() => setActiveTab('announcements')}
-            className={`flex-1 md:flex-none px-8 py-3 rounded-[1.75rem] text-sm font-black transition-all flex items-center justify-center gap-3 ${
-              activeTab === 'announcements' 
-                ? 'bg-white text-emerald-600 shadow-sm' 
-                : 'text-slate-400 hover:text-slate-600'
-            }`}
-          >
-            <Megaphone className="h-4 w-4" />
-            لوحة الإعلانات
-          </button>
+          {currentUser?.role !== 'teacher' && (
+            <button
+              onClick={() => setActiveTab('announcements')}
+              className={`flex-1 md:flex-none px-8 py-3 rounded-[1.75rem] text-sm font-black transition-all flex items-center justify-center gap-3 ${
+                activeTab === 'announcements' 
+                  ? 'bg-white text-emerald-600 shadow-sm' 
+                  : 'text-slate-400 hover:text-slate-600'
+              }`}
+            >
+              <Megaphone className="h-4 w-4" />
+              لوحة الإعلانات
+            </button>
+          )}
         </div>
 
         <div className="relative flex-1 group px-2">
@@ -627,11 +661,7 @@ export default function MessagesPage() {
                         <button
                           onClick={() => {
                             setRecipientType('student');
-                            if (currentUser?.role === 'teacher') {
-                              setStep(2); // Go to section selection
-                            } else {
-                              setStep(2); // Go to message content (admin can see all students)
-                            }
+                            setStep(2);
                           }}
                           className="flex flex-col items-center justify-center p-10 rounded-[2.5rem] border-2 border-slate-100 hover:border-emerald-600 hover:bg-emerald-50/50 transition-all group"
                         >
@@ -645,11 +675,53 @@ export default function MessagesPage() {
                     )}
 
                     {step === 2 && recipientType === 'student' && currentUser?.role === 'teacher' && (
-                      <div className="space-y-6">
+                      <div className="space-y-8">
                         <div className="flex items-center gap-4 mb-4">
                           <button onClick={() => setStep(1)} className="text-indigo-600 font-black text-sm flex items-center gap-1 hover:underline">
                             <ArrowRight className="h-4 w-4" /> العودة
                           </button>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                          <button
+                            onClick={() => {
+                              setIsGroupMessage(true);
+                              setStep(3);
+                            }}
+                            className="flex flex-col items-center justify-center p-8 rounded-[2rem] border-2 border-slate-100 hover:border-indigo-600 hover:bg-indigo-50/50 transition-all group"
+                          >
+                            <div className="h-16 w-16 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600 mb-4 group-hover:scale-110 transition-transform">
+                              <Users className="h-8 w-8" />
+                            </div>
+                            <span className="text-lg font-black text-slate-900">رسالة جماعية</span>
+                            <p className="text-xs text-slate-500 font-medium mt-1">إرسال لجميع طلاب الصف</p>
+                          </button>
+                          <button
+                            onClick={() => {
+                              setIsGroupMessage(false);
+                              setStep(3);
+                            }}
+                            className="flex flex-col items-center justify-center p-8 rounded-[2rem] border-2 border-slate-100 hover:border-emerald-600 hover:bg-emerald-50/50 transition-all group"
+                          >
+                            <div className="h-16 w-16 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600 mb-4 group-hover:scale-110 transition-transform">
+                              <User className="h-8 w-8" />
+                            </div>
+                            <span className="text-lg font-black text-slate-900">رسالة فردية</span>
+                            <p className="text-xs text-slate-500 font-medium mt-1">إرسال لطالب محدد</p>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {step === 3 && recipientType === 'student' && currentUser?.role === 'teacher' && (
+                      <div className="space-y-6">
+                        <div className="flex items-center gap-4 mb-4">
+                          <button onClick={() => setStep(2)} className="text-indigo-600 font-black text-sm flex items-center gap-1 hover:underline">
+                            <ArrowRight className="h-4 w-4" /> العودة
+                          </button>
+                          <span className="text-xs font-black text-slate-400 uppercase tracking-widest">
+                            {isGroupMessage ? 'اختر الصف للمراسلة الجماعية' : 'اختر الصف للبحث عن الطالب'}
+                          </span>
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           {teacherSections.map((section: any) => (
@@ -657,7 +729,7 @@ export default function MessagesPage() {
                               key={section.id}
                               onClick={() => {
                                 setSelectedSectionId(section.id);
-                                setStep(3);
+                                setStep(4);
                               }}
                               className="flex items-center gap-4 p-6 rounded-3xl border border-slate-100 hover:border-indigo-600 hover:bg-indigo-50 transition-all text-right"
                             >
@@ -679,42 +751,44 @@ export default function MessagesPage() {
                       </div>
                     )}
 
-                    {((step === 2 && (recipientType === 'teacher' || (recipientType === 'student' && currentUser?.role !== 'teacher'))) || step === 3) && (
+                    {((step === 2 && (recipientType === 'teacher' || (recipientType === 'student' && currentUser?.role !== 'teacher'))) || step === 4) && (
                       <form id="new-message-form" onSubmit={handleSendMessage} className="space-y-8">
                         <div className="flex items-center justify-between mb-4">
                           <button 
                             type="button"
-                            onClick={() => setStep(recipientType === 'student' && currentUser?.role === 'teacher' ? 2 : 1)} 
+                            onClick={() => setStep(recipientType === 'student' && currentUser?.role === 'teacher' ? 3 : 1)} 
                             className="text-indigo-600 font-black text-sm flex items-center gap-1 hover:underline"
                           >
                             <ArrowRight className="h-4 w-4" /> العودة
                           </button>
                           <div className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-100 text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                            {recipientType === 'teacher' ? 'مراسلة معلم' : 'مراسلة طالب'}
+                            {recipientType === 'teacher' ? 'مراسلة معلم' : isGroupMessage ? 'رسالة جماعية للصف' : 'مراسلة طالب'}
                           </div>
                         </div>
 
-                        <div className="space-y-2">
-                          <label className="text-xs font-black text-slate-400 uppercase tracking-widest mr-1">المستلم</label>
-                          <div className="relative">
-                            <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
-                              <UserPlus className="h-4 w-4 text-slate-400" />
+                        {!isGroupMessage && (
+                          <div className="space-y-2">
+                            <label className="text-xs font-black text-slate-400 uppercase tracking-widest mr-1">المستلم</label>
+                            <div className="relative">
+                              <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
+                                <UserPlus className="h-4 w-4 text-slate-400" />
+                              </div>
+                              <select 
+                                required
+                                value={newMessage.receiver_id}
+                                onChange={(e) => setNewMessage({...newMessage, receiver_id: e.target.value})}
+                                className="block w-full rounded-2xl border-0 py-4 pr-11 pl-4 text-slate-900 bg-slate-50 ring-1 ring-inset ring-slate-100 focus:ring-2 focus:ring-inset focus:ring-indigo-500 sm:text-sm transition-all font-bold appearance-none"
+                              >
+                                <option value="">اختر المستلم من القائمة...</option>
+                                {getFilteredRecipients().map(user => (
+                                  <option key={user.id} value={user.id}>
+                                    {user.full_name}
+                                  </option>
+                                ))}
+                              </select>
                             </div>
-                            <select 
-                              required
-                              value={newMessage.receiver_id}
-                              onChange={(e) => setNewMessage({...newMessage, receiver_id: e.target.value})}
-                              className="block w-full rounded-2xl border-0 py-4 pr-11 pl-4 text-slate-900 bg-slate-50 ring-1 ring-inset ring-slate-100 focus:ring-2 focus:ring-inset focus:ring-indigo-500 sm:text-sm transition-all font-bold appearance-none"
-                            >
-                              <option value="">اختر المستلم من القائمة...</option>
-                              {getFilteredRecipients().map(user => (
-                                <option key={user.id} value={user.id}>
-                                  {user.full_name}
-                                </option>
-                              ))}
-                            </select>
                           </div>
-                        </div>
+                        )}
                         
                         <div className="space-y-2">
                           <label className="text-xs font-black text-slate-400 uppercase tracking-widest mr-1">موضوع الرسالة</label>
@@ -748,7 +822,7 @@ export default function MessagesPage() {
                     )}
                   </div>
                 </div>
-                {((step === 2 && (recipientType === 'teacher' || (recipientType === 'student' && currentUser?.role !== 'teacher'))) || step === 3) && (
+                {((step === 2 && (recipientType === 'teacher' || (recipientType === 'student' && currentUser?.role !== 'teacher'))) || step === 4) && (
                   <div className="bg-slate-50/50 px-8 py-6 sm:flex sm:flex-row-reverse sm:px-10 gap-3">
                     <button
                       type="submit"

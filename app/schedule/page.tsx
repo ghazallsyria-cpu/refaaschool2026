@@ -58,12 +58,9 @@ export default function SchedulePage() {
       if (assignmentsRes.data) setAssignments(assignmentsRes.data);
 
       if (currentUserRole === 'teacher' && user) {
-        const teacherRecord = teachersRes.data?.find(t => t.id === user.id);
-        if (teacherRecord) {
-          setSelectedId(teacherRecord.id);
-          setViewType('teacher');
-          setShowAllSchedules(false);
-        }
+        setSelectedId(user.id);
+        setViewType('teacher');
+        setShowAllSchedules(false);
       } else if (teachersRes.data?.[0]) {
         setSelectedId(teachersRes.data[0].id);
       }
@@ -338,8 +335,8 @@ export default function SchedulePage() {
         }
       `}</style>
       {/* Debug Info */}
-      {!isAdmin && (
-        <div className="bg-yellow-100 p-4 rounded-lg text-sm text-yellow-800">
+      {isAdmin && userRole !== 'teacher' && (
+        <div className="bg-yellow-100 p-4 rounded-lg text-sm text-yellow-800 no-print">
           <p className="font-bold">Debug Info:</p>
           <p>isAdmin: {String(isAdmin)}</p>
           <p>Email: {userEmail || 'غير مسجل'}</p>
@@ -350,8 +347,14 @@ export default function SchedulePage() {
 
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 print:hidden">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">الجدول الدراسي</h1>
-          <p className="text-slate-500">عرض الجداول الدراسية للمعلمين والفصول</p>
+          <h1 className="text-2xl font-bold text-slate-900">
+            {userRole === 'teacher' ? 'جدولي الدراسي' : 'الجدول الدراسي'}
+          </h1>
+          <p className="text-slate-500">
+            {userRole === 'teacher' 
+              ? 'عرض حصصك الدراسية الأسبوعية' 
+              : 'عرض الجداول الدراسية للمعلمين والفصول'}
+          </p>
         </div>
         <button 
           onClick={handlePrint}
@@ -363,7 +366,7 @@ export default function SchedulePage() {
       </div>
 
       {/* Swapping Indicator */}
-      {isAdmin && swappingFrom && (
+      {isAdmin && userRole !== 'teacher' && swappingFrom && (
         <div className="bg-indigo-600 text-white p-4 rounded-xl shadow-lg flex items-center justify-between animate-pulse sticky top-4 z-40 no-print">
           <div className="flex items-center gap-3">
             <div className="bg-white/20 p-2 rounded-lg">
@@ -388,7 +391,7 @@ export default function SchedulePage() {
       )}
 
       {/* Copied Lesson Indicator */}
-      {isAdmin && copiedLesson && (
+      {isAdmin && userRole !== 'teacher' && copiedLesson && (
         <div className="bg-emerald-600 text-white p-4 rounded-xl shadow-lg flex items-center justify-between sticky top-4 z-40 no-print mt-4">
           <div className="flex items-center gap-3">
             <div className="bg-white/20 p-2 rounded-lg">
@@ -412,7 +415,7 @@ export default function SchedulePage() {
         </div>
       )}
 
-      {isAdmin && (
+      {isAdmin && userRole !== 'teacher' && (
         <div className="bg-white p-4 rounded-xl shadow-sm ring-1 ring-slate-200 print:hidden">
           <div className="flex flex-col sm:flex-row gap-4 items-center">
             <div className="flex rounded-md shadow-sm" role="group">

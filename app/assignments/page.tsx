@@ -148,25 +148,48 @@ export default function AssignmentsPage() {
         }));
         teachersData = teachersRes.data || [];
       } else {
-        // Fetch teacher's assigned subjects and sections
-        const [subjectsRes, sectionsRes] = await Promise.all([
-          supabase.from('teacher_subjects').select('subject:subjects(id, name)').eq('teacher_id', user.id),
-          supabase.from('teacher_sections').select('section:sections(id, name, classes(name))').eq('teacher_id', user.id)
-        ]);
+        // Fetch teacher's assigned subjects and sections from teacher_sections
+        const { data: teacherSectionsData, error: tsError } = await supabase
+          .from('teacher_sections')
+          .select(`
+            section:sections(id, name, classes(name)),
+            subject:subjects(id, name)
+          `)
+          .eq('teacher_id', user.id);
         
-        subjectsData = (subjectsRes.data || []).map((ts: any) => {
+        if (tsError) throw tsError;
+
+        // Extract unique subjects
+        const uniqueSubjects = Array.from(new Set((teacherSectionsData || []).map(ts => {
           const subject = Array.isArray(ts.subject) ? ts.subject[0] : ts.subject;
-          return subject;
+          return subject?.id;
+        }))).map(id => {
+          const ts = teacherSectionsData?.find(item => {
+            const subject = Array.isArray(item.subject) ? item.subject[0] : item.subject;
+            return subject?.id === id;
+          });
+          return Array.isArray(ts?.subject) ? ts?.subject[0] : ts?.subject;
         }).filter(Boolean);
 
-        sectionsData = (sectionsRes.data || []).map((ts: any) => {
+        // Extract unique sections
+        const uniqueSections = Array.from(new Set((teacherSectionsData || []).map(ts => {
           const section = Array.isArray(ts.section) ? ts.section[0] : ts.section;
+          return section?.id;
+        }))).map(id => {
+          const ts = teacherSectionsData?.find(item => {
+            const section = Array.isArray(item.section) ? item.section[0] : item.section;
+            return section?.id === id;
+          });
+          const section = Array.isArray(ts?.section) ? ts?.section[0] : ts?.section;
           if (!section) return null;
           return {
             ...section,
             classes: Array.isArray(section.classes) ? section.classes[0] : section.classes
           };
         }).filter(Boolean);
+
+        subjectsData = uniqueSubjects;
+        sectionsData = uniqueSections;
 
         // Only the current teacher
         const { data: currentTeacher } = await supabase.from('teachers').select('id, users(full_name)').eq('id', user.id).single();

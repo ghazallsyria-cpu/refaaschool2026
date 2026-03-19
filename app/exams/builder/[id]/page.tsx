@@ -139,19 +139,39 @@ export default function QuizBuilder() {
           name: `${Array.isArray(s.classes) ? s.classes[0]?.name : s.classes?.name} - ${s.name}`
         }));
       } else {
-        // Fetch teacher's assigned subjects and sections
-        const [subjectsRes, sectionsRes] = await Promise.all([
-          supabase.from('teacher_subjects').select('subject:subjects(id, name)').eq('teacher_id', user.id),
-          supabase.from('teacher_sections').select('section:sections(id, name, classes(name))').eq('teacher_id', user.id)
-        ]);
+        // Fetch teacher's assigned subjects and sections from teacher_sections
+        const { data: teacherSectionsData, error: tsError } = await supabase
+          .from('teacher_sections')
+          .select(`
+            section:sections(id, name, classes(name)),
+            subject:subjects(id, name)
+          `)
+          .eq('teacher_id', user.id);
         
-        subjectsData = (subjectsRes.data || []).map((ts: any) => {
+        if (tsError) throw tsError;
+
+        // Extract unique subjects
+        const uniqueSubjects = Array.from(new Set((teacherSectionsData || []).map(ts => {
           const subject = Array.isArray(ts.subject) ? ts.subject[0] : ts.subject;
-          return subject;
+          return subject?.id;
+        }))).map(id => {
+          const ts = teacherSectionsData?.find(item => {
+            const subject = Array.isArray(item.subject) ? item.subject[0] : item.subject;
+            return subject?.id === id;
+          });
+          return Array.isArray(ts?.subject) ? ts?.subject[0] : ts?.subject;
         }).filter(Boolean);
-        
-        sectionsData = (sectionsRes.data || []).map((ts: any) => {
+
+        // Extract unique sections
+        const uniqueSections = Array.from(new Set((teacherSectionsData || []).map(ts => {
           const section = Array.isArray(ts.section) ? ts.section[0] : ts.section;
+          return section?.id;
+        }))).map(id => {
+          const ts = teacherSectionsData?.find(item => {
+            const section = Array.isArray(item.section) ? item.section[0] : item.section;
+            return section?.id === id;
+          });
+          const section = Array.isArray(ts?.section) ? ts?.section[0] : ts?.section;
           if (!section) return null;
           const className = Array.isArray(section.classes) ? section.classes[0]?.name : section.classes?.name;
           return {
@@ -159,6 +179,9 @@ export default function QuizBuilder() {
             name: className ? `${className} - ${section.name}` : section.name
           };
         }).filter(Boolean);
+
+        subjectsData = uniqueSubjects;
+        sectionsData = uniqueSections;
       }
       
       setSubjects(subjectsData);

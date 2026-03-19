@@ -45,6 +45,9 @@ export default function AssignmentsPage() {
   const fetchAssignments = useCallback(async () => {
     setLoading(true);
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
       const { data, error } = await supabase
         .from('assignments')
         .select(`
@@ -60,6 +63,7 @@ export default function AssignmentsPage() {
           sections (name, classes (name)),
           teachers (users (full_name))
         `)
+        .eq('teacher_id', user.id)
         .order('due_date', { ascending: true });
 
       if (error) throw error;

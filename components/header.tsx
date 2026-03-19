@@ -1,26 +1,65 @@
 'use client';
 
-import { Search, User, LogOut, Menu } from 'lucide-react';
+import { Search, User, LogOut, Menu, School } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import { NotificationsBell } from '@/components/notifications-bell';
+import Link from 'next/link';
 
 export function Header({ onMenuClick, showMenuButton = true }: { onMenuClick?: () => void, showMenuButton?: boolean }) {
   const [user, setUser] = useState<any>(null);
+  const [userRole, setUserRole] = useState<string>('');
+  const [userName, setUserName] = useState<string>('');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
-    // Check active sessions and sets the user
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-    });
+    const fetchUserAndRole = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        setUser(session.user);
+        
+        // Fetch user role and name
+        const { data: userData } = await supabase
+          .from('users')
+          .select('role, full_name')
+          .eq('id', session.user.id)
+          .single();
+          
+        if (userData) {
+          setUserName(userData.full_name || session.user.email?.split('@')[0] || '');
+          
+          // Map role to Arabic display name
+          const roleMap: Record<string, string> = {
+            'admin': 'المدير العام',
+            'management': 'الإدارة',
+            'teacher': 'معلم',
+            'student': 'طالب',
+            'parent': 'ولي أمر'
+          };
+          
+          setUserRole(roleMap[userData.role] || userData.role);
+        }
+      } else {
+        setUser(null);
+        setUserRole('');
+        setUserName('');
+      }
+    };
+
+    fetchUserAndRole();
 
     // Listen for changes on auth state (logged in, signed out, etc.)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
+      if (session?.user) {
+        fetchUserAndRole();
+      } else {
+        setUser(null);
+        setUserRole('');
+        setUserName('');
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -44,6 +83,19 @@ export function Header({ onMenuClick, showMenuButton = true }: { onMenuClick?: (
             <Menu className="h-6 w-6" aria-hidden="true" />
           </button>
         )}
+        
+        {!showMenuButton && (
+          <Link href="/" className="flex items-center gap-4 group transition-transform hover:scale-105">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 shadow-xl shadow-indigo-500/20 ring-1 ring-slate-200/50">
+              <School className="h-7 w-7 text-white" />
+            </div>
+            <div className="hidden sm:flex flex-col">
+              <span className="text-lg font-black text-slate-900 tracking-tight leading-none group-hover:text-indigo-600 transition-colors">مدرسة الرفعة</span>
+              <span className="text-[10px] text-indigo-500 font-bold uppercase tracking-[0.2em] mt-1">المنصة الرقمية</span>
+            </div>
+          </Link>
+        )}
+
         <div className="w-full max-w-xl relative hidden md:block group">
           <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-5">
             <Search className="h-5 w-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" aria-hidden="true" />
@@ -75,9 +127,9 @@ export function Header({ onMenuClick, showMenuButton = true }: { onMenuClick?: (
           >
             <div className="hidden sm:flex flex-col items-end">
               <span className="text-sm font-black text-slate-900 truncate max-w-[150px] group-hover:text-indigo-600 transition-colors">
-                {user ? user.email.split('@')[0] : 'تسجيل الدخول'}
+                {userName || (user ? user.email.split('@')[0] : 'تسجيل الدخول')}
               </span>
-              <span className="text-[10px] text-indigo-500 font-bold uppercase tracking-widest">المدير العام</span>
+              <span className="text-[10px] text-indigo-500 font-bold uppercase tracking-widest">{userRole || 'مستخدم'}</span>
             </div>
             <div className="relative">
               <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center overflow-hidden shadow-lg shadow-indigo-500/20 ring-2 ring-white">

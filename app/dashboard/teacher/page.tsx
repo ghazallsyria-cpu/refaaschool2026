@@ -5,10 +5,13 @@ import { supabase } from '@/lib/supabase';
 import { 
   Users, BookOpen, Calendar, CheckCircle2, 
   Clock, FileText, Plus, Search, 
-  TrendingUp, BarChart2, UserCheck, MessageSquare
+  TrendingUp, BarChart2, UserCheck, MessageSquare,
+  Bell, ChevronLeft, MoreVertical, Edit, Trash2
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import Link from 'next/link';
+import { format } from 'date-fns';
+import { arSA } from 'date-fns/locale';
 
 export default function TeacherDashboard() {
   const [teacherData, setTeacherData] = useState<any>(null);
@@ -107,258 +110,287 @@ export default function TeacherDashboard() {
 
   if (loading) {
     return (
-      <div className="flex h-full items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent"></div>
+      <div className="flex h-[80vh] items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="h-12 w-12 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent"></div>
+          <p className="text-slate-500 font-medium animate-pulse">جاري تحميل البيانات...</p>
+        </div>
       </div>
     );
   }
 
+  const today = new Date().getDay(); // 0 is Sunday
+  const todaysSchedule = schedule.filter(s => s.day_of_week === today);
+
   return (
-    <div className="space-y-8 pb-8">
-      {/* Header with Quick Actions */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900">مرحباً، أ. {teacherData?.users?.full_name}</h1>
-          <p className="text-slate-500 mt-1">إليك نظرة سريعة على فصولك الدراسية وطلابك.</p>
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="space-y-8 pb-8 max-w-7xl mx-auto"
+    >
+      {/* Header Section */}
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-indigo-600 to-violet-600 p-8 text-white shadow-xl">
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+          <div>
+            <h1 className="text-3xl font-bold mb-2">مرحباً، أ. {teacherData?.users?.full_name} 👋</h1>
+            <p className="text-indigo-100 text-lg">
+              لديك اليوم {todaysSchedule.length} حصص دراسية و {recentAssignments.length} واجبات بانتظار التقييم.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <Link 
+              href="/attendance"
+              className="inline-flex items-center gap-2 rounded-xl bg-white/10 backdrop-blur-md px-5 py-3 text-sm font-bold text-white hover:bg-white/20 transition-all border border-white/20"
+            >
+              <UserCheck className="h-5 w-5" />
+              رصد الحضور
+            </Link>
+            <Link 
+              href="/exams/builder"
+              className="inline-flex items-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-bold text-indigo-600 shadow-sm hover:bg-indigo-50 transition-all"
+            >
+              <Plus className="h-5 w-5" />
+              إنشاء اختبار
+            </Link>
+          </div>
         </div>
-        <div className="flex flex-wrap gap-3">
-          <Link 
-            href="/attendance"
-            className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50 transition-all"
+        {/* Decorative background elements */}
+        <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-white/10 blur-3xl"></div>
+        <div className="absolute -left-20 -bottom-20 h-64 w-64 rounded-full bg-indigo-500/20 blur-3xl"></div>
+      </div>
+
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        {[
+          { label: 'إجمالي الطلاب', value: stats.totalStudents, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50', ring: 'ring-blue-100' },
+          { label: 'الاختبارات النشطة', value: stats.totalExams, icon: FileText, color: 'text-indigo-600', bg: 'bg-indigo-50', ring: 'ring-indigo-100' },
+          { label: 'الواجبات الحالية', value: stats.totalAssignments, icon: BookOpen, color: 'text-amber-600', bg: 'bg-amber-50', ring: 'ring-amber-100' },
+          { label: 'متوسط الحضور', value: `${stats.avgAttendance}%`, icon: BarChart2, color: 'text-emerald-600', bg: 'bg-emerald-50', ring: 'ring-emerald-100' },
+        ].map((stat, i) => (
+          <motion.div 
+            key={i}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: i * 0.1 }}
+            className="bg-white p-6 rounded-3xl shadow-sm ring-1 ring-slate-200 flex items-center gap-5 hover:shadow-md transition-shadow"
           >
-            <UserCheck className="h-4 w-4 text-emerald-600" />
-            رصد الحضور
-          </Link>
-          <Link 
-            href="/exams/builder"
-            className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-indigo-700 transition-all"
-          >
-            <Plus className="h-4 w-4" />
-            إنشاء اختبار
-          </Link>
-        </div>
-      </div>      {/* Stats Grid */}
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-4">
-        <div className="bg-white p-6 rounded-3xl shadow-sm ring-1 ring-slate-200 flex items-center gap-6">
-          <div className="h-14 w-14 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600">
-            <Users className="h-7 w-7" />
-          </div>
-          <div>
-            <p className="text-sm font-medium text-slate-500">إجمالي الطلاب</p>
-            <p className="text-2xl font-bold text-slate-900">{stats.totalStudents}</p>
-          </div>
-        </div>
-        <div className="bg-white p-6 rounded-3xl shadow-sm ring-1 ring-slate-200 flex items-center gap-6">
-          <div className="h-14 w-14 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600">
-            <FileText className="h-7 w-7" />
-          </div>
-          <div>
-            <p className="text-sm font-medium text-slate-500">الاختبارات</p>
-            <p className="text-2xl font-bold text-slate-900">{stats.totalExams}</p>
-          </div>
-        </div>
-        <div className="bg-white p-6 rounded-3xl shadow-sm ring-1 ring-slate-200 flex items-center gap-6">
-          <div className="h-14 w-14 rounded-2xl bg-amber-50 flex items-center justify-center text-amber-600">
-            <BookOpen className="h-7 w-7" />
-          </div>
-          <div>
-            <p className="text-sm font-medium text-slate-500">الواجبات</p>
-            <p className="text-2xl font-bold text-slate-900">{stats.totalAssignments}</p>
-          </div>
-        </div>
-        <div className="bg-white p-6 rounded-3xl shadow-sm ring-1 ring-slate-200 flex items-center gap-6">
-          <div className="h-14 w-14 rounded-2xl bg-sky-50 flex items-center justify-center text-sky-600">
-            <BarChart2 className="h-7 w-7" />
-          </div>
-          <div>
-            <p className="text-sm font-medium text-slate-500">متوسط الحضور</p>
-            <p className="text-2xl font-bold text-slate-900">{stats.avgAttendance}%</p>
-          </div>
-        </div>
+            <div className={`h-14 w-14 rounded-2xl ${stat.bg} ${stat.ring} ring-1 flex items-center justify-center ${stat.color}`}>
+              <stat.icon className="h-7 w-7" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-slate-500 mb-1">{stat.label}</p>
+              <p className="text-2xl font-bold text-slate-900">{stat.value}</p>
+            </div>
+          </motion.div>
+        ))}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Main Content - Left 2 Columns */}
         <div className="lg:col-span-2 space-y-8">
-          {/* My Sections */}
-          <div className="bg-white rounded-3xl shadow-sm ring-1 ring-slate-200 overflow-hidden">
-            <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+          
+          {/* Today's Schedule Timeline */}
+          <div className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-sm ring-1 ring-slate-200/50 overflow-hidden hover:shadow-md transition-all">
+            <div className="p-6 border-b border-slate-100/50 flex items-center justify-between bg-white/50">
               <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-                <BookOpen className="h-5 w-5 text-indigo-600" />
-                فصولي الدراسية
+                <div className="p-2 bg-indigo-50 rounded-xl">
+                  <Clock className="h-5 w-5 text-indigo-600" />
+                </div>
+                جدول اليوم
               </h2>
-              <Link href="/classes" className="text-sm font-bold text-indigo-600 hover:underline">عرض الكل</Link>
+              <span className="text-sm font-medium text-slate-500">
+                {format(new Date(), 'EEEE، d MMMM', { locale: arSA })}
+              </span>
             </div>
             <div className="p-6">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {sections.length > 0 ? (
-                  sections.map((section) => (
-                    <div key={section.id} className="p-5 rounded-2xl bg-slate-50 border border-slate-100 hover:border-indigo-200 transition-all group">
-                      <div className="flex justify-between items-start mb-4">
-                        <div>
-                          <h3 className="font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">{section.classes?.name}</h3>
-                          <p className="text-sm text-slate-500">{section.name}</p>
-                        </div>
-                        <div className="h-10 w-10 rounded-xl bg-white flex items-center justify-center shadow-sm text-slate-400 group-hover:text-indigo-600 transition-colors">
-                          <Users className="h-5 w-5" />
-                        </div>
+              {todaysSchedule.length > 0 ? (
+                <div className="space-y-6 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-slate-200 before:to-transparent">
+                  {todaysSchedule.map((item, i) => (
+                    <div key={i} className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
+                      <div className="flex items-center justify-center w-10 h-10 rounded-full border-4 border-white bg-indigo-100 text-indigo-600 shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10">
+                        <span className="text-sm font-bold">{item.period}</span>
                       </div>
-                      <div className="flex items-center justify-between text-xs text-slate-500">
-                        <span>{section.students?.[0]?.count || 0} طالب</span>
-                        <div className="flex items-center gap-1 text-emerald-600 font-bold">
-                          <div className="h-1.5 w-1.5 rounded-full bg-emerald-600"></div>
-                          نشط حالياً
+                      <div className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] p-4 rounded-2xl border border-slate-100 bg-white shadow-sm hover:shadow-md transition-shadow group-hover:border-indigo-200">
+                        <div className="flex items-center justify-between mb-2">
+                          <h3 className="font-bold text-slate-900">{item.subjects?.name}</h3>
+                          <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-slate-100 text-slate-600">
+                            الحصة {item.period}
+                          </span>
                         </div>
+                        <p className="text-sm text-slate-500 flex items-center gap-1.5">
+                          <Users className="h-4 w-4" />
+                          {item.sections?.classes?.name} - {item.sections?.name}
+                        </p>
                       </div>
                     </div>
-                  ))
-                ) : (
-                  <div className="col-span-2 p-8 text-center text-slate-500">
-                    لا توجد فصول مسجلة حالياً
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Recent Assignments */}
-          <div className="bg-white rounded-3xl shadow-sm ring-1 ring-slate-200 overflow-hidden">
-            <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-              <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-                <Plus className="h-5 w-5 text-amber-600" />
-                آخر الواجبات
-              </h2>
-              <Link href="/assignments" className="text-sm font-bold text-indigo-600 hover:underline">إدارة الواجبات</Link>
-            </div>
-            <div className="divide-y divide-slate-100">
-              {recentAssignments.length > 0 ? (
-                recentAssignments.map((assignment) => (
-                  <div key={assignment.id} className="p-6 flex items-center justify-between hover:bg-slate-50 transition-colors">
-                    <div className="flex items-center gap-4">
-                      <div className="h-12 w-12 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600">
-                        <BookOpen className="h-6 w-6" />
-                      </div>
-                      <div>
-                        <p className="font-bold text-slate-900">{assignment.title}</p>
-                        <p className="text-sm text-slate-500">{assignment.subjects?.name} • {assignment.sections?.classes?.name} - {assignment.sections?.name}</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm font-bold text-slate-900">موعد التسليم</p>
-                      <p className="text-xs text-slate-400">{new Date(assignment.due_date).toLocaleDateString('ar-SA')}</p>
-                    </div>
-                  </div>
-                ))
+                  ))}
+                </div>
               ) : (
-                <div className="p-12 text-center text-slate-500">
-                  لا توجد واجبات منشورة حالياً
+                <div className="text-center py-12">
+                  <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-slate-50 mb-4">
+                    <Calendar className="h-8 w-8 text-slate-400" />
+                  </div>
+                  <h3 className="text-lg font-medium text-slate-900 mb-1">لا توجد حصص اليوم</h3>
+                  <p className="text-slate-500">استمتع بيومك! ليس لديك أي حصص مجدولة لهذا اليوم.</p>
                 </div>
               )}
             </div>
           </div>
 
-          {/* Recent Exams */}
-          <div className="bg-white rounded-3xl shadow-sm ring-1 ring-slate-200 overflow-hidden">
-            <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+          {/* My Sections Grid */}
+          <div className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-sm ring-1 ring-slate-200/50 overflow-hidden hover:shadow-md transition-all">
+            <div className="p-6 border-b border-slate-100/50 flex items-center justify-between bg-white/50">
               <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-                <FileText className="h-5 w-5 text-indigo-600" />
-                آخر الاختبارات
+                <div className="p-2 bg-indigo-50 rounded-xl">
+                  <BookOpen className="h-5 w-5 text-indigo-600" />
+                </div>
+                فصولي الدراسية
               </h2>
-              <Link href="/exams" className="text-sm font-bold text-indigo-600 hover:underline">إدارة الاختبارات</Link>
+              <Link href="/classes" className="text-sm font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-1 bg-indigo-50 px-3 py-1.5 rounded-lg hover:bg-indigo-100 transition-colors">
+                عرض الكل <ChevronLeft className="h-4 w-4" />
+              </Link>
             </div>
-            <div className="divide-y divide-slate-100">
-              {recentExams.length > 0 ? (
-                recentExams.map((exam) => (
-                  <div key={exam.id} className="p-6 flex items-center justify-between hover:bg-slate-50 transition-colors">
-                    <div className="flex items-center gap-4">
-                      <div className="h-12 w-12 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600">
-                        <FileText className="h-6 w-6" />
+            <div className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {sections.length > 0 ? (
+                sections.map((section) => (
+                  <Link href={`/classes/${section.id}`} key={section.id} className="block group">
+                    <div className="p-5 rounded-2xl bg-white border border-slate-200 hover:border-indigo-300 hover:shadow-md transition-all h-full flex flex-col">
+                      <div className="flex justify-between items-start mb-4">
+                        <div>
+                          <h3 className="font-bold text-lg text-slate-900 group-hover:text-indigo-600 transition-colors">
+                            {section.classes?.name}
+                          </h3>
+                          <p className="text-sm text-slate-500 font-medium">{section.name}</p>
+                        </div>
+                        <div className="h-10 w-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600 group-hover:scale-110 transition-transform">
+                          <Users className="h-5 w-5" />
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-bold text-slate-900">{exam.title}</p>
-                        <p className="text-sm text-slate-500">{exam.subject?.name} • {exam.section?.name || 'جميع الشعب'}</p>
+                      <div className="mt-auto pt-4 border-t border-slate-100 flex items-center justify-between text-sm">
+                        <span className="text-slate-600 flex items-center gap-1.5">
+                          <Users className="h-4 w-4 text-slate-400" />
+                          {section.students?.[0]?.count || 0} طالب
+                        </span>
+                        <span className="text-indigo-600 font-medium group-hover:underline">
+                          إدارة الفصل
+                        </span>
                       </div>
                     </div>
-                    <div className="flex items-center gap-6">
-                      <div className="text-right hidden sm:block">
-                        <p className="text-sm font-bold text-slate-900">24/30</p>
-                        <p className="text-xs text-slate-400">تم التسليم</p>
-                      </div>
-                      <Link 
-                        href={`/exams/results/${exam.id}`}
-                        className="p-2 rounded-xl bg-slate-100 text-slate-600 hover:bg-indigo-600 hover:text-white transition-all"
-                      >
-                        <BarChart2 className="h-5 w-5" />
+                  </Link>
+                ))
+              ) : (
+                <div className="col-span-2 p-12 text-center text-slate-500 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                  لا توجد فصول مسجلة حالياً
+                </div>
+              )}
+            </div>
+          </div>
+
+        </div>
+
+        {/* Sidebar Content - Right 1 Column */}
+        <div className="space-y-8">
+          
+          {/* Recent Assignments */}
+          <div className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-sm ring-1 ring-slate-200/50 overflow-hidden hover:shadow-md transition-all">
+            <div className="p-6 border-b border-slate-100/50 flex items-center justify-between bg-white/50">
+              <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                <div className="p-2 bg-amber-50 rounded-xl">
+                  <FileText className="h-5 w-5 text-amber-500" />
+                </div>
+                الواجبات الأخيرة
+              </h2>
+            </div>
+            <div className="divide-y divide-slate-100">
+              {recentAssignments.length > 0 ? (
+                recentAssignments.map((assignment) => (
+                  <div key={assignment.id} className="p-5 hover:bg-slate-50 transition-colors">
+                    <div className="flex justify-between items-start mb-2">
+                      <h3 className="font-bold text-slate-900 line-clamp-1">{assignment.title}</h3>
+                      <span className="text-xs font-medium px-2 py-1 bg-amber-50 text-amber-700 rounded-md whitespace-nowrap ml-2">
+                        {format(new Date(assignment.due_date), 'd MMM', { locale: arSA })}
+                      </span>
+                    </div>
+                    <p className="text-sm text-slate-500 mb-3">
+                      {assignment.subjects?.name} • {assignment.sections?.classes?.name}
+                    </p>
+                    <div className="flex gap-2">
+                      <Link href={`/assignments`} className="flex-1 text-center py-1.5 text-xs font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 hover:text-indigo-600 transition-colors">
+                        عرض التفاصيل
+                      </Link>
+                      <Link href={`/assignments`} className="flex-1 text-center py-1.5 text-xs font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors">
+                        التقييم
                       </Link>
                     </div>
                   </div>
                 ))
               ) : (
-                <div className="p-12 text-center text-slate-500">
-                  لم تقم بإنشاء أي اختبارات بعد
+                <div className="p-8 text-center text-slate-500 text-sm">
+                  لا توجد واجبات حالياً
                 </div>
               )}
             </div>
-          </div>
-        </div>
-        <div className="space-y-8">
-          {/* Calendar / Schedule Widget */}
-          <div className="bg-white rounded-3xl shadow-sm ring-1 ring-slate-200 p-6">
-            <h2 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
-              <Calendar className="h-5 w-5 text-indigo-600" />
-              الجدول اليومي
-            </h2>
-            <div className="space-y-4">
-              {schedule.length > 0 ? (
-                schedule.map((item, i) => (
-                  <div key={i} className="p-4 rounded-2xl border border-slate-100 hover:border-indigo-200 bg-slate-50/50 transition-all">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <p className="font-bold text-slate-900">{item.subjects?.name}</p>
-                        <p className="text-xs text-slate-500 mt-1">{item.sections?.classes?.name} - {item.sections?.name}</p>
-                      </div>
-                      <span className="text-xs font-bold px-2 py-1 rounded-lg bg-indigo-600 text-white">
-                        {item.period} - {['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'][item.day_of_week]}
-                      </span>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <p className="text-center text-slate-500">لا توجد حصص مجدولة</p>
-              )}
+            <div className="p-4 border-t border-slate-100 bg-slate-50/50">
+              <Link href="/assignments" className="block w-full text-center text-sm font-medium text-indigo-600 hover:text-indigo-700">
+                عرض كل الواجبات
+              </Link>
             </div>
           </div>
 
-          {/* Recent Messages / Notifications */}
-          <div className="bg-white rounded-3xl shadow-sm ring-1 ring-slate-200 p-6">
-            <h2 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
-              <MessageSquare className="h-5 w-5 text-indigo-600" />
-              تواصل أولياء الأمور
-            </h2>
-            <div className="space-y-4">
-              {messages.length > 0 ? (
-                messages.map((item, i) => (
-                  <div key={i} className="flex gap-3 p-3 rounded-2xl hover:bg-slate-50 transition-colors cursor-pointer">
-                    <div className="h-10 w-10 rounded-full bg-slate-100 flex-shrink-0 flex items-center justify-center font-bold text-slate-500">
-                      {item.sender?.full_name?.charAt(0) || 'م'}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-bold text-slate-900 truncate">{item.sender?.full_name}</p>
-                      <p className="text-xs text-slate-500 truncate mt-0.5">{item.subject}</p>
-                      <p className="text-[10px] text-slate-400 mt-1">{new Date(item.created_at).toLocaleDateString('ar-SA')}</p>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <p className="text-center text-slate-500">لا توجد رسائل جديدة</p>
+          {/* Recent Messages */}
+          <div className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-sm ring-1 ring-slate-200/50 overflow-hidden hover:shadow-md transition-all">
+            <div className="p-6 border-b border-slate-100/50 flex items-center justify-between bg-white/50">
+              <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                <div className="p-2 bg-emerald-50 rounded-xl">
+                  <MessageSquare className="h-5 w-5 text-emerald-500" />
+                </div>
+                رسائل جديدة
+              </h2>
+              {messages.length > 0 && (
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
+                  {messages.length}
+                </span>
               )}
             </div>
-            <button className="w-full mt-4 py-2 text-sm font-bold text-indigo-600 border border-indigo-100 rounded-xl hover:bg-indigo-50 transition-all">
-              فتح صندوق الرسائل
-            </button>
+            <div className="divide-y divide-slate-100">
+              {messages.length > 0 ? (
+                messages.map((msg, i) => (
+                  <Link href={`/messages?id=${msg.id}`} key={i} className="flex gap-4 p-5 hover:bg-slate-50 transition-colors group">
+                    <div className="h-10 w-10 rounded-full bg-gradient-to-br from-emerald-100 to-teal-100 flex-shrink-0 flex items-center justify-center font-bold text-emerald-700">
+                      {msg.sender?.full_name?.charAt(0) || 'م'}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex justify-between items-baseline mb-1">
+                        <p className="text-sm font-bold text-slate-900 truncate group-hover:text-indigo-600 transition-colors">
+                          {msg.sender?.full_name}
+                        </p>
+                        <p className="text-[10px] text-slate-400 whitespace-nowrap mr-2">
+                          {format(new Date(msg.created_at), 'd MMM', { locale: arSA })}
+                        </p>
+                      </div>
+                      <p className="text-xs text-slate-600 truncate font-medium">{msg.subject}</p>
+                      <p className="text-xs text-slate-500 truncate mt-1">{msg.content}</p>
+                    </div>
+                  </Link>
+                ))
+              ) : (
+                <div className="p-8 text-center text-slate-500 text-sm flex flex-col items-center">
+                  <div className="h-12 w-12 rounded-full bg-slate-50 flex items-center justify-center mb-3">
+                    <CheckCircle2 className="h-6 w-6 text-slate-300" />
+                  </div>
+                  صندوق الوارد فارغ
+                </div>
+              )}
+            </div>
+            <div className="p-4 border-t border-slate-100 bg-slate-50/50">
+              <Link href="/messages" className="block w-full text-center text-sm font-medium text-indigo-600 hover:text-indigo-700">
+                فتح صندوق الرسائل
+              </Link>
+            </div>
           </div>
+
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }

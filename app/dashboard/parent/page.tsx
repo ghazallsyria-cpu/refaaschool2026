@@ -93,8 +93,8 @@ export default function ParentDashboard() {
       {/* Children Overview Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {children.map((child) => (
-          <div key={child.id} className="bg-white rounded-3xl shadow-sm ring-1 ring-slate-200 overflow-hidden group">
-            <div className="p-6 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+          <div key={child.id} className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-sm ring-1 ring-slate-200/50 overflow-hidden group hover:shadow-md transition-all">
+            <div className="p-6 border-b border-slate-100/50 bg-white/50 flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <div className="h-14 w-14 rounded-2xl bg-white shadow-sm flex items-center justify-center text-indigo-600 font-bold text-xl ring-1 ring-slate-100">
                   {child.users?.full_name?.[0]}
@@ -151,10 +151,12 @@ export default function ParentDashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Recent Notifications */}
-        <div className="lg:col-span-2 bg-white rounded-3xl shadow-sm ring-1 ring-slate-200 overflow-hidden">
-          <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+        <div className="lg:col-span-2 bg-white/80 backdrop-blur-xl rounded-3xl shadow-sm ring-1 ring-slate-200/50 overflow-hidden hover:shadow-md transition-all">
+          <div className="p-6 border-b border-slate-100/50 flex items-center justify-between bg-white/50">
             <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-              <Bell className="h-5 w-5 text-indigo-600" />
+              <div className="p-2 bg-indigo-50 rounded-xl">
+                <Bell className="h-5 w-5 text-indigo-600" />
+              </div>
               تنبيهات هامة
             </h2>
           </div>
@@ -184,7 +186,7 @@ export default function ParentDashboard() {
 
         {/* Quick Links & Support */}
         <div className="space-y-8">
-          <div className="bg-white rounded-3xl shadow-sm ring-1 ring-slate-200 p-6">
+          <div className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-sm ring-1 ring-slate-200/50 p-6 hover:shadow-md transition-all">
             <h2 className="text-xl font-bold text-slate-900 mb-6">روابط سريعة</h2>
             <div className="grid grid-cols-2 gap-3">
               <Link href="/reports" className="p-4 rounded-2xl bg-slate-50 border border-slate-100 hover:border-indigo-200 text-center transition-all group">

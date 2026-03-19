@@ -36,11 +36,25 @@ export default function ExamsDashboard() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [userRole, setUserRole] = useState<string | null>(null);
 
   const fetchExams = useCallback(async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const { data: userData } = await supabase
+        .from('users')
+        .select('role')
+        .eq('id', session.user.id)
+        .single();
+        
+      const role = userData?.role || null;
+      setUserRole(role);
+
+      let query = supabase
         .from('exams')
         .select(`
           *,
@@ -48,6 +62,13 @@ export default function ExamsDashboard() {
           section:sections(name)
         `)
         .order('created_at', { ascending: false });
+
+      // If student, only show published exams
+      if (role === 'student') {
+        query = query.eq('status', 'published');
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
 
@@ -101,6 +122,8 @@ export default function ExamsDashboard() {
     }
   };
 
+  const isTeacherOrAdmin = userRole === 'teacher' || userRole === 'admin' || userRole === 'management';
+
   return (
     <div className="min-h-screen bg-[#F8FAFC] pb-24">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 space-y-12">
@@ -116,47 +139,55 @@ export default function ExamsDashboard() {
               <FileText className="h-4 w-4" />
               نظام التقييم
             </div>
-            <h1 className="text-5xl font-black text-slate-900 tracking-tight">إدارة الاختبارات</h1>
-            <p className="text-xl text-slate-500 font-medium max-w-2xl">قم بإنشاء وإدارة الاختبارات التفاعلية ومتابعة أداء الطلاب بدقة.</p>
+            <h1 className="text-5xl font-black text-slate-900 tracking-tight">الاختبارات</h1>
+            <p className="text-xl text-slate-500 font-medium max-w-2xl">
+              {isTeacherOrAdmin 
+                ? 'قم بإنشاء وإدارة الاختبارات التفاعلية ومتابعة أداء الطلاب بدقة.' 
+                : 'استعرض الاختبارات المتاحة لك وتابع نتائجك.'}
+            </p>
           </div>
           
-          <Link href="/exams/builder/new">
-            <motion.button 
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              className="inline-flex items-center justify-center gap-3 rounded-3xl bg-indigo-600 px-10 py-5 text-base font-black text-white shadow-2xl shadow-indigo-200 hover:bg-indigo-700 transition-all self-start md:self-end"
-            >
-              <Plus className="h-6 w-6" />
-              إنشاء اختبار جديد
-            </motion.button>
-          </Link>
+          {isTeacherOrAdmin && (
+            <Link href="/exams/builder/new">
+              <motion.button 
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className="inline-flex items-center justify-center gap-3 rounded-3xl bg-indigo-600 px-10 py-5 text-base font-black text-white shadow-2xl shadow-indigo-200 hover:bg-indigo-700 transition-all self-start md:self-end"
+              >
+                <Plus className="h-6 w-6" />
+                إنشاء اختبار جديد
+              </motion.button>
+            </Link>
+          )}
         </motion.div>
 
         {/* Stats Overview */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-          {[
-            { label: 'إجمالي الاختبارات', value: exams.length, icon: FileText, color: 'text-blue-600', bg: 'bg-blue-50', shadow: 'shadow-blue-100' },
-            { label: 'اختبارات منشورة', value: exams.filter(e => e.status === 'published').length, icon: CheckCircle, color: 'text-emerald-600', bg: 'bg-emerald-50', shadow: 'shadow-emerald-100' },
-            { label: 'إجمالي المحاولات', value: exams.reduce((acc, e) => acc + (e._count?.attempts || 0), 0), icon: Users, color: 'text-amber-600', bg: 'bg-amber-50', shadow: 'shadow-amber-100' },
-            { label: 'متوسط النجاح', value: '84%', icon: TrendingUp, color: 'text-indigo-600', bg: 'bg-indigo-50', shadow: 'shadow-indigo-100' },
-          ].map((stat, i) => (
-            <motion.div
-              key={i}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.1 }}
-              className="glass-card p-8 rounded-[2.5rem] border border-white/60 shadow-xl flex items-center gap-6 transition-all hover:shadow-2xl hover:-translate-y-1"
-            >
-              <div className={`h-16 w-16 rounded-3xl ${stat.bg} flex items-center justify-center shadow-xl ${stat.shadow}`}>
-                <stat.icon className={`h-8 w-8 ${stat.color}`} />
-              </div>
-              <div>
-                <p className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] leading-none mb-2">{stat.label}</p>
-                <p className="text-3xl font-black text-slate-900 tracking-tight leading-none">{stat.value}</p>
-              </div>
-            </motion.div>
-          ))}
-        </div>
+        {isTeacherOrAdmin && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+            {[
+              { label: 'إجمالي الاختبارات', value: exams.length, icon: FileText, color: 'text-blue-600', bg: 'bg-blue-50', shadow: 'shadow-blue-100' },
+              { label: 'اختبارات منشورة', value: exams.filter(e => e.status === 'published').length, icon: CheckCircle, color: 'text-emerald-600', bg: 'bg-emerald-50', shadow: 'shadow-emerald-100' },
+              { label: 'إجمالي المحاولات', value: exams.reduce((acc, e) => acc + (e._count?.attempts || 0), 0), icon: Users, color: 'text-amber-600', bg: 'bg-amber-50', shadow: 'shadow-amber-100' },
+              { label: 'متوسط النجاح', value: '84%', icon: TrendingUp, color: 'text-indigo-600', bg: 'bg-indigo-50', shadow: 'shadow-indigo-100' },
+            ].map((stat, i) => (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.1 }}
+                className="glass-card p-8 rounded-[2.5rem] border border-white/60 shadow-xl flex items-center gap-6 transition-all hover:shadow-2xl hover:-translate-y-1"
+              >
+                <div className={`h-16 w-16 rounded-3xl ${stat.bg} flex items-center justify-center shadow-xl ${stat.shadow}`}>
+                  <stat.icon className={`h-8 w-8 ${stat.color}`} />
+                </div>
+                <div>
+                  <p className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] leading-none mb-2">{stat.label}</p>
+                  <p className="text-3xl font-black text-slate-900 tracking-tight leading-none">{stat.value}</p>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        )}
 
         {/* Filters Section */}
         <motion.div 
@@ -178,21 +209,23 @@ export default function ExamsDashboard() {
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            <div className="relative md:w-80 group">
-              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-6 text-slate-400 group-focus-within:text-indigo-600 transition-colors">
-                <Filter className="h-6 w-6" />
+            {isTeacherOrAdmin && (
+              <div className="relative md:w-80 group">
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-6 text-slate-400 group-focus-within:text-indigo-600 transition-colors">
+                  <Filter className="h-6 w-6" />
+                </div>
+                <select
+                  className="block w-full rounded-3xl border-0 py-5 pr-14 pl-6 text-slate-900 bg-slate-50/50 ring-1 ring-inset ring-slate-100 focus:ring-2 focus:ring-indigo-600 sm:text-base transition-all font-bold appearance-none"
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                >
+                  <option value="all">جميع حالات النشر</option>
+                  <option value="published">منشور</option>
+                  <option value="draft">مسودة</option>
+                  <option value="archived">مؤرشف</option>
+                </select>
               </div>
-              <select
-                className="block w-full rounded-3xl border-0 py-5 pr-14 pl-6 text-slate-900 bg-slate-50/50 ring-1 ring-inset ring-slate-100 focus:ring-2 focus:ring-indigo-600 sm:text-base transition-all font-bold appearance-none"
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-              >
-                <option value="all">جميع حالات النشر</option>
-                <option value="published">منشور</option>
-                <option value="draft">مسودة</option>
-                <option value="archived">مؤرشف</option>
-              </select>
-            </div>
+            )}
           </div>
         </motion.div>
 
@@ -219,44 +252,46 @@ export default function ExamsDashboard() {
                       <div className={`px-5 py-2 rounded-2xl text-xs font-black uppercase tracking-widest border shadow-sm ${getStatusColor(exam.status)}`}>
                         {getStatusLabel(exam.status)}
                       </div>
-                      <DropdownMenu.Root>
-                        <DropdownMenu.Trigger asChild>
-                          <motion.button 
-                            whileHover={{ scale: 1.1 }}
-                            whileTap={{ scale: 0.9 }}
-                            className="h-12 w-12 flex items-center justify-center rounded-2xl hover:bg-slate-100 text-slate-400 hover:text-indigo-600 transition-all bg-slate-50 border border-slate-100"
-                          >
-                            <MoreVertical className="h-6 w-6" />
-                          </motion.button>
-                        </DropdownMenu.Trigger>
-                        <DropdownMenu.Portal>
-                          <DropdownMenu.Content className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/60 p-3 min-w-[220px] z-50 animate-in fade-in zoom-in-95 duration-200">
-                            <DropdownMenu.Item asChild>
-                              <Link href={`/exams/builder/${exam.id}`} className="flex items-center gap-4 px-5 py-4 text-sm font-black text-slate-700 hover:bg-indigo-50 hover:text-indigo-600 rounded-2xl outline-none cursor-pointer transition-colors">
-                                <Edit2 className="h-5 w-5" />
-                                <span>تعديل الاختبار</span>
-                              </Link>
-                            </DropdownMenu.Item>
-                            <DropdownMenu.Item asChild>
-                              <Link href={`/exams/take/${exam.id}`} className="flex items-center gap-4 px-5 py-4 text-sm font-black text-slate-700 hover:bg-indigo-50 hover:text-indigo-600 rounded-2xl outline-none cursor-pointer transition-colors">
-                                <Eye className="h-5 w-5" />
-                                <span>معاينة الاختبار</span>
-                              </Link>
-                            </DropdownMenu.Item>
-                            <DropdownMenu.Item asChild>
-                              <Link href={`/exams/results/${exam.id}`} className="flex items-center gap-4 px-5 py-4 text-sm font-black text-slate-700 hover:bg-indigo-50 hover:text-indigo-600 rounded-2xl outline-none cursor-pointer transition-colors">
-                                <BarChart2 className="h-5 w-5" />
-                                <span>النتائج والتحليلات</span>
-                              </Link>
-                            </DropdownMenu.Item>
-                            <DropdownMenu.Separator className="h-px bg-slate-100 my-3 mx-3" />
-                            <DropdownMenu.Item className="flex items-center gap-4 px-5 py-4 text-sm font-black text-red-600 hover:bg-red-50 rounded-2xl outline-none cursor-pointer transition-colors">
-                              <Trash2 className="h-5 w-5" />
-                              <span>حذف الاختبار</span>
-                            </DropdownMenu.Item>
-                          </DropdownMenu.Content>
-                        </DropdownMenu.Portal>
-                      </DropdownMenu.Root>
+                      {isTeacherOrAdmin && (
+                        <DropdownMenu.Root>
+                          <DropdownMenu.Trigger asChild>
+                            <motion.button 
+                              whileHover={{ scale: 1.1 }}
+                              whileTap={{ scale: 0.9 }}
+                              className="h-12 w-12 flex items-center justify-center rounded-2xl hover:bg-slate-100 text-slate-400 hover:text-indigo-600 transition-all bg-slate-50 border border-slate-100"
+                            >
+                              <MoreVertical className="h-6 w-6" />
+                            </motion.button>
+                          </DropdownMenu.Trigger>
+                          <DropdownMenu.Portal>
+                            <DropdownMenu.Content className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/60 p-3 min-w-[220px] z-50 animate-in fade-in zoom-in-95 duration-200">
+                              <DropdownMenu.Item asChild>
+                                <Link href={`/exams/builder/${exam.id}`} className="flex items-center gap-4 px-5 py-4 text-sm font-black text-slate-700 hover:bg-indigo-50 hover:text-indigo-600 rounded-2xl outline-none cursor-pointer transition-colors">
+                                  <Edit2 className="h-5 w-5" />
+                                  <span>تعديل الاختبار</span>
+                                </Link>
+                              </DropdownMenu.Item>
+                              <DropdownMenu.Item asChild>
+                                <Link href={`/exams/take/${exam.id}`} className="flex items-center gap-4 px-5 py-4 text-sm font-black text-slate-700 hover:bg-indigo-50 hover:text-indigo-600 rounded-2xl outline-none cursor-pointer transition-colors">
+                                  <Eye className="h-5 w-5" />
+                                  <span>معاينة الاختبار</span>
+                                </Link>
+                              </DropdownMenu.Item>
+                              <DropdownMenu.Item asChild>
+                                <Link href={`/exams/results/${exam.id}`} className="flex items-center gap-4 px-5 py-4 text-sm font-black text-slate-700 hover:bg-indigo-50 hover:text-indigo-600 rounded-2xl outline-none cursor-pointer transition-colors">
+                                  <BarChart2 className="h-5 w-5" />
+                                  <span>النتائج والتحليلات</span>
+                                </Link>
+                              </DropdownMenu.Item>
+                              <DropdownMenu.Separator className="h-px bg-slate-100 my-3 mx-3" />
+                              <DropdownMenu.Item className="flex items-center gap-4 px-5 py-4 text-sm font-black text-red-600 hover:bg-red-50 rounded-2xl outline-none cursor-pointer transition-colors">
+                                <Trash2 className="h-5 w-5" />
+                                <span>حذف الاختبار</span>
+                              </DropdownMenu.Item>
+                            </DropdownMenu.Content>
+                          </DropdownMenu.Portal>
+                        </DropdownMenu.Root>
+                      )}
                     </div>
 
                     <h3 className="text-3xl font-black text-slate-900 mb-4 group-hover:text-indigo-600 transition-colors tracking-tight leading-tight">
@@ -279,40 +314,59 @@ export default function ExamsDashboard() {
                         </div>
                         <span>{exam.duration ? `${exam.duration} د` : 'مفتوح'}</span>
                       </div>
-                      <div className="flex items-center gap-4 text-sm font-black text-slate-600 bg-slate-50/50 p-4 rounded-3xl border border-slate-100/50">
-                        <div className="h-10 w-10 rounded-2xl bg-blue-50 flex items-center justify-center">
-                          <FileText className="h-5 w-5 text-blue-500" />
-                        </div>
-                        <span>{exam._count?.questions} سؤال</span>
-                      </div>
-                      <div className="flex items-center gap-4 text-sm font-black text-slate-600 bg-slate-50/50 p-4 rounded-3xl border border-slate-100/50">
-                        <div className="h-10 w-10 rounded-2xl bg-emerald-50 flex items-center justify-center">
-                          <Users className="h-5 w-5 text-emerald-500" />
-                        </div>
-                        <span>{exam._count?.attempts} محاولة</span>
-                      </div>
+                      {isTeacherOrAdmin && (
+                        <>
+                          <div className="flex items-center gap-4 text-sm font-black text-slate-600 bg-slate-50/50 p-4 rounded-3xl border border-slate-100/50">
+                            <div className="h-10 w-10 rounded-2xl bg-blue-50 flex items-center justify-center">
+                              <FileText className="h-5 w-5 text-blue-500" />
+                            </div>
+                            <span>{exam._count?.questions} سؤال</span>
+                          </div>
+                          <div className="flex items-center gap-4 text-sm font-black text-slate-600 bg-slate-50/50 p-4 rounded-3xl border border-slate-100/50">
+                            <div className="h-10 w-10 rounded-2xl bg-emerald-50 flex items-center justify-center">
+                              <Users className="h-5 w-5 text-emerald-500" />
+                            </div>
+                            <span>{exam._count?.attempts} محاولة</span>
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
 
                   <div className="p-8 bg-slate-50/50 border-t border-slate-100 flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className="h-12 w-12 rounded-2xl bg-white shadow-sm border border-slate-100 flex items-center justify-center">
-                        <TrendingUp className="h-6 w-6 text-indigo-600" />
-                      </div>
-                      <div>
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] leading-none mb-1">متوسط الأداء</p>
-                        <p className="text-xl font-black text-indigo-600 leading-none">{exam.stats?.avg_score}%</p>
-                      </div>
-                    </div>
-                    <Link href={`/exams/results/${exam.id}`}>
-                      <motion.button 
-                        whileHover={{ x: -5 }}
-                        className="h-14 px-8 rounded-2xl bg-white text-sm font-black text-slate-700 shadow-sm border border-slate-200 hover:bg-slate-50 hover:text-indigo-600 transition-all flex items-center gap-3 active:scale-95"
-                      >
-                        <span>النتائج</span>
-                        <ArrowRight className="h-5 w-5 rotate-180" />
-                      </motion.button>
-                    </Link>
+                    {isTeacherOrAdmin ? (
+                      <>
+                        <div className="flex items-center gap-4">
+                          <div className="h-12 w-12 rounded-2xl bg-white shadow-sm border border-slate-100 flex items-center justify-center">
+                            <TrendingUp className="h-6 w-6 text-indigo-600" />
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] leading-none mb-1">متوسط الأداء</p>
+                            <p className="text-xl font-black text-indigo-600 leading-none">{exam.stats?.avg_score}%</p>
+                          </div>
+                        </div>
+                        <Link href={`/exams/results/${exam.id}`}>
+                          <motion.button 
+                            whileHover={{ x: -5 }}
+                            className="h-14 px-8 rounded-2xl bg-white text-sm font-black text-slate-700 shadow-sm border border-slate-200 hover:bg-slate-50 hover:text-indigo-600 transition-all flex items-center gap-3 active:scale-95"
+                          >
+                            <span>النتائج</span>
+                            <ArrowRight className="h-5 w-5 rotate-180" />
+                          </motion.button>
+                        </Link>
+                      </>
+                    ) : (
+                      <Link href={`/exams/take/${exam.id}`} className="w-full">
+                        <motion.button 
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                          className="w-full h-14 rounded-2xl bg-indigo-600 text-white text-sm font-black shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all flex items-center justify-center gap-3"
+                        >
+                          <Play className="h-5 w-5" />
+                          <span>بدء الاختبار</span>
+                        </motion.button>
+                      </Link>
+                    )}
                   </div>
                 </motion.div>
               ))}
@@ -327,17 +381,21 @@ export default function ExamsDashboard() {
                 <FileText className="h-16 w-16 text-slate-200" />
               </div>
               <h3 className="text-3xl font-black text-slate-900 tracking-tight">لا توجد اختبارات حالياً</h3>
-              <p className="text-slate-500 mb-10 text-lg font-medium">ابدأ بإنشاء أول اختبار لك لتقييم مستوى طلابك.</p>
-              <Link href="/exams/builder/new">
-                <motion.button 
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  className="inline-flex items-center gap-4 bg-indigo-600 text-white px-10 py-5 rounded-3xl hover:bg-indigo-700 transition-all font-black shadow-2xl shadow-indigo-100"
-                >
-                  <Plus className="h-6 w-6" />
-                  <span>إنشاء اختبار جديد</span>
-                </motion.button>
-              </Link>
+              <p className="text-slate-500 mb-10 text-lg font-medium">
+                {isTeacherOrAdmin ? 'ابدأ بإنشاء أول اختبار لك لتقييم مستوى طلابك.' : 'لم يتم نشر أي اختبارات بعد.'}
+              </p>
+              {isTeacherOrAdmin && (
+                <Link href="/exams/builder/new">
+                  <motion.button 
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    className="inline-flex items-center gap-4 bg-indigo-600 text-white px-10 py-5 rounded-3xl hover:bg-indigo-700 transition-all font-black shadow-2xl shadow-indigo-100"
+                  >
+                    <Plus className="h-6 w-6" />
+                    <span>إنشاء اختبار جديد</span>
+                  </motion.button>
+                </Link>
+              )}
             </motion.div>
           )}
         </div>

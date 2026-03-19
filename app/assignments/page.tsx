@@ -45,6 +45,9 @@ export default function AssignmentsPage() {
   const fetchAssignments = useCallback(async () => {
     setLoading(true);
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
       const { data, error } = await supabase
         .from('assignments')
         .select(`
@@ -60,6 +63,7 @@ export default function AssignmentsPage() {
           sections (name, classes (name)),
           teachers (users (full_name))
         `)
+        .eq('teacher_id', user.id)
         .order('due_date', { ascending: true });
 
       if (error) throw error;
@@ -80,9 +84,18 @@ export default function AssignmentsPage() {
         supabase.from('teachers').select('id, users(full_name)')
       ]);
 
-      if (subjectsRes.data) setSubjects(subjectsRes.data);
-      if (sectionsRes.data) setSections(sectionsRes.data);
-      if (teachersRes.data) setTeachers(teachersRes.data);
+      if (subjectsRes.data) {
+        console.log('Fetched subjects:', subjectsRes.data);
+        setSubjects(subjectsRes.data);
+      }
+      if (sectionsRes.data) {
+        console.log('Fetched sections:', sectionsRes.data);
+        setSections(sectionsRes.data);
+      }
+      if (teachersRes.data) {
+        console.log('Fetched teachers:', teachersRes.data);
+        setTeachers(teachersRes.data);
+      }
     } catch (error) {
       console.error('Error fetching form data:', error);
     }
@@ -175,7 +188,7 @@ export default function AssignmentsPage() {
     }
   };
 
-  const openAddModal = () => {
+  const openAddModal = async () => {
     // Set default due date to tomorrow at 8:00 AM
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
@@ -186,7 +199,9 @@ export default function AssignmentsPage() {
       .toISOString()
       .slice(0, 16);
 
-    setCurrentAssignment({ due_date: formattedDate });
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    setCurrentAssignment({ due_date: formattedDate, teacher_id: user?.id });
     setIsModalOpen(true);
   };
 

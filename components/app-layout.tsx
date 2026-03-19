@@ -77,21 +77,32 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
         // Role-based routing
         if (session && !isPublicPage) {
-          if (role === 'student' && !pathname.startsWith('/dashboard/student')) {
-            router.push('/dashboard/student');
-          } else if (role === 'teacher' && !pathname.startsWith('/dashboard/teacher')) {
-            router.push('/dashboard/teacher');
-          } else if (role === 'parent' && !pathname.startsWith('/dashboard/parent')) {
-            router.push('/dashboard/parent');
-          } else if ((role === 'admin' || role === 'management') && pathname.startsWith('/dashboard/')) {
-            // Admins don't need to be in /dashboard/admin, they use the root pages
-            if (pathname === '/dashboard/admin') {
+          const isRoot = pathname === '/';
+          const isStudentDashboard = pathname.startsWith('/dashboard/student');
+          const isTeacherDashboard = pathname.startsWith('/dashboard/teacher');
+          const isParentDashboard = pathname.startsWith('/dashboard/parent');
+          const isAdminDashboard = pathname.startsWith('/dashboard/admin');
+          const isDashboardRoute = pathname.startsWith('/dashboard');
+          const isAdminByEmail = session?.user?.email === 'ghazallsyria@gmail.com';
+
+          if (role === 'student') {
+            if (isRoot || (isDashboardRoute && !isStudentDashboard)) {
+              router.push('/dashboard/student');
+            }
+          } else if (role === 'teacher') {
+            if (isRoot || (isDashboardRoute && !isTeacherDashboard)) {
+              router.push('/dashboard/teacher');
+            }
+          } else if (role === 'parent') {
+            if (isRoot || (isDashboardRoute && !isParentDashboard)) {
+              router.push('/dashboard/parent');
+            }
+          } else if (role === 'admin' || role === 'management' || isAdminByEmail) {
+            if (isAdminDashboard) {
               router.push('/');
             }
           }
         }
-
-        const isAdminByEmail = session?.user?.email === 'ghazallsyria@gmail.com';
 
         // Check platform settings
         try {
@@ -190,28 +201,28 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // If user is not admin/management, don't show the admin sidebar
-  const showAdminSidebar = userRole === 'admin' || userRole === 'management' || isAdminByEmail;
+  // We will always show the sidebar, but its content will depend on the userRole
+  const showSidebar = !isPublicPage;
 
   return (
     <div className="flex h-full">
       {/* Mobile sidebar backdrop */}
-      {isSidebarOpen && showAdminSidebar && (
+      {isSidebarOpen && showSidebar && (
         <div 
           className="fixed inset-0 z-40 bg-slate-900/80 lg:hidden"
           onClick={() => setIsSidebarOpen(false)}
         />
       )}
       
-      {showAdminSidebar && (
+      {showSidebar && (
         <div className={`fixed inset-y-0 right-0 z-50 w-64 transform transition-transform duration-300 ease-in-out lg:static lg:translate-x-0 print:hidden ${isSidebarOpen ? 'translate-x-0' : 'translate-x-full'}`}>
-          <Sidebar onClose={() => setIsSidebarOpen(false)} />
+          <Sidebar onClose={() => setIsSidebarOpen(false)} userRole={userRole || 'student'} />
         </div>
       )}
       
       <div className="flex flex-1 flex-col overflow-hidden print:overflow-visible w-full">
         <div className="print:hidden">
-          <Header onMenuClick={() => setIsSidebarOpen(true)} showMenuButton={showAdminSidebar} />
+          <Header onMenuClick={() => setIsSidebarOpen(true)} showMenuButton={showSidebar} />
         </div>
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 print:p-0 print:overflow-visible flex flex-col">
           <div className="flex-1">

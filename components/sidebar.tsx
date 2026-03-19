@@ -43,8 +43,37 @@ const navigation = [
   { name: 'الإعدادات', href: '/settings', icon: Settings },
 ];
 
-export function Sidebar({ onClose }: { onClose?: () => void }) {
+export function Sidebar({ onClose, userRole = 'admin' }: { onClose?: () => void, userRole?: string }) {
   const pathname = usePathname();
+
+  // Filter navigation based on user role
+  const filteredNavigation = navigation.filter(item => {
+    if (userRole === 'admin' || userRole === 'management') return true;
+    
+    if (userRole === 'teacher') {
+      return ['لوحة التحكم', 'الفصول', 'الحضور والغياب', 'الاختبارات والدرجات', 'الجدول الدراسي', 'الواجبات', 'الرسائل', 'الإعلانات', 'الإعدادات'].includes(item.name);
+    }
+    
+    if (userRole === 'student') {
+      return ['لوحة التحكم', 'الحضور والغياب', 'الاختبارات والدرجات', 'الجدول الدراسي', 'الواجبات', 'الرسائل', 'الإعلانات', 'الإعدادات'].includes(item.name);
+    }
+    
+    if (userRole === 'parent') {
+      return ['لوحة التحكم', 'الحضور والغياب', 'الاختبارات والدرجات', 'الجدول الدراسي', 'الواجبات', 'الرسائل', 'الإعلانات', 'الإعدادات'].includes(item.name);
+    }
+    
+    return false;
+  });
+
+  // Map role to display name
+  const roleDisplayNames: Record<string, string> = {
+    'admin': 'المدير العام',
+    'management': 'الإدارة',
+    'teacher': 'معلم',
+    'student': 'طالب',
+    'parent': 'ولي أمر'
+  };
+  const roleDisplayName = roleDisplayNames[userRole] || 'مستخدم';
 
   return (
     <div className="flex h-full w-72 flex-col bg-slate-900 text-slate-300 border-l border-slate-800/50 shadow-2xl relative overflow-hidden">
@@ -74,12 +103,20 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
 
       <div className="flex flex-1 flex-col overflow-y-auto py-8 px-4 custom-scrollbar relative z-10">
         <nav className="space-y-1.5">
-          {navigation.map((item) => {
-            const isActive = pathname === item.href || (item.href !== '/' && pathname?.startsWith(item.href));
+          {filteredNavigation.map((item) => {
+            // Special handling for dashboard route based on role
+            let itemHref = item.href;
+            if (item.name === 'لوحة التحكم') {
+              if (userRole === 'student') itemHref = '/dashboard/student';
+              else if (userRole === 'teacher') itemHref = '/dashboard/teacher';
+              else if (userRole === 'parent') itemHref = '/dashboard/parent';
+            }
+
+            const isActive = pathname === itemHref || (itemHref !== '/' && pathname?.startsWith(itemHref));
             return (
               <Link
                 key={item.name}
-                href={item.href}
+                href={itemHref}
                 onClick={onClose}
                 className={cn(
                   "flex items-center px-4 py-3.5 rounded-2xl text-sm font-medium transition-all duration-200 group relative overflow-hidden",
@@ -115,13 +152,13 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
         <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-4 flex items-center gap-4 border border-white/5 hover:bg-white/10 transition-colors cursor-pointer group">
           <div className="relative">
             <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white font-black text-sm shadow-lg ring-2 ring-white/10">
-              AD
+              {roleDisplayName.substring(0, 2)}
             </div>
             <div className="absolute -bottom-1 -left-1 w-4 h-4 bg-emerald-500 border-2 border-slate-900 rounded-full shadow-sm" />
           </div>
           <div className="flex flex-col overflow-hidden">
-            <span className="text-sm font-bold text-white truncate group-hover:text-indigo-400 transition-colors">المدير العام</span>
-            <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">لوحة التحكم المركزية</span>
+            <span className="text-sm font-bold text-white truncate group-hover:text-indigo-400 transition-colors">{roleDisplayName}</span>
+            <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">لوحة التحكم</span>
           </div>
         </div>
       </div>

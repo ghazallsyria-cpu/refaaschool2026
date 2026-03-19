@@ -8,19 +8,28 @@ const supabase = createClient(
 
 export async function POST(req: Request) {
   try {
-    const { sectionId, subject, content, senderId, idempotencyKey } = await req.json();
+    const body = await req.json();
+    console.log('API Request Body:', body);
+    const { sectionId, subject, content, senderId } = body;
 
-    // 1. Check if this request has already been processed (Idempotency)
-    // We can use a simple check or a dedicated table if needed, 
-    // but for now, we'll rely on the transaction logic.
-    
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      console.error('Missing environment variables');
+      return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
+    }
+
     // 2. Fetch students in the section
+    console.log('Fetching students for section:', sectionId);
     const { data: students, error: studentsError } = await supabase
       .from('students')
       .select('id')
       .eq('section_id', sectionId);
 
-    if (studentsError) throw studentsError;
+    if (studentsError) {
+      console.error('Supabase students error:', studentsError);
+      throw studentsError;
+    }
+    
+    console.log('Students found:', students?.length);
     if (!students || students.length === 0) {
       return NextResponse.json({ error: 'لا يوجد طلاب في هذا الصف' }, { status: 400 });
     }
@@ -35,15 +44,20 @@ export async function POST(req: Request) {
     }));
 
     // 4. Insert messages
+    console.log('Inserting messages:', messagesToInsert.length);
     const { error: insertError } = await supabase
       .from('messages')
       .insert(messagesToInsert);
 
-    if (insertError) throw insertError;
+    if (insertError) {
+      console.error('Supabase insert error:', insertError);
+      throw insertError;
+    }
 
+    console.log('Messages inserted successfully');
     return NextResponse.json({ success: true });
   } catch (error: any) {
     console.error('Error in send-group API:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: error.message || 'Unknown error' }, { status: 500 });
   }
 }

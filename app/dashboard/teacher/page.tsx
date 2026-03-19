@@ -123,13 +123,6 @@ export default function TeacherDashboard() {
         </div>
         <div className="flex flex-wrap gap-3">
           <Link 
-            href="/dashboard/teacher/schedule"
-            className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50 transition-all"
-          >
-            <Calendar className="h-4 w-4 text-indigo-600" />
-            الجدول الأسبوعي الكامل
-          </Link>
-          <Link 
             href="/attendance"
             className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-slate-700 shadow-sm ring-1 ring-slate-200 hover:bg-slate-50 transition-all"
           >

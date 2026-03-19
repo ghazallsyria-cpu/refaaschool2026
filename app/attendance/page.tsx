@@ -18,23 +18,15 @@ export default function AttendancePage() {
 
   const fetchSections = useCallback(async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
       const { data, error } = await supabase
-        .from('teacher_sections')
-        .select('section:sections(id, name, classes(name))')
-        .eq('teacher_id', user.id);
-      
-      console.log('Fetched teacher_sections:', data);
+        .from('sections')
+        .select('id, name, classes(name)')
+        .order('name');
       
       if (error) throw error;
-      
-      const sectionsData = (data?.map(ts => ts.section) || []) as any[];
-      setSections(sectionsData);
-      
-      if (sectionsData && sectionsData.length > 0) {
-        setSelectedSection(sectionsData[0].id);
+      setSections(data || []);
+      if (data && data.length > 0) {
+        setSelectedSection(data[0].id);
       }
     } catch (error) {
       console.error('Error fetching sections:', error);

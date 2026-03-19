@@ -43,18 +43,9 @@ export default function SettingsPage() {
       if (user) {
         const { data: userData } = await supabase
           .from('users')
-          .select('full_name, email, phone, role')
+          .select('role')
           .eq('id', user.id)
           .single();
-        
-        if (userData) {
-          setProfileSettings({
-            full_name: userData.full_name || '',
-            email: userData.email || '',
-            phone: userData.phone || '',
-            role: userData.role || ''
-          });
-        }
         
         if (userData?.role === 'admin' || userData?.role === 'management' || user.email === 'ghazallsyria@gmail.com') {
           setIsAdmin(true);
@@ -149,21 +140,9 @@ export default function SettingsPage() {
             .insert([updateData]);
           if (error) throw error;
         }
-      } else if (activeTab === 'profile') {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          const { error } = await supabase
-            .from('users')
-            .update({
-              full_name: profileSettings.full_name,
-              email: profileSettings.email,
-              phone: profileSettings.phone
-            })
-            .eq('id', user.id);
-          if (error) throw error;
-        }
       } else {
-        // For other tabs, simulate save
+        // In a real app, this would save to the database via Supabase
+        // For now, we simulate a successful save with a slight delay
         await new Promise(resolve => setTimeout(resolve, 800));
       }
       

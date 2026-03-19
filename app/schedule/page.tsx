@@ -32,12 +32,10 @@ export default function SchedulePage() {
   const fetchFilters = useCallback(async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      let currentUserRole = null;
       if (user) {
         setUserEmail(user.email || null);
         const { data: profile } = await supabase.from('users').select('role').eq('id', user.id).single();
-        currentUserRole = profile?.role || null;
-        setUserRole(currentUserRole);
+        setUserRole(profile?.role || null);
         
         const isSystemAdmin = profile?.role === 'admin' || profile?.role === 'management' || user.email === 'ghazallsyria@gmail.com';
         setIsAdmin(isSystemAdmin);
@@ -57,16 +55,7 @@ export default function SchedulePage() {
       if (subjectsRes.data) setSubjects(subjectsRes.data);
       if (assignmentsRes.data) setAssignments(assignmentsRes.data);
 
-      if (currentUserRole === 'teacher' && user) {
-        const teacherRecord = teachersRes.data?.find(t => t.id === user.id);
-        if (teacherRecord) {
-          setSelectedId(teacherRecord.id);
-        } else if (teachersRes.data?.[0]) {
-          setSelectedId(teachersRes.data[0].id);
-        }
-      } else if (teachersRes.data?.[0]) {
-        setSelectedId(teachersRes.data[0].id);
-      }
+      if (teachersRes.data?.[0]) setSelectedId(teachersRes.data[0].id);
     } catch (err) {
       console.error(err);
     }
@@ -267,7 +256,6 @@ export default function SchedulePage() {
 
       const { data, error } = await query;
       if (error) throw error;
-      console.log('Fetched schedule data:', data);
       setScheduleData(data || []);
     } catch (err: any) {
       console.error('Error fetching schedule:', err);

@@ -40,9 +40,6 @@ export default function ExamsDashboard() {
   const fetchExams = useCallback(async () => {
     try {
       setLoading(true);
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
       const { data, error } = await supabase
         .from('exams')
         .select(`
@@ -50,7 +47,6 @@ export default function ExamsDashboard() {
           subject:subjects(name),
           section:sections(name)
         `)
-        .eq('teacher_id', user.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;

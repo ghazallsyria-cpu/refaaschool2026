@@ -158,9 +158,8 @@ export default function MessagesPage() {
   useEffect(() => {
     if (activeTab === 'messages') {
       fetchMessages();
-    } else {
-      fetchAnnouncements();
     }
+    // Removed fetchAnnouncements() as it is not defined in this component
   }, [activeTab]);
 
   const fetchMessages = async () => {

@@ -131,9 +131,9 @@ export default function AssignmentsPage() {
       const { data: userData } = await supabase.from('users').select('role').eq('id', user.id).single();
       const isAdmin = userData?.role === 'admin' || userData?.role === 'management';
 
-      let subjectsData = [];
-      let sectionsData = [];
-      let teachersData = [];
+      let subjectsData: any[] = [];
+      let sectionsData: any[] = [];
+      let teachersData: any[] = [];
 
       if (isAdmin) {
         const [subjectsRes, sectionsRes, teachersRes] = await Promise.all([

@@ -123,8 +123,8 @@ export default function QuizBuilder() {
         }
       }
 
-      let subjectsData = [];
-      let sectionsData = [];
+      let subjectsData: any[] = [];
+      let sectionsData: any[] = [];
 
       if (!user) return;
 

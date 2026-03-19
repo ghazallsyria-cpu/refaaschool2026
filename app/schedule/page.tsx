@@ -20,6 +20,8 @@ export default function SchedulePage() {
   const [selectedSlot, setSelectedSlot] = useState<{day: number, period: number} | null>(null);
   const [formData, setFormData] = useState({ teacher_id: '', section_id: '', subject_id: '' });
   const [assignments, setAssignments] = useState<any[]>([]);
+  const [copiedLesson, setCopiedLesson] = useState<{subject_id: string, section_id: string, teacher_id: string} | null>(null);
+  const [showAllSchedules, setShowAllSchedules] = useState(true);
 
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
@@ -168,10 +170,13 @@ export default function SchedulePage() {
         subjects(id, name)
       `);
 
-      if (viewType === 'teacher') {
-        query = query.eq('teacher_id', selectedId);
-      } else {
-        query = query.eq('section_id', selectedId);
+      // If admin and showAllSchedules is true, fetch all to show occupancy
+      if (!(isAdmin && showAllSchedules)) {
+        if (viewType === 'teacher') {
+          query = query.eq('teacher_id', selectedId);
+        } else {
+          query = query.eq('section_id', selectedId);
+        }
       }
 
       const { data, error } = await query;
@@ -183,12 +188,12 @@ export default function SchedulePage() {
     } finally {
       setLoading(false);
     }
-  }, [selectedId, viewType]);
+  }, [selectedId, viewType, isAdmin, showAllSchedules]);
 
   useEffect(() => {
-    if (!selectedId) return;
+    if (!selectedId && !showAllSchedules) return;
     fetchSchedule();
-  }, [selectedId, viewType, fetchSchedule]);
+  }, [selectedId, viewType, showAllSchedules, fetchSchedule]);
 
   const handlePrint = () => {
     window.print();
@@ -203,6 +208,48 @@ export default function SchedulePage() {
 
   return (
     <div className="space-y-6 print:m-0 print:p-0">
+      <style jsx global>{`
+        @media print {
+          @page {
+            size: landscape;
+            margin: 1cm;
+          }
+          body {
+            background: white !important;
+            color: black !important;
+            -webkit-print-color-adjust: exact;
+          }
+          .no-print {
+            display: none !important;
+          }
+          .print-only {
+            display: block !important;
+          }
+          .print-table {
+            width: 100% !important;
+            border-collapse: collapse !important;
+            table-layout: fixed !important;
+          }
+          .print-table th, .print-table td {
+            border: 1px solid black !important;
+            padding: 4px !important;
+            text-align: center !important;
+            vertical-align: middle !important;
+            word-wrap: break-word !important;
+          }
+          .print-table th {
+            background-color: #f1f5f9 !important;
+            font-weight: bold !important;
+          }
+          .print-others-text {
+            font-size: 8px !important;
+            color: #444 !important;
+            border-top: 1px dashed #ccc !important;
+            margin-top: 2px !important;
+            display: block !important;
+          }
+        }
+      `}</style>
       {/* Debug Info */}
       {!isAdmin && (
         <div className="bg-yellow-100 p-4 rounded-lg text-sm text-yellow-800">
@@ -269,6 +316,7 @@ export default function SchedulePage() {
               onChange={(e) => setSelectedId(e.target.value)}
               className="block w-full rounded-md border-0 py-2 pl-3 pr-10 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-indigo-600 sm:text-sm sm:leading-6"
             >
+              <option value="">-- اختر {viewType === 'teacher' ? 'المعلم' : 'الفصل'} --</option>
               {viewType === 'teacher' ? (
                 teachers.map(t => (
                   <option key={t.id} value={t.id}>{t.users?.full_name || 'معلم غير معروف'}</option>
@@ -280,6 +328,19 @@ export default function SchedulePage() {
               )}
             </select>
           </div>
+
+          {isAdmin && (
+            <div className="flex items-center gap-2">
+              <input 
+                type="checkbox" 
+                id="showAll" 
+                checked={showAllSchedules} 
+                onChange={(e) => setShowAllSchedules(e.target.checked)}
+                className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-600"
+              />
+              <label htmlFor="showAll" className="text-sm font-medium text-slate-700">عرض جميع الحصص (للمدير)</label>
+            </div>
+          )}
         </div>
       </div>
 
@@ -372,16 +433,16 @@ export default function SchedulePage() {
         </p>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm ring-1 ring-slate-200 overflow-hidden print:shadow-none print:ring-2 print:ring-black">
-        <div className="overflow-x-auto">
-          <div className="min-w-[800px] p-6 print:p-0">
-            <div className="grid grid-cols-6 gap-3 print:gap-1">
+      <div className="bg-white rounded-xl shadow-sm ring-1 ring-slate-200 overflow-hidden print:shadow-none print:ring-0 print:border-0">
+        <div className="overflow-x-auto print:hidden">
+          <div className="min-w-[800px] p-6">
+            <div className="grid grid-cols-6 gap-3">
               {/* Header Row */}
-              <div className="font-bold text-center p-4 bg-slate-100 rounded-lg flex items-center justify-center print:bg-slate-200 print:border print:border-black">
+              <div className="font-bold text-center p-4 bg-slate-100 rounded-lg flex items-center justify-center">
                 اليوم / الحصة
               </div>
               {PERIODS.map(p => (
-                <div key={p} className="font-bold text-center p-4 bg-slate-100 rounded-lg print:bg-slate-200 print:border print:border-black">
+                <div key={p} className="font-bold text-center p-4 bg-slate-100 rounded-lg">
                   الحصة {p}
                 </div>
               ))}
@@ -394,19 +455,30 @@ export default function SchedulePage() {
               ) : (
                 DAYS.map((day, dayIndex) => (
                   <React.Fragment key={day}>
-                    <div className="font-bold text-center p-4 bg-slate-50 rounded-lg flex items-center justify-center print:border print:border-black">
+                    <div className="font-bold text-center p-4 bg-slate-50 rounded-lg flex items-center justify-center">
                       {day}
                     </div>
                     {PERIODS.map(period => {
-                      const slot = scheduleData.find(s => s.day_of_week === dayIndex && s.period === period);
+                      const slot = scheduleData.find(s => 
+                        s.day_of_week === dayIndex && 
+                        s.period === period && 
+                        (viewType === 'teacher' ? s.teachers?.id === selectedId : s.sections?.id === selectedId)
+                      );
+
+                      const others = (isAdmin && showAllSchedules) ? scheduleData.filter(s => 
+                        s.day_of_week === dayIndex && 
+                        s.period === period && 
+                        (viewType === 'teacher' ? s.teachers?.id !== selectedId : s.sections?.id !== selectedId)
+                      ) : [];
+
                       return (
-                        <div key={`${day}-${period}`} className={`p-3 border border-slate-200 rounded-lg bg-white min-h-[100px] flex flex-col items-center justify-center text-center print:border-black print:min-h-[80px] ${isAdmin ? 'cursor-pointer hover:bg-slate-50' : ''} ${slot?.teachers?.zoom_link ? 'cursor-pointer hover:bg-indigo-50' : ''}`}
+                        <div key={`${day}-${period}`} className={`p-3 border border-slate-200 rounded-lg bg-white min-h-[100px] flex flex-col items-center justify-center text-center ${isAdmin ? 'cursor-pointer hover:bg-slate-50' : ''} ${slot?.teachers?.zoom_link ? 'cursor-pointer hover:bg-indigo-50' : ''}`}
                           onClick={() => {
                             if (isAdmin) {
                               setFormData({ 
-                                teacher_id: viewType === 'teacher' ? selectedId : '', 
-                                section_id: viewType === 'section' ? selectedId : '', 
-                                subject_id: '' 
+                                teacher_id: viewType === 'teacher' ? selectedId : (copiedLesson?.teacher_id || ''), 
+                                section_id: viewType === 'section' ? selectedId : (copiedLesson?.section_id || ''), 
+                                subject_id: copiedLesson?.subject_id || '' 
                               });
                               setSelectedSlot({day: dayIndex, period: period});
                               setIsModalOpen(true);
@@ -417,13 +489,13 @@ export default function SchedulePage() {
                         >
                           {slot ? (
                             <>
-                              <span className="font-bold text-indigo-700 print:text-black">{slot.subjects?.name}</span>
+                              <span className="font-bold text-indigo-700">{slot.subjects?.name}</span>
                               {viewType === 'teacher' ? (
-                                <span className="text-sm text-slate-600 mt-1 print:text-black">
+                                <span className="text-sm text-slate-600 mt-1">
                                   {slot.sections?.classes?.name} - {slot.sections?.name}
                                 </span>
                               ) : (
-                                <span className="text-sm text-slate-600 mt-1 print:text-black">
+                                <span className="text-sm text-slate-600 mt-1">
                                   {slot.teachers?.users?.full_name}
                                 </span>
                               )}
@@ -431,11 +503,37 @@ export default function SchedulePage() {
                                 <span className="text-xs text-indigo-500 mt-1">رابط زوم</span>
                               )}
                               {isAdmin && (
-                                <button className="mt-2 text-red-500 text-xs" onClick={(e) => { e.stopPropagation(); handleDeleteSchedule(slot.id); }}>حذف</button>
+                                <div className="mt-2 flex gap-2">
+                                  <button 
+                                    className="text-indigo-500 text-xs hover:underline" 
+                                    onClick={(e) => { 
+                                      e.stopPropagation(); 
+                                      setCopiedLesson({
+                                        subject_id: slot.subjects?.id,
+                                        section_id: slot.sections?.id,
+                                        teacher_id: slot.teachers?.id
+                                      });
+                                      alert('تم نسخ تفاصيل الحصة');
+                                    }}
+                                  >
+                                    نسخ
+                                  </button>
+                                  <button className="text-red-500 text-xs hover:underline" onClick={(e) => { e.stopPropagation(); handleDeleteSchedule(slot.id); }}>حذف</button>
+                                </div>
                               )}
                             </>
+                          ) : others.length > 0 ? (
+                            <div className="flex flex-col items-center opacity-40">
+                              <span className="text-[10px] font-bold text-slate-400 mb-1">حصص أخرى:</span>
+                              {others.slice(0, 2).map(o => (
+                                <div key={o.id} className="text-[9px] text-slate-500 leading-tight">
+                                  {viewType === 'teacher' ? o.sections?.name : o.teachers?.users?.full_name}
+                                </div>
+                              ))}
+                              {others.length > 2 && <span className="text-[8px] text-slate-400">+{others.length - 2} أخرى</span>}
+                            </div>
                           ) : (
-                            <span className="text-slate-300 text-sm print:text-transparent">-</span>
+                            <span className="text-slate-300 text-sm">-</span>
                           )}
                         </div>
                       );
@@ -445,6 +543,63 @@ export default function SchedulePage() {
               )}
             </div>
           </div>
+        </div>
+
+        {/* Vertical Table for Print */}
+        <div className="hidden print:block p-4">
+          <table className="print-table">
+            <thead>
+              <tr>
+                <th className="w-24">الحصة / اليوم</th>
+                {DAYS.map(day => <th key={day}>{day}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {PERIODS.map(period => (
+                <tr key={period}>
+                  <td className="font-bold bg-slate-50">الحصة {period}</td>
+                  {DAYS.map((day, dayIndex) => {
+                    const slot = scheduleData.find(s => 
+                      s.day_of_week === dayIndex && 
+                      s.period === period && 
+                      (viewType === 'teacher' ? s.teachers?.id === selectedId : s.sections?.id === selectedId)
+                    );
+
+                    const others = (isAdmin && showAllSchedules) ? scheduleData.filter(s => 
+                      s.day_of_week === dayIndex && 
+                      s.period === period && 
+                      (viewType === 'teacher' ? s.teachers?.id !== selectedId : s.sections?.id !== selectedId)
+                    ) : [];
+
+                    return (
+                      <td key={day} className="h-24">
+                        {slot ? (
+                          <div className="flex flex-col items-center">
+                            <div className="font-bold">{slot.subjects?.name}</div>
+                            <div className="text-[10px]">
+                              {viewType === 'teacher' 
+                                ? `${slot.sections?.classes?.name} - ${slot.sections?.name}`
+                                : slot.teachers?.users?.full_name}
+                            </div>
+                          </div>
+                        ) : others.length > 0 ? (
+                          <div className="flex flex-col items-center">
+                            <span className="text-[8px] text-slate-400">مشغول:</span>
+                            {others.slice(0, 3).map(o => (
+                              <div key={o.id} className="text-[8px] leading-tight">
+                                {viewType === 'teacher' ? o.sections?.name : o.teachers?.users?.full_name}
+                              </div>
+                            ))}
+                            {others.length > 3 && <span className="text-[7px]">+{others.length - 3}</span>}
+                          </div>
+                        ) : null}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>

@@ -6,9 +6,17 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- 2. Custom Types
-CREATE TYPE user_role AS ENUM ('admin', 'management', 'teacher', 'student', 'parent', 'all');
-CREATE TYPE attendance_status AS ENUM ('present', 'absent', 'late', 'excused');
-CREATE TYPE question_type AS ENUM ('multiple_choice', 'true_false', 'multi_select', 'essay', 'fill_in_blank', 'matching', 'ordering');
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'user_role') THEN
+        CREATE TYPE user_role AS ENUM ('admin', 'management', 'teacher', 'student', 'parent', 'all');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'attendance_status') THEN
+        CREATE TYPE attendance_status AS ENUM ('present', 'absent', 'late', 'excused');
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'question_type') THEN
+        CREATE TYPE question_type AS ENUM ('multiple_choice', 'true_false', 'multi_select', 'essay', 'fill_in_blank', 'matching', 'ordering');
+    END IF;
+END $$;
 
 -- 3. Tables Definition
 

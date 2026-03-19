@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Plus, Search, Edit2, Trash2, FileText, Calendar, Clock, Link as LinkIcon, X, BookOpen, Users, User, AlertCircle } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
+import Link from 'next/link';
 
 type Assignment = {
   id: string;
@@ -23,6 +24,7 @@ export default function AssignmentsPage() {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [userRole, setUserRole] = useState<string | null>(null);
   
   // Form Data
   const [subjects, setSubjects] = useState<any[]>([]);
@@ -48,7 +50,17 @@ export default function AssignmentsPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data, error } = await supabase
+      // Fetch user role
+      const { data: userData } = await supabase
+        .from('users')
+        .select('role')
+        .eq('id', user.id)
+        .single();
+      
+      const role = userData?.role || 'student';
+      setUserRole(role);
+
+      let query = supabase
         .from('assignments')
         .select(`
           id,
@@ -63,8 +75,43 @@ export default function AssignmentsPage() {
           sections (name, classes (name)),
           teachers (users (full_name))
         `)
-        .eq('teacher_id', user.id)
         .order('due_date', { ascending: true });
+
+      if (role === 'teacher') {
+        query = query.eq('teacher_id', user.id);
+      } else if (role === 'student') {
+        // Get student's section_id
+        const { data: studentData } = await supabase
+          .from('students')
+          .select('section_id')
+          .eq('id', user.id)
+          .single();
+        
+        if (studentData?.section_id) {
+          query = query.eq('section_id', studentData.section_id);
+        } else {
+          // If student has no section, return empty
+          setAssignments([]);
+          return;
+        }
+      } else if (role === 'parent') {
+        // Get parent's children's section_ids
+        const { data: childrenData } = await supabase
+          .from('students')
+          .select('section_id')
+          .eq('parent_id', user.id);
+        
+        const sectionIds = childrenData?.map(c => c.section_id).filter(Boolean) || [];
+        if (sectionIds.length > 0) {
+          query = query.in('section_id', sectionIds);
+        } else {
+          setAssignments([]);
+          return;
+        }
+      }
+      // admins and management see all
+
+      const { data, error } = await query;
 
       if (error) throw error;
       setAssignments((data as unknown) as Assignment[] || []);
@@ -252,13 +299,15 @@ export default function AssignmentsPage() {
           <h1 className="text-4xl font-black text-slate-900 tracking-tight">الواجبات المدرسية</h1>
           <p className="text-lg text-slate-500 font-medium">إدارة الواجبات والمهام المسندة للطلاب</p>
         </div>
-        <button 
-          onClick={openAddModal}
-          className="inline-flex items-center justify-center gap-3 rounded-2xl bg-indigo-600 px-8 py-4 text-sm font-black text-white shadow-xl shadow-indigo-200 hover:bg-indigo-700 hover:shadow-indigo-300 transition-all active:scale-95 self-start md:self-end"
-        >
-          <Plus className="h-5 w-5" />
-          إضافة واجب جديد
-        </button>
+        {(userRole === 'teacher' || userRole === 'admin' || userRole === 'management') && (
+          <button 
+            onClick={openAddModal}
+            className="inline-flex items-center justify-center gap-3 rounded-2xl bg-indigo-600 px-8 py-4 text-sm font-black text-white shadow-xl shadow-indigo-200 hover:bg-indigo-700 hover:shadow-indigo-300 transition-all active:scale-95 self-start md:self-end"
+          >
+            <Plus className="h-5 w-5" />
+            إضافة واجب جديد
+          </button>
+        )}
       </div>
 
       <div className="glass-card p-6 rounded-4xl shadow-2xl shadow-slate-200/50 border border-white/60">
@@ -302,22 +351,24 @@ export default function AssignmentsPage() {
                     <span className="inline-flex items-center rounded-2xl bg-indigo-50 px-4 py-1.5 text-xs font-black text-indigo-700 uppercase tracking-widest border border-indigo-100 shadow-sm">
                       {assignment.subjects?.name}
                     </span>
-                    <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-all translate-x-4 group-hover:translate-x-0">
-                      <button 
-                        onClick={() => openEditModal(assignment)}
-                        className="h-10 w-10 flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all shadow-sm bg-white"
-                        title="تعديل الواجب"
-                      >
-                        <Edit2 className="h-5 w-5" />
-                      </button>
-                      <button 
-                        onClick={() => setAssignmentToDelete(assignment.id)}
-                        className="h-10 w-10 flex items-center justify-center text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all shadow-sm bg-white"
-                        title="حذف الواجب"
-                      >
-                        <Trash2 className="h-5 w-5" />
-                      </button>
-                    </div>
+                    {(userRole === 'teacher' || userRole === 'admin' || userRole === 'management') && (
+                      <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-all translate-x-4 group-hover:translate-x-0">
+                        <button 
+                          onClick={() => openEditModal(assignment)}
+                          className="h-10 w-10 flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all shadow-sm bg-white"
+                          title="تعديل الواجب"
+                        >
+                          <Edit2 className="h-5 w-5" />
+                        </button>
+                        <button 
+                          onClick={() => setAssignmentToDelete(assignment.id)}
+                          className="h-10 w-10 flex items-center justify-center text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all shadow-sm bg-white"
+                          title="حذف الواجب"
+                        >
+                          <Trash2 className="h-5 w-5" />
+                        </button>
+                      </div>
+                    )}
                   </div>
                   
                   <h3 className="text-2xl font-black text-slate-900 mb-3 line-clamp-2 group-hover:text-indigo-600 transition-colors tracking-tight leading-tight" title={assignment.title}>
@@ -359,6 +410,12 @@ export default function AssignmentsPage() {
                       <span>المرفق</span>
                     </a>
                   )}
+                  <Link 
+                    href={`/assignments/${assignment.id}`}
+                    className="h-10 px-4 rounded-xl bg-indigo-600 text-xs font-black text-white shadow-sm hover:bg-indigo-700 transition-all flex items-center gap-2 active:scale-95 mr-auto"
+                  >
+                    <span>{userRole === 'student' ? 'عرض وتسليم' : 'التفاصيل'}</span>
+                  </Link>
                 </div>
               </div>
             );

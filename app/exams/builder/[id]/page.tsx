@@ -9,7 +9,7 @@ import {
   Video, FileText, ChevronDown, Check,
   X, HelpCircle, AlertCircle, ArrowRight,
   MoreVertical, Type, List, CheckSquare,
-  AlignLeft, Hash, Link as LinkIcon, Clock
+  AlignLeft, Hash, Link as LinkIcon, Clock, CheckCircle
 } from 'lucide-react';
 import { motion, Reorder, AnimatePresence } from 'motion/react';
 import * as Dialog from '@radix-ui/react-dialog';
@@ -478,6 +478,19 @@ export default function QuizBuilder() {
                 </Dialog.Content>
               </Dialog.Portal>
             </Dialog.Root>
+
+            <button
+              onClick={() => setExam({...exam, status: exam.status === 'published' ? 'draft' : 'published'})}
+              className={`flex items-center gap-2 px-6 py-3 rounded-2xl font-black transition-all active:scale-95 border ${
+                exam.status === 'published' 
+                  ? 'bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100' 
+                  : 'bg-amber-50 text-amber-600 border-amber-200 hover:bg-amber-100'
+              }`}
+            >
+              <CheckCircle className="h-5 w-5" />
+              <span>{exam.status === 'published' ? 'منشور' : 'مسودة'}</span>
+            </button>
+
             <button 
               onClick={handleSave}
               disabled={saving}

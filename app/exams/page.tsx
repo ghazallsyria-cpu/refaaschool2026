@@ -63,9 +63,39 @@ export default function ExamsDashboard() {
         `)
         .order('created_at', { ascending: false });
 
-      // If student, only show published exams
-      if (role === 'student') {
-        query = query.eq('status', 'published');
+      if (role === 'teacher') {
+        query = query.eq('teacher_id', session.user.id);
+      } else if (role === 'student') {
+        const { data: studentData } = await supabase
+          .from('students')
+          .select('section_id')
+          .eq('id', session.user.id)
+          .single();
+        
+        if (studentData?.section_id) {
+          query = query.eq('section_id', studentData.section_id).eq('status', 'published');
+        } else {
+          setExams([]);
+          return;
+        }
+      } else if (role === 'parent') {
+        const { data: childrenData } = await supabase
+          .from('students')
+          .select('section_id')
+          .eq('parent_id', session.user.id);
+          
+        if (childrenData && childrenData.length > 0) {
+          const sectionIds = childrenData.map(c => c.section_id).filter(Boolean);
+          if (sectionIds.length > 0) {
+            query = query.in('section_id', sectionIds).eq('status', 'published');
+          } else {
+            setExams([]);
+            return;
+          }
+        } else {
+          setExams([]);
+          return;
+        }
       }
 
       const { data, error } = await query;

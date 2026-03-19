@@ -306,7 +306,7 @@ export default function StudentDashboard() {
             <div className="space-y-4">
               {upcomingAssignments.length > 0 ? (
                 upcomingAssignments.map((assignment) => (
-                  <Link href={`/assignments`} key={assignment.id} className="block group">
+                  <Link href={`/assignments/${assignment.id}`} key={assignment.id} className="block group">
                     <div className="p-4 rounded-2xl border border-slate-100 hover:border-amber-200 hover:shadow-sm transition-all bg-white">
                       <div className="flex items-start justify-between mb-2">
                         <p className="font-bold text-slate-900 group-hover:text-amber-600 transition-colors line-clamp-1">{assignment.title}</p>

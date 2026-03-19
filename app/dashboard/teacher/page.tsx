@@ -146,7 +146,7 @@ export default function TeacherDashboard() {
               رصد الحضور
             </Link>
             <Link 
-              href="/exams/builder"
+              href="/exams/builder/new"
               className="inline-flex items-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-bold text-indigo-600 shadow-sm hover:bg-indigo-50 transition-all"
             >
               <Plus className="h-5 w-5" />
@@ -315,10 +315,10 @@ export default function TeacherDashboard() {
                       {assignment.subjects?.name} • {assignment.sections?.classes?.name}
                     </p>
                     <div className="flex gap-2">
-                      <Link href={`/assignments`} className="flex-1 text-center py-1.5 text-xs font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 hover:text-indigo-600 transition-colors">
+                      <Link href={`/assignments/${assignment.id}`} className="flex-1 text-center py-1.5 text-xs font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 hover:text-indigo-600 transition-colors">
                         عرض التفاصيل
                       </Link>
-                      <Link href={`/assignments`} className="flex-1 text-center py-1.5 text-xs font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors">
+                      <Link href={`/assignments/${assignment.id}`} className="flex-1 text-center py-1.5 text-xs font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors">
                         التقييم
                       </Link>
                     </div>

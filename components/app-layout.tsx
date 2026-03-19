@@ -150,7 +150,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     });
 
     return () => subscription.unsubscribe();
-  }, [pathname, router, isPublicPage, isLoginPage]);
+  }, [pathname, router, isPublicPage, isLoginPage, isAdminByEmail]);
 
   if (isChecking) {
     return (

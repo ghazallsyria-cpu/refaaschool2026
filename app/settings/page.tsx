@@ -204,17 +204,19 @@ export default function SettingsPage() {
         {/* Sidebar Navigation */}
         <aside className="w-full md:w-64 shrink-0">
           <nav className="flex flex-col space-y-1">
-            <button
-              onClick={() => setActiveTab('school')}
-              className={`flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-colors ${
-                activeTab === 'school' 
-                  ? 'bg-indigo-50 text-indigo-700' 
-                  : 'text-slate-700 hover:bg-slate-50 hover:text-slate-900'
-              }`}
-            >
-              <Building2 className={`h-5 w-5 ${activeTab === 'school' ? 'text-indigo-700' : 'text-slate-400'}`} />
-              إعدادات المدرسة
-            </button>
+            {isAdmin && (
+              <button
+                onClick={() => setActiveTab('school')}
+                className={`flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-colors ${
+                  activeTab === 'school' 
+                    ? 'bg-indigo-50 text-indigo-700' 
+                    : 'text-slate-700 hover:bg-slate-50 hover:text-slate-900'
+                }`}
+              >
+                <Building2 className={`h-5 w-5 ${activeTab === 'school' ? 'text-indigo-700' : 'text-slate-400'}`} />
+                إعدادات المدرسة
+              </button>
+            )}
             <button
               onClick={() => setActiveTab('profile')}
               className={`flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-colors ${
@@ -248,17 +250,19 @@ export default function SettingsPage() {
               <Shield className={`h-5 w-5 ${activeTab === 'security' ? 'text-indigo-700' : 'text-slate-400'}`} />
               الأمان وكلمة المرور
             </button>
-            <button
-              onClick={() => setActiveTab('platform')}
-              className={`flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-colors ${
-                activeTab === 'platform' 
-                  ? 'bg-indigo-50 text-indigo-700' 
-                  : 'text-slate-700 hover:bg-slate-50 hover:text-slate-900'
-              }`}
-            >
-              <Building2 className={`h-5 w-5 ${activeTab === 'platform' ? 'text-indigo-700' : 'text-slate-400'}`} />
-              حالة المنصة
-            </button>
+            {isAdmin && (
+              <button
+                onClick={() => setActiveTab('platform')}
+                className={`flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-colors ${
+                  activeTab === 'platform' 
+                    ? 'bg-indigo-50 text-indigo-700' 
+                    : 'text-slate-700 hover:bg-slate-50 hover:text-slate-900'
+                }`}
+              >
+                <Building2 className={`h-5 w-5 ${activeTab === 'platform' ? 'text-indigo-700' : 'text-slate-400'}`} />
+                حالة المنصة
+              </button>
+            )}
           </nav>
         </aside>
 

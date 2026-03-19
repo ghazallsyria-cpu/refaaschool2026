@@ -142,7 +142,10 @@ export default function AssignmentsPage() {
           supabase.from('teachers').select('id, users(full_name)')
         ]);
         subjectsData = subjectsRes.data || [];
-        sectionsData = sectionsRes.data || [];
+        sectionsData = (sectionsRes.data || []).map(s => ({
+          ...s,
+          classes: Array.isArray(s.classes) ? s.classes[0] : s.classes
+        }));
         teachersData = teachersRes.data || [];
       } else {
         // Fetch teacher's assigned subjects and sections
@@ -151,8 +154,35 @@ export default function AssignmentsPage() {
           supabase.from('teacher_sections').select('section:sections(id, name, classes(name))').eq('teacher_id', user.id)
         ]);
         
-        subjectsData = subjectsRes.data?.map((ts: any) => ts.subject) || [];
-        sectionsData = sectionsRes.data?.map((ts: any) => ts.section) || [];
+        subjectsData = (subjectsRes.data || []).map((ts: any) => {
+          const subject = Array.isArray(ts.subject) ? ts.subject[0] : ts.subject;
+          return subject;
+        }).filter(Boolean);
+
+        sectionsData = (sectionsRes.data || []).map((ts: any) => {
+          const section = Array.isArray(ts.section) ? ts.section[0] : ts.section;
+          if (!section) return null;
+          return {
+            ...section,
+            classes: Array.isArray(section.classes) ? section.classes[0] : section.classes
+          };
+        }).filter(Boolean);
+
+        // Fallback: If no assigned subjects, fetch all subjects (to avoid empty dropdown)
+        if (subjectsData.length === 0) {
+          const { data: allSubjects } = await supabase.from('subjects').select('id, name').order('name');
+          subjectsData = allSubjects || [];
+        }
+
+        // Fallback: If no assigned sections, fetch all sections
+        if (sectionsData.length === 0) {
+          const { data: allSections } = await supabase.from('sections').select('id, name, classes(name)').order('name');
+          sectionsData = (allSections || []).map(s => ({
+            ...s,
+            classes: Array.isArray(s.classes) ? s.classes[0] : s.classes
+          }));
+        }
+
         // Only the current teacher
         const { data: currentTeacher } = await supabase.from('teachers').select('id, users(full_name)').eq('id', user.id).single();
         teachersData = currentTeacher ? [currentTeacher] : [];

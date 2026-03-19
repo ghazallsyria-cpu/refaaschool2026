@@ -131,10 +131,13 @@ export default function QuizBuilder() {
       if (userIsAdmin) {
         const [subjectsRes, sectionsRes] = await Promise.all([
           supabase.from('subjects').select('id, name'),
-          supabase.from('sections').select('id, name')
+          supabase.from('sections').select('id, name, classes(name)')
         ]);
         subjectsData = subjectsRes.data || [];
-        sectionsData = sectionsRes.data || [];
+        sectionsData = (sectionsRes.data || []).map(s => ({
+          id: s.id,
+          name: `${Array.isArray(s.classes) ? s.classes[0]?.name : s.classes?.name} - ${s.name}`
+        }));
       } else {
         // Fetch teacher's assigned subjects and sections
         const [subjectsRes, sectionsRes] = await Promise.all([
@@ -142,11 +145,35 @@ export default function QuizBuilder() {
           supabase.from('teacher_sections').select('section:sections(id, name, classes(name))').eq('teacher_id', user.id)
         ]);
         
-        subjectsData = subjectsRes.data?.map((ts: any) => ts.subject) || [];
-        sectionsData = sectionsRes.data?.map((ts: any) => ({
-          id: ts.section.id,
-          name: `${ts.section.classes?.name} - ${ts.section.name}`
-        })) || [];
+        subjectsData = (subjectsRes.data || []).map((ts: any) => {
+          const subject = Array.isArray(ts.subject) ? ts.subject[0] : ts.subject;
+          return subject;
+        }).filter(Boolean);
+        
+        // Fallback: if teacher has no assigned subjects, fetch all subjects
+        if (subjectsData.length === 0) {
+          const { data: allSubjects } = await supabase.from('subjects').select('id, name');
+          subjectsData = allSubjects || [];
+        }
+
+        sectionsData = (sectionsRes.data || []).map((ts: any) => {
+          const section = Array.isArray(ts.section) ? ts.section[0] : ts.section;
+          if (!section) return null;
+          const className = Array.isArray(section.classes) ? section.classes[0]?.name : section.classes?.name;
+          return {
+            id: section.id,
+            name: className ? `${className} - ${section.name}` : section.name
+          };
+        }).filter(Boolean);
+
+        // Fallback: if teacher has no assigned sections, fetch all sections
+        if (sectionsData.length === 0) {
+          const { data: allSections } = await supabase.from('sections').select('id, name, classes(name)');
+          sectionsData = (allSections || []).map(s => ({
+            id: s.id,
+            name: `${Array.isArray(s.classes) ? s.classes[0]?.name : s.classes?.name} - ${s.name}`
+          }));
+        }
       }
       
       setSubjects(subjectsData);

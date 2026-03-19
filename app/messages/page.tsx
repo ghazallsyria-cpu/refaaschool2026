@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { MessageSquare, Megaphone, Plus, Search, Send, User, Clock, Check, CheckCheck, X, UserPlus, Filter, Mail, Bell } from 'lucide-react';
+import { MessageSquare, Megaphone, Plus, Search, Send, User, Clock, Check, CheckCheck, X, UserPlus, Filter, Mail, Bell, ArrowRight, Users } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 type Tab = 'messages' | 'announcements';
@@ -20,20 +20,28 @@ export default function MessagesPage() {
   const [notification, setNotification] = useState<{type: 'success' | 'error', message: string} | null>(null);
   
   const [users, setUsers] = useState<any[]>([]);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [teacherSections, setTeacherSections] = useState<any[]>([]);
+  const [step, setStep] = useState(1);
+  const [recipientType, setRecipientType] = useState<'teacher' | 'student' | ''>('');
+  const [selectedSectionId, setSelectedSectionId] = useState('');
   const [newMessage, setNewMessage] = useState({ receiver_id: '', subject: '', content: '' });
   const [newAnnouncement, setNewAnnouncement] = useState({ title: '', target_role: 'all', content: '' });
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const resetMessageForm = () => {
+    setNewMessage({ receiver_id: '', subject: '', content: '' });
+    setRecipientType('');
+    setSelectedSectionId('');
+    setStep(1);
+  };
 
   const showNotification = (type: 'success' | 'error', message: string) => {
     setNotification({ type, message });
     setTimeout(() => setNotification(null), 5000);
   };
 
-  useEffect(() => {
-    fetchUsers();
-  }, []);
-
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('users')
@@ -43,6 +51,102 @@ export default function MessagesPage() {
       setUsers(data || []);
     } catch (error) {
       console.error('Error fetching users:', error);
+    }
+  }, []);
+
+  const fetchInitialData = useCallback(async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: userData } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+        setCurrentUser(userData);
+
+        if (userData.role === 'teacher') {
+          const { data: sectionsData } = await supabase
+            .from('teacher_sections')
+            .select(`
+              section_id,
+              section:sections(id, name, classes(name))
+            `)
+            .eq('teacher_id', user.id);
+          
+          // Deduplicate sections
+          const uniqueSections = Array.from(new Set((sectionsData || []).map(s => s.section_id)))
+            .map(id => {
+              const s = sectionsData?.find(item => item.section_id === id);
+              const section = Array.isArray(s?.section) ? s.section[0] : s?.section;
+              if (!section) return null;
+              return {
+                id: section.id,
+                name: section.name,
+                classes: Array.isArray(section.classes) ? section.classes[0] : section.classes
+              };
+            });
+          
+          setTeacherSections(uniqueSections.filter(Boolean));
+        }
+      }
+      fetchUsers();
+    } catch (error) {
+      console.error('Error fetching initial data:', error);
+    }
+  }, [fetchUsers]);
+
+  useEffect(() => {
+    fetchInitialData();
+  }, [fetchInitialData]);
+
+  const getFilteredRecipients = () => {
+    if (!recipientType) return [];
+    
+    if (recipientType === 'teacher') {
+      return users.filter(u => u.role === 'teacher' || u.role === 'admin' || u.role === 'management');
+    }
+    
+    if (recipientType === 'student') {
+      if (currentUser?.role === 'admin' || currentUser?.role === 'management') {
+        return users.filter(u => u.role === 'student');
+      }
+      
+      // For teachers, we need to filter students by section
+      // This is handled by a separate fetch if a section is selected
+      return filteredStudents;
+    }
+    
+    return [];
+  };
+
+  const [filteredStudents, setFilteredStudents] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (recipientType === 'student' && selectedSectionId) {
+      fetchStudentsBySection(selectedSectionId);
+    } else {
+      setFilteredStudents([]);
+    }
+  }, [recipientType, selectedSectionId]);
+
+  const fetchStudentsBySection = async (sectionId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('students')
+        .select(`
+          id,
+          users:id(id, full_name, role)
+        `)
+        .eq('section_id', sectionId);
+      
+      if (error) throw error;
+      setFilteredStudents(data?.map(s => {
+        const user = Array.isArray(s.users) ? s.users[0] : s.users;
+        return user;
+      }).filter(Boolean) || []);
+    } catch (error) {
+      console.error('Error fetching students by section:', error);
     }
   };
 
@@ -139,7 +243,7 @@ export default function MessagesPage() {
 
       showNotification('success', 'تم إرسال الرسالة بنجاح');
       setShowNewMessage(false);
-      setNewMessage({ receiver_id: '', subject: '', content: '' });
+      resetMessageForm();
       fetchMessages();
     } catch (error: any) {
       console.error('Error sending message:', error);
@@ -488,87 +592,183 @@ export default function MessagesPage() {
                   <div className="flex items-center justify-between mb-10">
                     <div className="flex items-center gap-4">
                       <div className="h-12 w-12 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600">
-                        <Plus className="h-6 w-6" />
+                        {step === 1 ? <UserPlus className="h-6 w-6" /> : <Plus className="h-6 w-6" />}
                       </div>
-                      <h3 className="text-2xl font-black text-slate-900 tracking-tight">إنشاء رسالة جديدة</h3>
+                      <div>
+                        <h3 className="text-2xl font-black text-slate-900 tracking-tight">
+                          {step === 1 ? 'اختر نوع المستلم' : 'إنشاء رسالة جديدة'}
+                        </h3>
+                        <p className="text-xs text-slate-400 font-black uppercase tracking-widest mt-1">
+                          الخطوة {step} من {recipientType === 'student' && currentUser?.role === 'teacher' ? '3' : '2'}
+                        </p>
+                      </div>
                     </div>
-                    <button onClick={() => setShowNewMessage(false)} className="p-2 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-50 transition-all">
+                    <button onClick={() => { setShowNewMessage(false); resetMessageForm(); }} className="p-2 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-50 transition-all">
                       <X className="h-6 w-6" />
                     </button>
                   </div>
                   
-                  <form id="new-message-form" onSubmit={handleSendMessage} className="space-y-8">
-                    <div className="space-y-2">
-                      <label className="text-xs font-black text-slate-400 uppercase tracking-widest mr-1">إلى المستلم</label>
-                      <div className="relative">
-                        <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
-                          <UserPlus className="h-4 w-4 text-slate-400" />
-                        </div>
-                        <select 
-                          required
-                          value={newMessage.receiver_id}
-                          onChange={(e) => setNewMessage({...newMessage, receiver_id: e.target.value})}
-                          className="block w-full rounded-2xl border-0 py-4 pr-11 pl-4 text-slate-900 bg-slate-50 ring-1 ring-inset ring-slate-100 focus:ring-2 focus:ring-inset focus:ring-indigo-500 sm:text-sm transition-all font-bold appearance-none"
+                  <div className="space-y-8">
+                    {step === 1 && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                        <button
+                          onClick={() => {
+                            setRecipientType('teacher');
+                            setStep(2);
+                          }}
+                          className="flex flex-col items-center justify-center p-10 rounded-[2.5rem] border-2 border-slate-100 hover:border-indigo-600 hover:bg-indigo-50/50 transition-all group"
                         >
-                          <option value="">اختر المستلم من القائمة...</option>
-                          {users.map(user => (
-                            <option key={user.id} value={user.id}>
-                              {user.full_name} ({user.role === 'admin' ? 'إدارة' : user.role === 'teacher' ? 'معلم' : user.role === 'student' ? 'طالب' : 'ولي أمر'})
-                            </option>
-                          ))}
-                        </select>
+                          <div className="h-20 w-20 rounded-3xl bg-indigo-50 flex items-center justify-center text-indigo-600 mb-6 group-hover:scale-110 transition-transform">
+                            <User className="h-10 w-10" />
+                          </div>
+                          <span className="text-xl font-black text-slate-900">معلم / إدارة</span>
+                          <p className="text-sm text-slate-500 font-medium mt-2">مراسلة الزملاء أو الطاقم الإداري</p>
+                        </button>
+                        <button
+                          onClick={() => {
+                            setRecipientType('student');
+                            if (currentUser?.role === 'teacher') {
+                              setStep(2); // Go to section selection
+                            } else {
+                              setStep(2); // Go to message content (admin can see all students)
+                            }
+                          }}
+                          className="flex flex-col items-center justify-center p-10 rounded-[2.5rem] border-2 border-slate-100 hover:border-emerald-600 hover:bg-emerald-50/50 transition-all group"
+                        >
+                          <div className="h-20 w-20 rounded-3xl bg-emerald-50 flex items-center justify-center text-emerald-600 mb-6 group-hover:scale-110 transition-transform">
+                            <Users className="h-10 w-10" />
+                          </div>
+                          <span className="text-xl font-black text-slate-900">طالب</span>
+                          <p className="text-sm text-slate-500 font-medium mt-2">مراسلة الطلاب في صفوفك</p>
+                        </button>
                       </div>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <label className="text-xs font-black text-slate-400 uppercase tracking-widest mr-1">موضوع الرسالة</label>
-                      <div className="relative">
-                        <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
-                          <Filter className="h-4 w-4 text-slate-400" />
+                    )}
+
+                    {step === 2 && recipientType === 'student' && currentUser?.role === 'teacher' && (
+                      <div className="space-y-6">
+                        <div className="flex items-center gap-4 mb-4">
+                          <button onClick={() => setStep(1)} className="text-indigo-600 font-black text-sm flex items-center gap-1 hover:underline">
+                            <ArrowRight className="h-4 w-4" /> العودة
+                          </button>
                         </div>
-                        <input 
-                          type="text" 
-                          required
-                          value={newMessage.subject}
-                          onChange={(e) => setNewMessage({...newMessage, subject: e.target.value})}
-                          className="block w-full rounded-2xl border-0 py-4 pr-11 pl-4 text-slate-900 bg-slate-50 ring-1 ring-inset ring-slate-100 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-indigo-500 sm:text-sm transition-all font-bold" 
-                          placeholder="أدخل عنواناً مختصراً للرسالة..."
-                        />
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          {teacherSections.map((section: any) => (
+                            <button
+                              key={section.id}
+                              onClick={() => {
+                                setSelectedSectionId(section.id);
+                                setStep(3);
+                              }}
+                              className="flex items-center gap-4 p-6 rounded-3xl border border-slate-100 hover:border-indigo-600 hover:bg-indigo-50 transition-all text-right"
+                            >
+                              <div className="h-12 w-12 rounded-2xl bg-white shadow-sm flex items-center justify-center text-indigo-600 shrink-0">
+                                <Users className="h-6 w-6" />
+                              </div>
+                              <div>
+                                <p className="font-black text-slate-900">{section.classes?.name}</p>
+                                <p className="text-xs text-slate-500 font-bold">{section.name}</p>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                        {teacherSections.length === 0 && (
+                          <div className="text-center py-10 bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200">
+                            <p className="text-slate-500 font-bold">لا توجد صفوف مسندة إليك حالياً</p>
+                          </div>
+                        )}
                       </div>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <label className="text-xs font-black text-slate-400 uppercase tracking-widest mr-1">محتوى الرسالة</label>
-                      <textarea 
-                        rows={6} 
-                        required
-                        value={newMessage.content}
-                        onChange={(e) => setNewMessage({...newMessage, content: e.target.value})}
-                        className="block w-full rounded-2xl border-0 py-4 px-5 text-slate-900 bg-slate-50 ring-1 ring-inset ring-slate-100 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-indigo-500 sm:text-sm transition-all font-bold resize-none"
-                        placeholder="اكتب رسالتك هنا بالتفصيل..."
-                      ></textarea>
-                    </div>
-                  </form>
+                    )}
+
+                    {((step === 2 && (recipientType === 'teacher' || (recipientType === 'student' && currentUser?.role !== 'teacher'))) || step === 3) && (
+                      <form id="new-message-form" onSubmit={handleSendMessage} className="space-y-8">
+                        <div className="flex items-center justify-between mb-4">
+                          <button 
+                            type="button"
+                            onClick={() => setStep(recipientType === 'student' && currentUser?.role === 'teacher' ? 2 : 1)} 
+                            className="text-indigo-600 font-black text-sm flex items-center gap-1 hover:underline"
+                          >
+                            <ArrowRight className="h-4 w-4" /> العودة
+                          </button>
+                          <div className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-100 text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                            {recipientType === 'teacher' ? 'مراسلة معلم' : 'مراسلة طالب'}
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <label className="text-xs font-black text-slate-400 uppercase tracking-widest mr-1">المستلم</label>
+                          <div className="relative">
+                            <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
+                              <UserPlus className="h-4 w-4 text-slate-400" />
+                            </div>
+                            <select 
+                              required
+                              value={newMessage.receiver_id}
+                              onChange={(e) => setNewMessage({...newMessage, receiver_id: e.target.value})}
+                              className="block w-full rounded-2xl border-0 py-4 pr-11 pl-4 text-slate-900 bg-slate-50 ring-1 ring-inset ring-slate-100 focus:ring-2 focus:ring-inset focus:ring-indigo-500 sm:text-sm transition-all font-bold appearance-none"
+                            >
+                              <option value="">اختر المستلم من القائمة...</option>
+                              {getFilteredRecipients().map(user => (
+                                <option key={user.id} value={user.id}>
+                                  {user.full_name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <label className="text-xs font-black text-slate-400 uppercase tracking-widest mr-1">موضوع الرسالة</label>
+                          <div className="relative">
+                            <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
+                              <Filter className="h-4 w-4 text-slate-400" />
+                            </div>
+                            <input 
+                              type="text" 
+                              required
+                              value={newMessage.subject}
+                              onChange={(e) => setNewMessage({...newMessage, subject: e.target.value})}
+                              className="block w-full rounded-2xl border-0 py-4 pr-11 pl-4 text-slate-900 bg-slate-50 ring-1 ring-inset ring-slate-100 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-indigo-500 sm:text-sm transition-all font-bold" 
+                              placeholder="أدخل عنواناً مختصراً للرسالة..."
+                            />
+                          </div>
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <label className="text-xs font-black text-slate-400 uppercase tracking-widest mr-1">محتوى الرسالة</label>
+                          <textarea 
+                            rows={6} 
+                            required
+                            value={newMessage.content}
+                            onChange={(e) => setNewMessage({...newMessage, content: e.target.value})}
+                            className="block w-full rounded-2xl border-0 py-4 px-5 text-slate-900 bg-slate-50 ring-1 ring-inset ring-slate-100 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-indigo-500 sm:text-sm transition-all font-bold resize-none"
+                            placeholder="اكتب رسالتك هنا بالتفصيل..."
+                          ></textarea>
+                        </div>
+                      </form>
+                    )}
+                  </div>
                 </div>
-                <div className="bg-slate-50/50 px-8 py-6 sm:flex sm:flex-row-reverse sm:px-10 gap-3">
-                  <button
-                    type="submit"
-                    form="new-message-form"
-                    disabled={isSubmitting}
-                    className="inline-flex w-full justify-center rounded-2xl bg-indigo-600 px-8 py-4 text-sm font-black text-white shadow-xl shadow-indigo-200 hover:bg-indigo-700 transition-all active:scale-95 sm:w-auto disabled:opacity-50"
-                  >
-                    <Send className="w-4 h-4 ml-2" />
-                    {isSubmitting ? 'جاري الإرسال...' : 'إرسال الرسالة'}
-                  </button>
-                  <button
-                    type="button"
-                    disabled={isSubmitting}
-                    className="mt-3 inline-flex w-full justify-center rounded-2xl bg-white px-8 py-4 text-sm font-black text-slate-700 shadow-sm ring-1 ring-inset ring-slate-200 hover:bg-slate-50 sm:mt-0 sm:w-auto transition-all"
-                    onClick={() => setShowNewMessage(false)}
-                  >
-                    إلغاء
-                  </button>
-                </div>
+                {((step === 2 && (recipientType === 'teacher' || (recipientType === 'student' && currentUser?.role !== 'teacher'))) || step === 3) && (
+                  <div className="bg-slate-50/50 px-8 py-6 sm:flex sm:flex-row-reverse sm:px-10 gap-3">
+                    <button
+                      type="submit"
+                      form="new-message-form"
+                      disabled={isSubmitting}
+                      className="inline-flex w-full justify-center rounded-2xl bg-indigo-600 px-8 py-4 text-sm font-black text-white shadow-xl shadow-indigo-200 hover:bg-indigo-700 transition-all active:scale-95 sm:w-auto disabled:opacity-50"
+                    >
+                      <Send className="w-4 h-4 ml-2" />
+                      {isSubmitting ? 'جاري الإرسال...' : 'إرسال الرسالة'}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isSubmitting}
+                      className="mt-3 inline-flex w-full justify-center rounded-2xl bg-white px-8 py-4 text-sm font-black text-slate-700 shadow-sm ring-1 ring-inset ring-slate-200 hover:bg-slate-50 sm:mt-0 sm:w-auto transition-all"
+                      onClick={() => { setShowNewMessage(false); resetMessageForm(); }}
+                    >
+                      إلغاء
+                    </button>
+                  </div>
+                )}
               </motion.div>
             </div>
           </div>

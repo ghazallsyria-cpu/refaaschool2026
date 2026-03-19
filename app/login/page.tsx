@@ -3,7 +3,9 @@
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
-import { School, Lock, User } from 'lucide-react';
+import { School, Lock, User, ArrowLeft, ShieldCheck, Heart, Code } from 'lucide-react';
+import { motion } from 'motion/react';
+import Image from 'next/image';
 
 export default function LoginPage() {
   const [civilId, setCivilId] = useState('');
@@ -20,9 +22,7 @@ export default function LoginPage() {
     try {
       let authEmail = civilId;
       
-      // If the input is not an email, assume it's a Civil ID and look up the email
       if (!civilId.includes('@')) {
-        // Check in role tables
         const { data: studentData } = await supabase
           .from('students')
           .select('id, users!inner(email)')
@@ -50,14 +50,11 @@ export default function LoginPage() {
             if (parentData && parentData.users) {
               authEmail = (parentData.users as any).email;
             } else {
-              // Final fallback
               authEmail = `${civilId}@alrefaa.edu`;
             }
           }
         }
       }
-
-      console.log('Attempting login with email:', authEmail);
 
       const { data: authData, error: signInError } = await supabase.auth.signInWithPassword({
         email: authEmail,
@@ -67,24 +64,16 @@ export default function LoginPage() {
       if (signInError) throw signInError;
       
       if (authData.user) {
-        // Verify user exists in public.users table
         const { data: userData, error: userError } = await supabase
           .from('users')
           .select('role, must_reset_password')
           .eq('id', authData.user.id)
           .maybeSingle();
 
-        if (userError) {
-          console.error('Database lookup error:', userError);
-          throw new Error(`خطأ في الاتصال بقاعدة البيانات: ${userError.message}`);
-        }
+        if (userError) throw userError;
 
         if (!userData) {
-          const uid = authData.user.id;
-          console.error('User UID not found in public.users:', uid);
-          // Check if RLS might be the issue by logging the full response
-          throw new Error(`تم تسجيل الدخول، ولكن لم نجد بياناتك في جدول public.users. 
-          تأكد من تشغيل استعلام SQL لتحديث المعرّف: ${uid}`);
+          throw new Error(`تم تسجيل الدخول، ولكن لم نجد بياناتك في النظام. يرجى مراجعة الإدارة.`);
         }
 
         if (userData.must_reset_password) {
@@ -96,126 +85,165 @@ export default function LoginPage() {
       router.push('/');
       router.refresh();
     } catch (err: any) {
-      console.error('Login error:', err);
       setError(err.message || 'حدث خطأ أثناء تسجيل الدخول. تأكد من البيانات وحاول مرة أخرى.');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDemoLogin = async (role: 'admin' | 'teacher' | 'student') => {
-    setLoading(true);
-    setError(null);
-    
-    const demoUsers = {
-      admin: { id: '123456789012', pass: 'admin123' },
-      teacher: { id: '290123456789', pass: 'teacher123' },
-      student: { id: '305123456789', pass: 'student123' }
-    };
-
-    const user = demoUsers[role];
-    setCivilId(user.id);
-    setPassword(user.pass);
-    
-    // We'll trigger the login manually after a short delay to show the UI update
-    setTimeout(() => {
-      const form = document.querySelector('form');
-      if (form) form.requestSubmit();
-    }, 100);
-  };
-
   return (
-    <div className="flex min-h-screen flex-1 flex-col justify-center px-6 py-12 lg:px-8 bg-slate-50" dir="rtl">
-      <div className="sm:mx-auto sm:w-full sm:max-w-sm">
-        <div className="flex justify-center">
-          <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-indigo-600 shadow-lg">
-            <School className="h-10 w-10 text-white" />
-          </div>
-        </div>
-        <h2 className="mt-6 text-center text-2xl font-bold leading-9 tracking-tight text-slate-900">
-          مدرسة الرفعة النموذجية
-        </h2>
-        <p className="mt-2 text-center text-sm text-slate-600">
-          تسجيل الدخول للنظام
-        </p>
+    <div className="relative min-h-screen flex items-center justify-center overflow-hidden bg-slate-950" dir="rtl">
+      {/* Background Image with Overlay */}
+      <div className="absolute inset-0 z-0">
+        <Image 
+          src="https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?auto=format&fit=crop&q=80"
+          alt="School Background"
+          fill
+          className="object-cover opacity-40"
+          priority
+          referrerPolicy="no-referrer"
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-slate-950/80 via-slate-950/50 to-slate-950/80" />
       </div>
 
-      <div className="mt-10 sm:mx-auto sm:w-full sm:max-w-sm">
-        <form className="space-y-6 bg-white p-8 rounded-xl shadow-sm ring-1 ring-slate-200" onSubmit={handleLogin}>
-          {error && (
-            <div className="rounded-md bg-red-50 p-4">
-              <div className="flex">
-                <div className="ml-3">
-                  <h3 className="text-sm font-medium text-red-800">{error}</h3>
-                </div>
-              </div>
-            </div>
-          )}
+      {/* Animated Background Elements */}
+      <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
+        <motion.div 
+          animate={{ 
+            scale: [1, 1.2, 1],
+            opacity: [0.3, 0.5, 0.3],
+            x: [0, 50, 0],
+            y: [0, -30, 0]
+          }}
+          transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
+          className="absolute -top-24 -left-24 w-96 h-96 bg-indigo-600/20 rounded-full blur-3xl"
+        />
+        <motion.div 
+          animate={{ 
+            scale: [1, 1.1, 1],
+            opacity: [0.2, 0.4, 0.2],
+            x: [0, -40, 0],
+            y: [0, 60, 0]
+          }}
+          transition={{ duration: 12, repeat: Infinity, ease: "linear" }}
+          className="absolute -bottom-24 -right-24 w-96 h-96 bg-emerald-600/20 rounded-full blur-3xl"
+        />
+      </div>
 
-          <div>
-            <label htmlFor="civilId" className="block text-sm font-medium leading-6 text-slate-900">
-              الرقم المدني
-            </label>
-            <div className="mt-2 relative">
-              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
-                <User className="h-5 w-5 text-slate-400" aria-hidden="true" />
-              </div>
-              <input
-                id="civilId"
-                name="civilId"
-                type="text"
-                autoComplete="username"
-                required
-                value={civilId}
-                onChange={(e) => setCivilId(e.target.value)}
-                className="block w-full rounded-md border-0 py-2.5 pr-10 text-slate-900 shadow-sm ring-1 ring-inset ring-slate-300 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
-                placeholder="أدخل الرقم المدني المكون من 12 رقم"
-                dir="ltr"
-                style={{ textAlign: 'right' }}
-              />
-            </div>
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="relative z-10 w-full max-w-md px-6"
+      >
+        <div className="backdrop-blur-xl bg-white/10 p-8 rounded-3xl border border-white/20 shadow-2xl">
+          <div className="text-center mb-8">
+            <motion.div 
+              initial={{ scale: 0.5, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              className="inline-flex h-20 w-20 items-center justify-center rounded-2xl bg-indigo-600 shadow-xl shadow-indigo-500/20 mb-6"
+            >
+              <School className="h-12 w-12 text-white" />
+            </motion.div>
+            <h2 className="text-3xl font-black text-white tracking-tight mb-2">
+              مدرسة الرفعة النموذجية
+            </h2>
+            <p className="text-slate-300 font-medium">
+              بوابة التعليم الرقمي الذكي
+            </p>
           </div>
 
-          <div>
-            <div className="flex items-center justify-between">
-              <label htmlFor="password" className="block text-sm font-medium leading-6 text-slate-900">
-                كلمة المرور
+          <form className="space-y-6" onSubmit={handleLogin}>
+            {error && (
+              <motion.div 
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                className="rounded-xl bg-red-500/10 border border-red-500/20 p-4"
+              >
+                <p className="text-sm font-medium text-red-400 text-center">{error}</p>
+              </motion.div>
+            )}
+
+            <div className="space-y-2">
+              <label htmlFor="civilId" className="block text-sm font-bold text-slate-200 mr-1">
+                الرقم المدني
               </label>
-              <div className="text-sm">
-                <a href="#" className="font-semibold text-indigo-600 hover:text-indigo-500">
+              <div className="relative group">
+                <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
+                  <User className="h-5 w-5 text-slate-400 group-focus-within:text-indigo-400 transition-colors" />
+                </div>
+                <input
+                  id="civilId"
+                  type="text"
+                  required
+                  value={civilId}
+                  onChange={(e) => setCivilId(e.target.value)}
+                  className="block w-full bg-white/5 border border-white/10 rounded-2xl py-3.5 pr-12 pl-4 text-white placeholder:text-slate-500 focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all outline-none"
+                  placeholder="أدخل الرقم المدني"
+                  dir="ltr"
+                  style={{ textAlign: 'right' }}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between px-1">
+                <label htmlFor="password" className="block text-sm font-bold text-slate-200">
+                  كلمة المرور
+                </label>
+                <a href="#" className="text-xs font-bold text-indigo-400 hover:text-indigo-300 transition-colors">
                   نسيت كلمة المرور؟
                 </a>
               </div>
-            </div>
-            <div className="mt-2 relative">
-              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3">
-                <Lock className="h-5 w-5 text-slate-400" aria-hidden="true" />
+              <div className="relative group">
+                <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
+                  <Lock className="h-5 w-5 text-slate-400 group-focus-within:text-indigo-400 transition-colors" />
+                </div>
+                <input
+                  id="password"
+                  type="password"
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="block w-full bg-white/5 border border-white/10 rounded-2xl py-3.5 pr-12 pl-4 text-white placeholder:text-slate-500 focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all outline-none"
+                  placeholder="••••••••"
+                />
               </div>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                autoComplete="current-password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="block w-full rounded-md border-0 py-2.5 pr-10 text-slate-900 shadow-sm ring-1 ring-inset ring-slate-300 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
-                placeholder="••••••••"
-              />
             </div>
-          </div>
 
-          <div>
             <button
               type="submit"
               disabled={loading}
-              className="flex w-full justify-center rounded-md bg-indigo-600 px-3 py-2.5 text-sm font-semibold leading-6 text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:opacity-50"
+              className="relative w-full group overflow-hidden rounded-2xl bg-indigo-600 py-4 text-sm font-black text-white shadow-xl shadow-indigo-600/20 hover:bg-indigo-500 transition-all active:scale-[0.98] disabled:opacity-50"
             >
-              {loading ? 'جاري تسجيل الدخول...' : 'تسجيل الدخول'}
+              <span className="relative z-10 flex items-center justify-center gap-2">
+                {loading ? (
+                  <div className="h-5 w-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : (
+                  'تسجيل الدخول للنظام'
+                )}
+              </span>
             </button>
+          </form>
+
+          {/* Footer inside glass card */}
+          <div className="mt-10 pt-8 border-t border-white/10 text-center space-y-4">
+            <div className="flex flex-col items-center gap-2">
+              <div className="flex items-center gap-2 text-white font-black text-sm">
+                <Code className="h-4 w-4 text-indigo-400" />
+                <span>برمجة وتطوير : ايهاب جمال غزال</span>
+              </div>
+              <div className="flex items-center gap-2 text-slate-400 font-bold text-xs">
+                <ShieldCheck className="h-4 w-4 text-emerald-500" />
+                <span>جميع الحقوق محفوظة © {new Date().getFullYear()}</span>
+              </div>
+              <p className="text-slate-500 text-[10px] flex items-center gap-1 font-medium">
+                صنع بكل <Heart className="h-2 w-2 text-red-500 fill-red-500" /> لخدمة التعليم الرقمي
+              </p>
+            </div>
           </div>
-        </form>
-      </div>
+        </div>
+      </motion.div>
     </div>
   );
 }
+

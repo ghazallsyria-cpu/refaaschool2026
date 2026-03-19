@@ -154,6 +154,42 @@ export default function StudentDashboard() {
         <div className="absolute -left-20 -bottom-20 h-64 w-64 rounded-full bg-indigo-500/20 blur-3xl"></div>
       </div>
 
+      {/* Quick Actions */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Link href="/dashboard/student/schedule" className="group">
+          <div className="p-4 rounded-2xl bg-white border border-slate-100 shadow-sm hover:shadow-md hover:border-indigo-100 transition-all flex items-center gap-3">
+            <div className="p-2 bg-indigo-50 rounded-xl group-hover:bg-indigo-100 transition-colors">
+              <Calendar className="h-5 w-5 text-indigo-600" />
+            </div>
+            <span className="font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">الجدول الدراسي</span>
+          </div>
+        </Link>
+        <Link href="/exams" className="group">
+          <div className="p-4 rounded-2xl bg-white border border-slate-100 shadow-sm hover:shadow-md hover:border-emerald-100 transition-all flex items-center gap-3">
+            <div className="p-2 bg-emerald-50 rounded-xl group-hover:bg-emerald-100 transition-colors">
+              <FileText className="h-5 w-5 text-emerald-600" />
+            </div>
+            <span className="font-bold text-slate-900 group-hover:text-emerald-600 transition-colors">الاختبارات</span>
+          </div>
+        </Link>
+        <Link href="/assignments" className="group">
+          <div className="p-4 rounded-2xl bg-white border border-slate-100 shadow-sm hover:shadow-md hover:border-amber-100 transition-all flex items-center gap-3">
+            <div className="p-2 bg-amber-50 rounded-xl group-hover:bg-amber-100 transition-colors">
+              <BookOpen className="h-5 w-5 text-amber-600" />
+            </div>
+            <span className="font-bold text-slate-900 group-hover:text-amber-600 transition-colors">الواجبات</span>
+          </div>
+        </Link>
+        <Link href="/messages" className="group">
+          <div className="p-4 rounded-2xl bg-white border border-slate-100 shadow-sm hover:shadow-md hover:border-sky-100 transition-all flex items-center gap-3">
+            <div className="p-2 bg-sky-50 rounded-xl group-hover:bg-sky-100 transition-colors">
+              <Bell className="h-5 w-5 text-sky-600" />
+            </div>
+            <span className="font-bold text-slate-900 group-hover:text-sky-600 transition-colors">التنبيهات</span>
+          </div>
+        </Link>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Main Content - Left 2 Columns */}
         <div className="lg:col-span-2 space-y-8">

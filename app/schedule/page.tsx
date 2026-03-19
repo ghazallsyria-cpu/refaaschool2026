@@ -22,6 +22,7 @@ export default function SchedulePage() {
   const [assignments, setAssignments] = useState<any[]>([]);
   const [copiedLesson, setCopiedLesson] = useState<{subject_id: string, section_id: string, teacher_id: string} | null>(null);
   const [showAllSchedules, setShowAllSchedules] = useState(true);
+  const [swappingFrom, setSwappingFrom] = useState<any | null>(null);
 
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
@@ -82,6 +83,51 @@ export default function SchedulePage() {
   useEffect(() => {
     fetchFilters();
   }, [fetchFilters]);
+
+  const handleSwap = async (targetDay: number, targetPeriod: number, targetSlot: any | null) => {
+    if (!swappingFrom) return;
+
+    try {
+      setLoading(true);
+      
+      // If there's a lesson in the target slot, we swap them
+      if (targetSlot) {
+        // Move target lesson to source position
+        const { error: err1 } = await supabase
+          .from('schedules')
+          .update({ day_of_week: swappingFrom.day_of_week, period: swappingFrom.period })
+          .eq('id', targetSlot.id);
+        
+        if (err1) throw err1;
+
+        // Move source lesson to target position
+        const { error: err2 } = await supabase
+          .from('schedules')
+          .update({ day_of_week: targetDay, period: targetPeriod })
+          .eq('id', swappingFrom.id);
+        
+        if (err2) throw err2;
+      } else {
+        // Just move the source lesson to the empty target slot
+        const { error } = await supabase
+          .from('schedules')
+          .update({ day_of_week: targetDay, period: targetPeriod })
+          .eq('id', swappingFrom.id);
+        
+        if (error) throw error;
+      }
+
+      setSwappingFrom(null);
+      fetchSchedule();
+      alert('تم تبديل الحصص بنجاح');
+    } catch (err) {
+      console.error('Error swapping lessons:', err);
+      alert('حدث خطأ أثناء تبديل الحصص. قد يكون هناك تضارب في المواعيد.');
+      fetchSchedule(); // Refresh to show current state
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleAddSchedule = async () => {
     if (!formData.teacher_id || !formData.section_id || !formData.subject_id || !selectedSlot) {
@@ -472,16 +518,24 @@ export default function SchedulePage() {
                       ) : [];
 
                       return (
-                        <div key={`${day}-${period}`} className={`p-3 border border-slate-200 rounded-lg bg-white min-h-[100px] flex flex-col items-center justify-center text-center ${isAdmin ? 'cursor-pointer hover:bg-slate-50' : ''} ${slot?.teachers?.zoom_link ? 'cursor-pointer hover:bg-indigo-50' : ''}`}
+                        <div key={`${day}-${period}`} className={`p-3 border border-slate-200 rounded-lg bg-white min-h-[100px] flex flex-col items-center justify-center text-center ${isAdmin ? 'cursor-pointer hover:bg-slate-50' : ''} ${slot?.teachers?.zoom_link ? 'cursor-pointer hover:bg-indigo-50' : ''} ${swappingFrom?.id === slot?.id && slot ? 'ring-2 ring-indigo-500 bg-indigo-50' : ''}`}
                           onClick={() => {
                             if (isAdmin) {
-                              setFormData({ 
-                                teacher_id: viewType === 'teacher' ? selectedId : (copiedLesson?.teacher_id || ''), 
-                                section_id: viewType === 'section' ? selectedId : (copiedLesson?.section_id || ''), 
-                                subject_id: copiedLesson?.subject_id || '' 
-                              });
-                              setSelectedSlot({day: dayIndex, period: period});
-                              setIsModalOpen(true);
+                              if (swappingFrom) {
+                                if (swappingFrom.id === slot?.id) {
+                                  setSwappingFrom(null); // Cancel swap
+                                } else {
+                                  handleSwap(dayIndex, period, slot);
+                                }
+                              } else {
+                                setFormData({ 
+                                  teacher_id: viewType === 'teacher' ? selectedId : (copiedLesson?.teacher_id || ''), 
+                                  section_id: viewType === 'section' ? selectedId : (copiedLesson?.section_id || ''), 
+                                  subject_id: copiedLesson?.subject_id || '' 
+                                });
+                                setSelectedSlot({day: dayIndex, period: period});
+                                setIsModalOpen(true);
+                              }
                             } else if (slot?.teachers?.zoom_link) {
                               window.open(slot.teachers.zoom_link, '_blank');
                             }
@@ -503,9 +557,9 @@ export default function SchedulePage() {
                                 <span className="text-xs text-indigo-500 mt-1">رابط زوم</span>
                               )}
                               {isAdmin && (
-                                <div className="mt-2 flex gap-2">
+                                <div className="mt-2 flex flex-wrap justify-center gap-2">
                                   <button 
-                                    className="text-indigo-500 text-xs hover:underline" 
+                                    className="text-indigo-500 text-[10px] hover:underline" 
                                     onClick={(e) => { 
                                       e.stopPropagation(); 
                                       setCopiedLesson({
@@ -518,7 +572,16 @@ export default function SchedulePage() {
                                   >
                                     نسخ
                                   </button>
-                                  <button className="text-red-500 text-xs hover:underline" onClick={(e) => { e.stopPropagation(); handleDeleteSchedule(slot.id); }}>حذف</button>
+                                  <button 
+                                    className="text-amber-600 text-[10px] hover:underline" 
+                                    onClick={(e) => { 
+                                      e.stopPropagation(); 
+                                      setSwappingFrom(slot);
+                                    }}
+                                  >
+                                    تبديل
+                                  </button>
+                                  <button className="text-red-500 text-[10px] hover:underline" onClick={(e) => { e.stopPropagation(); handleDeleteSchedule(slot.id); }}>حذف</button>
                                 </div>
                               )}
                             </>

@@ -226,8 +226,15 @@ export default function MessagesPage() {
           throw new Error('لا يوجد طلاب في هذا الصف لإرسال الرسالة إليهم');
         }
 
-        // Deduplicate students based on ID
-        const uniqueStudents = Array.from(new Map(filteredStudents.map(s => [s.id, s])).values());
+        // Deduplicate students based on ID using a Set for guaranteed uniqueness
+        const uniqueStudentIds = new Set(filteredStudents.map(s => s.id));
+        const uniqueStudents = filteredStudents.filter(s => {
+          if (uniqueStudentIds.has(s.id)) {
+            uniqueStudentIds.delete(s.id);
+            return true;
+          }
+          return false;
+        });
 
         const messagesToInsert = uniqueStudents.map(student => ({
           sender_id: user.id,

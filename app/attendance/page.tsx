@@ -256,7 +256,7 @@ export default function AttendancePage() {
                 <th scope="col" className="px-4 py-6 text-center text-[10px] font-black uppercase tracking-widest text-slate-400">مستأذن</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-50 bg-white">
+            <tbody className="divide-y divide-slate-100/50 bg-white/40 backdrop-blur-sm">
               {loading ? (
                 <tr>
                   <td colSpan={5} className="py-20 text-center">
@@ -279,13 +279,16 @@ export default function AttendancePage() {
                 </tr>
               ) : (
                 students.map((student) => (
-                  <tr key={student.id} className="group hover:bg-slate-50/50 transition-colors">
+                  <tr key={student.id} className="group hover:bg-white/60 transition-all duration-300">
                     <td className="whitespace-nowrap py-6 pr-8 pl-4">
-                      <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-600 font-black text-sm group-hover:bg-white group-hover:shadow-sm transition-all border border-transparent group-hover:border-slate-100">
-                          {student.users?.full_name?.charAt(0)}
+                      <div className="flex items-center gap-4">
+                        <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white font-black text-lg shadow-lg shadow-indigo-200/50 group-hover:scale-110 transition-transform duration-300">
+                          {student.users?.full_name?.charAt(0) || '?'}
                         </div>
-                        <span className="font-bold text-slate-900 tracking-tight">{student.users?.full_name}</span>
+                        <div className="flex flex-col">
+                          <span className="font-black text-slate-900 tracking-tight text-base group-hover:text-indigo-600 transition-colors">{student.users?.full_name || 'طالب غير معروف'}</span>
+                          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">رقم القيد: {student.id.slice(0, 8)}</span>
+                        </div>
                       </div>
                     </td>
                     <td className="whitespace-nowrap px-4 py-6 text-center">
@@ -297,8 +300,8 @@ export default function AttendancePage() {
                           onChange={() => handleStatusChange(student.id, 'present')}
                           className="peer sr-only"
                         />
-                        <div className="w-6 h-6 rounded-lg border-2 border-slate-200 peer-checked:border-emerald-500 peer-checked:bg-emerald-500 transition-all flex items-center justify-center group-hover/radio:border-emerald-200">
-                          <CheckCircle2 className="h-4 w-4 text-white scale-0 peer-checked:scale-100 transition-transform" />
+                        <div className="w-10 h-10 rounded-xl border-2 border-slate-200 peer-checked:border-emerald-500 peer-checked:bg-emerald-500 transition-all flex items-center justify-center group-hover/radio:border-emerald-200 shadow-sm peer-checked:shadow-emerald-100 peer-checked:shadow-lg">
+                          <CheckCircle2 className="h-6 w-6 text-white scale-0 peer-checked:scale-100 transition-all duration-300" />
                         </div>
                       </label>
                     </td>
@@ -311,8 +314,8 @@ export default function AttendancePage() {
                           onChange={() => handleStatusChange(student.id, 'absent')}
                           className="peer sr-only"
                         />
-                        <div className="w-6 h-6 rounded-lg border-2 border-slate-200 peer-checked:border-red-500 peer-checked:bg-red-500 transition-all flex items-center justify-center group-hover/radio:border-red-200">
-                          <XCircle className="h-4 w-4 text-white scale-0 peer-checked:scale-100 transition-transform" />
+                        <div className="w-10 h-10 rounded-xl border-2 border-slate-200 peer-checked:border-red-500 peer-checked:bg-red-500 transition-all flex items-center justify-center group-hover/radio:border-red-200 shadow-sm peer-checked:shadow-red-100 peer-checked:shadow-lg">
+                          <XCircle className="h-6 w-6 text-white scale-0 peer-checked:scale-100 transition-all duration-300" />
                         </div>
                       </label>
                     </td>
@@ -325,8 +328,8 @@ export default function AttendancePage() {
                           onChange={() => handleStatusChange(student.id, 'late')}
                           className="peer sr-only"
                         />
-                        <div className="w-6 h-6 rounded-lg border-2 border-slate-200 peer-checked:border-amber-500 peer-checked:bg-amber-500 transition-all flex items-center justify-center group-hover/radio:border-amber-200">
-                          <Clock className="h-4 w-4 text-white scale-0 peer-checked:scale-100 transition-transform" />
+                        <div className="w-10 h-10 rounded-xl border-2 border-slate-200 peer-checked:border-amber-500 peer-checked:bg-amber-500 transition-all flex items-center justify-center group-hover/radio:border-amber-200 shadow-sm peer-checked:shadow-amber-100 peer-checked:shadow-lg">
+                          <Clock className="h-6 w-6 text-white scale-0 peer-checked:scale-100 transition-all duration-300" />
                         </div>
                       </label>
                     </td>
@@ -339,8 +342,8 @@ export default function AttendancePage() {
                           onChange={() => handleStatusChange(student.id, 'excused')}
                           className="peer sr-only"
                         />
-                        <div className="w-6 h-6 rounded-lg border-2 border-slate-200 peer-checked:border-blue-500 peer-checked:bg-blue-500 transition-all flex items-center justify-center group-hover/radio:border-blue-200">
-                          <AlertCircle className="h-4 w-4 text-white scale-0 peer-checked:scale-100 transition-transform" />
+                        <div className="w-10 h-10 rounded-xl border-2 border-slate-200 peer-checked:border-blue-500 peer-checked:bg-blue-500 transition-all flex items-center justify-center group-hover/radio:border-blue-200 shadow-sm peer-checked:shadow-blue-100 peer-checked:shadow-lg">
+                          <AlertCircle className="h-6 w-6 text-white scale-0 peer-checked:scale-100 transition-all duration-300" />
                         </div>
                       </label>
                     </td>

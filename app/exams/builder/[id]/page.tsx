@@ -123,12 +123,34 @@ export default function QuizBuilder() {
         }
       }
 
-      const [subjectsRes, sectionsRes] = await Promise.all([
-        supabase.from('subjects').select('id, name'),
-        supabase.from('sections').select('id, name')
-      ]);
-      if (subjectsRes.data) setSubjects(subjectsRes.data);
-      if (sectionsRes.data) setSections(sectionsRes.data);
+      let subjectsData = [];
+      let sectionsData = [];
+
+      if (!user) return;
+
+      if (userIsAdmin) {
+        const [subjectsRes, sectionsRes] = await Promise.all([
+          supabase.from('subjects').select('id, name'),
+          supabase.from('sections').select('id, name')
+        ]);
+        subjectsData = subjectsRes.data || [];
+        sectionsData = sectionsRes.data || [];
+      } else {
+        // Fetch teacher's assigned subjects and sections
+        const [subjectsRes, sectionsRes] = await Promise.all([
+          supabase.from('teacher_subjects').select('subject:subjects(id, name)').eq('teacher_id', user.id),
+          supabase.from('teacher_sections').select('section:sections(id, name, classes(name))').eq('teacher_id', user.id)
+        ]);
+        
+        subjectsData = subjectsRes.data?.map((ts: any) => ts.subject) || [];
+        sectionsData = sectionsRes.data?.map((ts: any) => ({
+          id: ts.section.id,
+          name: `${ts.section.classes?.name} - ${ts.section.name}`
+        })) || [];
+      }
+      
+      setSubjects(subjectsData);
+      setSections(sectionsData);
 
       if (!isNew) {
         const { data: examData, error: examError } = await supabase

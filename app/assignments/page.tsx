@@ -125,24 +125,42 @@ export default function AssignmentsPage() {
 
   const fetchFormData = useCallback(async () => {
     try {
-      const [subjectsRes, sectionsRes, teachersRes] = await Promise.all([
-        supabase.from('subjects').select('id, name').order('name'),
-        supabase.from('sections').select('id, name, classes(name)').order('name'),
-        supabase.from('teachers').select('id, users(full_name)')
-      ]);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
 
-      if (subjectsRes.data) {
-        console.log('Fetched subjects:', subjectsRes.data);
-        setSubjects(subjectsRes.data);
+      const { data: userData } = await supabase.from('users').select('role').eq('id', user.id).single();
+      const isAdmin = userData?.role === 'admin' || userData?.role === 'management';
+
+      let subjectsData = [];
+      let sectionsData = [];
+      let teachersData = [];
+
+      if (isAdmin) {
+        const [subjectsRes, sectionsRes, teachersRes] = await Promise.all([
+          supabase.from('subjects').select('id, name').order('name'),
+          supabase.from('sections').select('id, name, classes(name)').order('name'),
+          supabase.from('teachers').select('id, users(full_name)')
+        ]);
+        subjectsData = subjectsRes.data || [];
+        sectionsData = sectionsRes.data || [];
+        teachersData = teachersRes.data || [];
+      } else {
+        // Fetch teacher's assigned subjects and sections
+        const [subjectsRes, sectionsRes] = await Promise.all([
+          supabase.from('teacher_subjects').select('subject:subjects(id, name)').eq('teacher_id', user.id),
+          supabase.from('teacher_sections').select('section:sections(id, name, classes(name))').eq('teacher_id', user.id)
+        ]);
+        
+        subjectsData = subjectsRes.data?.map((ts: any) => ts.subject) || [];
+        sectionsData = sectionsRes.data?.map((ts: any) => ts.section) || [];
+        // Only the current teacher
+        const { data: currentTeacher } = await supabase.from('teachers').select('id, users(full_name)').eq('id', user.id).single();
+        teachersData = currentTeacher ? [currentTeacher] : [];
       }
-      if (sectionsRes.data) {
-        console.log('Fetched sections:', sectionsRes.data);
-        setSections(sectionsRes.data);
-      }
-      if (teachersRes.data) {
-        console.log('Fetched teachers:', teachersRes.data);
-        setTeachers(teachersRes.data);
-      }
+
+      setSubjects(subjectsData);
+      setSections(sectionsData);
+      setTeachers(teachersData);
     } catch (error) {
       console.error('Error fetching form data:', error);
     }

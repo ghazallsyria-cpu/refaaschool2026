@@ -221,34 +221,20 @@ export default function MessagesPage() {
       if (!user) throw new Error('يجب تسجيل الدخول أولاً');
 
       if (isGroupMessage) {
-        // Send to all students in the section
-        if (filteredStudents.length === 0) {
-          throw new Error('لا يوجد طلاب في هذا الصف لإرسال الرسالة إليهم');
-        }
-
-        // Deduplicate students based on ID using a Set for guaranteed uniqueness
-        const uniqueStudentIds = new Set(filteredStudents.map(s => s.id));
-        const uniqueStudents = filteredStudents.filter(s => {
-          if (uniqueStudentIds.has(s.id)) {
-            uniqueStudentIds.delete(s.id);
-            return true;
-          }
-          return false;
+        // Use the new API route for group messages
+        const response = await fetch('/api/messages/send-group', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sectionId: selectedSectionId,
+            subject: newMessage.subject,
+            content: newMessage.content,
+            senderId: user.id,
+          }),
         });
 
-        const messagesToInsert = uniqueStudents.map(student => ({
-          sender_id: user.id,
-          receiver_id: student.id,
-          subject: newMessage.subject,
-          content: newMessage.content,
-          is_read: false
-        }));
-
-        const { error } = await supabase
-          .from('messages')
-          .insert(messagesToInsert);
-
-        if (error) throw error;
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'حدث خطأ أثناء إرسال الرسالة الجماعية');
       } else {
         // Individual message
         const { error } = await supabase

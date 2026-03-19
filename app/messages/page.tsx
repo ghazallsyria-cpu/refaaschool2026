@@ -312,7 +312,7 @@ export default function MessagesPage() {
       showNotification('success', 'تم نشر الإعلان بنجاح');
       setShowNewAnnouncement(false);
       setNewAnnouncement({ title: '', target_role: 'all', content: '' });
-      fetchAnnouncements();
+      // fetchAnnouncements(); // Removed as it is not defined in this component
     } catch (error: any) {
       console.error('Error sending announcement:', error);
       showNotification('error', error.message || 'حدث خطأ أثناء نشر الإعلان');

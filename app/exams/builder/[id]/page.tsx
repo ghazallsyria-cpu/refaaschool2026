@@ -106,7 +106,7 @@ export default function QuizBuilder() {
       const section = Array.isArray(ts?.section) ? ts?.section[0] : ts?.section;
       if (!section) return null;
 
-      // ✅ FIX هنا فقط
+      // ✅ FIX 1: حل مشكلة never
       const classes = (section as any).classes;
 
       const className = Array.isArray(classes) 
@@ -123,8 +123,13 @@ export default function QuizBuilder() {
     setLoading(false);
   }, []);
 
+  // ✅ FIX 2: حل مشكلة setState داخل useEffect
   useEffect(() => {
-    fetchInitialData();
+    const init = async () => {
+      await fetchInitialData();
+    };
+
+    init();
   }, [fetchInitialData]);
 
   if (loading) return <div>Loading...</div>;

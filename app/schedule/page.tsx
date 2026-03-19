@@ -20,9 +20,10 @@ export default function SchedulePage() {
   const [selectedSlot, setSelectedSlot] = useState<{day: number, period: number} | null>(null);
   const [formData, setFormData] = useState({ teacher_id: '', section_id: '', subject_id: '' });
   const [assignments, setAssignments] = useState<any[]>([]);
-  const [copiedLesson, setCopiedLesson] = useState<{subject_id: string, section_id: string, teacher_id: string} | null>(null);
+  const [copiedLesson, setCopiedLesson] = useState<any | null>(null);
   const [showAllSchedules, setShowAllSchedules] = useState(true);
   const [swappingFrom, setSwappingFrom] = useState<any | null>(null);
+  const [isSwapping, setIsSwapping] = useState(false);
 
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
@@ -90,17 +91,20 @@ export default function SchedulePage() {
     try {
       setLoading(true);
       
-      // If there's a lesson in the target slot, we swap them
+      const sourceDay = swappingFrom.day_of_week;
+      const sourcePeriod = swappingFrom.period;
+
       if (targetSlot) {
-        // Move target lesson to source position
+        // Swap two lessons
+        // We do this in two steps. 
+        // Note: If there are unique constraints, this might need a temporary position.
         const { error: err1 } = await supabase
           .from('schedules')
-          .update({ day_of_week: swappingFrom.day_of_week, period: swappingFrom.period })
+          .update({ day_of_week: sourceDay, period: sourcePeriod })
           .eq('id', targetSlot.id);
         
         if (err1) throw err1;
 
-        // Move source lesson to target position
         const { error: err2 } = await supabase
           .from('schedules')
           .update({ day_of_week: targetDay, period: targetPeriod })
@@ -108,7 +112,7 @@ export default function SchedulePage() {
         
         if (err2) throw err2;
       } else {
-        // Just move the source lesson to the empty target slot
+        // Move to empty slot
         const { error } = await supabase
           .from('schedules')
           .update({ day_of_week: targetDay, period: targetPeriod })
@@ -118,12 +122,13 @@ export default function SchedulePage() {
       }
 
       setSwappingFrom(null);
-      fetchSchedule();
+      setIsSwapping(false);
+      await fetchSchedule();
       alert('تم تبديل الحصص بنجاح');
     } catch (err) {
       console.error('Error swapping lessons:', err);
-      alert('حدث خطأ أثناء تبديل الحصص. قد يكون هناك تضارب في المواعيد.');
-      fetchSchedule(); // Refresh to show current state
+      alert('حدث خطأ أثناء تبديل الحصص. يرجى المحاولة مرة أخرى.');
+      fetchSchedule();
     } finally {
       setLoading(false);
     }
@@ -321,6 +326,56 @@ export default function SchedulePage() {
         </button>
       </div>
 
+      {/* Swapping Indicator */}
+      {isAdmin && swappingFrom && (
+        <div className="bg-indigo-600 text-white p-4 rounded-xl shadow-lg flex items-center justify-between animate-pulse sticky top-4 z-40 no-print">
+          <div className="flex items-center gap-3">
+            <div className="bg-white/20 p-2 rounded-lg">
+              <Users className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="font-bold">وضع تبديل الحصص نشط</p>
+              <p className="text-xs text-indigo-100">
+                أنت تقوم بنقل حصة: <span className="font-bold underline">{swappingFrom.subjects?.name}</span> ({swappingFrom.teachers?.users?.full_name})
+                <br />
+                انقر على أي خانة أخرى (فارغة أو مشغولة) لإتمام التبديل.
+              </p>
+            </div>
+          </div>
+          <button 
+            onClick={() => setSwappingFrom(null)}
+            className="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+          >
+            إلغاء التبديل
+          </button>
+        </div>
+      )}
+
+      {/* Copied Lesson Indicator */}
+      {isAdmin && copiedLesson && (
+        <div className="bg-emerald-600 text-white p-4 rounded-xl shadow-lg flex items-center justify-between sticky top-4 z-40 no-print mt-4">
+          <div className="flex items-center gap-3">
+            <div className="bg-white/20 p-2 rounded-lg">
+              <Info className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="font-bold">تم نسخ الحصة</p>
+              <p className="text-xs text-emerald-100">
+                الحصة المنسوخة: <span className="font-bold underline">{copiedLesson.subjects?.name}</span> ({copiedLesson.teachers?.users?.full_name})
+                <br />
+                انقر على أي خانة فارغة للصق هذه الحصة.
+              </p>
+            </div>
+          </div>
+          <button 
+            onClick={() => setCopiedLesson(null)}
+            className="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+          >
+            مسح النسخ
+          </button>
+        </div>
+      )}
+
       <div className="bg-white p-4 rounded-xl shadow-sm ring-1 ring-slate-200 print:hidden">
         <div className="flex flex-col sm:flex-row gap-4 items-center">
           <div className="flex rounded-md shadow-sm" role="group">
@@ -517,21 +572,30 @@ export default function SchedulePage() {
                         (viewType === 'teacher' ? s.teachers?.id !== selectedId : s.sections?.id !== selectedId)
                       ) : [];
 
+                      // Prioritize showing the swapping or copied lesson if it's in this slot
+                      const isSwappingFromThisSlot = swappingFrom && others.find(o => o.id === swappingFrom.id);
+                      const isCopiedFromThisSlot = copiedLesson && others.find(o => o.id === copiedLesson.id);
+                      const displaySlot = slot || (isSwappingFromThisSlot ? swappingFrom : (isCopiedFromThisSlot ? copiedLesson : others[0]));
+
                       return (
-                        <div key={`${day}-${period}`} className={`p-3 border border-slate-200 rounded-lg bg-white min-h-[100px] flex flex-col items-center justify-center text-center ${isAdmin ? 'cursor-pointer hover:bg-slate-50' : ''} ${slot?.teachers?.zoom_link ? 'cursor-pointer hover:bg-indigo-50' : ''} ${swappingFrom?.id === slot?.id && slot ? 'ring-2 ring-indigo-500 bg-indigo-50' : ''}`}
+                        <div key={`${day}-${period}`} className={`group p-3 border border-slate-200 rounded-lg bg-white min-h-[100px] flex flex-col items-center justify-center text-center transition-all ${isAdmin ? 'cursor-pointer hover:border-indigo-300 hover:shadow-sm' : ''} ${slot?.teachers?.zoom_link ? 'cursor-pointer hover:bg-indigo-50' : ''} ${swappingFrom?.id === displaySlot?.id && displaySlot ? 'ring-4 ring-indigo-500 bg-indigo-50 z-10 scale-105 shadow-md' : ''} ${copiedLesson?.id === displaySlot?.id && displaySlot ? 'ring-2 ring-emerald-500 bg-emerald-50' : ''}`}
                           onClick={() => {
                             if (isAdmin) {
                               if (swappingFrom) {
-                                if (swappingFrom.id === slot?.id) {
+                                if (swappingFrom.id === displaySlot?.id) {
                                   setSwappingFrom(null); // Cancel swap
                                 } else {
-                                  handleSwap(dayIndex, period, slot);
+                                  handleSwap(dayIndex, period, displaySlot);
                                 }
+                              } else if (displaySlot) {
+                                // If admin clicks an occupied slot and not swapping, maybe they want to start swapping?
+                                // Or we just let them use the button. Let's make the whole cell clickable for swap initiation if they want.
+                                // But they might want to edit. For now, let's keep the buttons for explicit actions but allow swap completion via cell click.
                               } else {
                                 setFormData({ 
-                                  teacher_id: viewType === 'teacher' ? selectedId : (copiedLesson?.teacher_id || ''), 
-                                  section_id: viewType === 'section' ? selectedId : (copiedLesson?.section_id || ''), 
-                                  subject_id: copiedLesson?.subject_id || '' 
+                                  teacher_id: viewType === 'teacher' ? selectedId : (copiedLesson?.teachers?.id || ''), 
+                                  section_id: viewType === 'section' ? selectedId : (copiedLesson?.sections?.id || ''), 
+                                  subject_id: copiedLesson?.subjects?.id || '' 
                                 });
                                 setSelectedSlot({day: dayIndex, period: period});
                                 setIsModalOpen(true);
@@ -541,59 +605,54 @@ export default function SchedulePage() {
                             }
                           }}
                         >
-                          {slot ? (
-                            <>
-                              <span className="font-bold text-indigo-700">{slot.subjects?.name}</span>
-                              {viewType === 'teacher' ? (
-                                <span className="text-sm text-slate-600 mt-1">
-                                  {slot.sections?.classes?.name} - {slot.sections?.name}
-                                </span>
-                              ) : (
-                                <span className="text-sm text-slate-600 mt-1">
-                                  {slot.teachers?.users?.full_name}
-                                </span>
-                              )}
-                              {slot.teachers?.zoom_link && (
-                                <span className="text-xs text-indigo-500 mt-1">رابط زوم</span>
+                          {displaySlot ? (
+                            <div className={!slot ? 'opacity-40' : ''}>
+                              <span className="font-bold text-indigo-700">{displaySlot.subjects?.name}</span>
+                              <div className="text-sm text-slate-600 mt-1">
+                                {viewType === 'teacher' ? (
+                                  `${displaySlot.sections?.classes?.name} - ${displaySlot.sections?.name}`
+                                ) : (
+                                  displaySlot.teachers?.users?.full_name
+                                )}
+                              </div>
+                              {displaySlot.teachers?.zoom_link && slot && (
+                                <span className="text-xs text-indigo-500 mt-1 block">رابط زوم</span>
                               )}
                               {isAdmin && (
-                                <div className="mt-2 flex flex-wrap justify-center gap-2">
+                                <div className="mt-2 flex flex-wrap justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity no-print">
                                   <button 
-                                    className="text-indigo-500 text-[10px] hover:underline" 
+                                    className="text-white text-[10px] bg-indigo-500 hover:bg-indigo-600 px-2 py-0.5 rounded shadow-sm transition-colors" 
                                     onClick={(e) => { 
                                       e.stopPropagation(); 
-                                      setCopiedLesson({
-                                        subject_id: slot.subjects?.id,
-                                        section_id: slot.sections?.id,
-                                        teacher_id: slot.teachers?.id
-                                      });
+                                      setCopiedLesson(displaySlot);
                                       alert('تم نسخ تفاصيل الحصة');
                                     }}
                                   >
                                     نسخ
                                   </button>
                                   <button 
-                                    className="text-amber-600 text-[10px] hover:underline" 
+                                    className="text-white text-[10px] bg-amber-500 hover:bg-amber-600 px-2 py-0.5 rounded shadow-sm transition-colors" 
                                     onClick={(e) => { 
                                       e.stopPropagation(); 
-                                      setSwappingFrom(slot);
+                                      setSwappingFrom(displaySlot);
                                     }}
                                   >
                                     تبديل
                                   </button>
-                                  <button className="text-red-500 text-[10px] hover:underline" onClick={(e) => { e.stopPropagation(); handleDeleteSchedule(slot.id); }}>حذف</button>
+                                  <button 
+                                    className="text-white text-[10px] bg-red-500 hover:bg-red-600 px-2 py-0.5 rounded shadow-sm transition-colors" 
+                                    onClick={(e) => { 
+                                      e.stopPropagation(); 
+                                      handleDeleteSchedule(displaySlot.id); 
+                                    }}
+                                  >
+                                    حذف
+                                  </button>
                                 </div>
                               )}
-                            </>
-                          ) : others.length > 0 ? (
-                            <div className="flex flex-col items-center opacity-40">
-                              <span className="text-[10px] font-bold text-slate-400 mb-1">حصص أخرى:</span>
-                              {others.slice(0, 2).map(o => (
-                                <div key={o.id} className="text-[9px] text-slate-500 leading-tight">
-                                  {viewType === 'teacher' ? o.sections?.name : o.teachers?.users?.full_name}
-                                </div>
-                              ))}
-                              {others.length > 2 && <span className="text-[8px] text-slate-400">+{others.length - 2} أخرى</span>}
+                              {!slot && others.length > 1 && (
+                                <span className="text-[8px] text-slate-400 block mt-1">+{others.length - 1} أخرى</span>
+                              )}
                             </div>
                           ) : (
                             <span className="text-slate-300 text-sm">-</span>
@@ -608,20 +667,20 @@ export default function SchedulePage() {
           </div>
         </div>
 
-        {/* Vertical Table for Print */}
+        {/* Vertical Table for Print (Days as Rows) */}
         <div className="hidden print:block p-4">
           <table className="print-table">
             <thead>
               <tr>
-                <th className="w-24">الحصة / اليوم</th>
-                {DAYS.map(day => <th key={day}>{day}</th>)}
+                <th className="w-32">اليوم / الحصة</th>
+                {PERIODS.map(p => <th key={p}>الحصة {p}</th>)}
               </tr>
             </thead>
             <tbody>
-              {PERIODS.map(period => (
-                <tr key={period}>
-                  <td className="font-bold bg-slate-50">الحصة {period}</td>
-                  {DAYS.map((day, dayIndex) => {
+              {DAYS.map((day, dayIndex) => (
+                <tr key={day}>
+                  <td className="font-bold bg-slate-50">{day}</td>
+                  {PERIODS.map(period => {
                     const slot = scheduleData.find(s => 
                       s.day_of_week === dayIndex && 
                       s.period === period && 
@@ -635,27 +694,29 @@ export default function SchedulePage() {
                     ) : [];
 
                     return (
-                      <td key={day} className="h-24">
+                      <td key={period} className="h-28">
                         {slot ? (
-                          <div className="flex flex-col items-center">
-                            <div className="font-bold">{slot.subjects?.name}</div>
-                            <div className="text-[10px]">
+                          <div className="flex flex-col items-center justify-center h-full gap-1">
+                            <div className="font-bold text-sm text-indigo-800">{slot.subjects?.name}</div>
+                            <div className="text-[10px] text-slate-700">
                               {viewType === 'teacher' 
                                 ? `${slot.sections?.classes?.name} - ${slot.sections?.name}`
                                 : slot.teachers?.users?.full_name}
                             </div>
                           </div>
                         ) : others.length > 0 ? (
-                          <div className="flex flex-col items-center">
-                            <span className="text-[8px] text-slate-400">مشغول:</span>
-                            {others.slice(0, 3).map(o => (
-                              <div key={o.id} className="text-[8px] leading-tight">
+                          <div className="flex flex-col items-center justify-center h-full opacity-60">
+                            <span className="text-[8px] text-slate-500 mb-1">مشغول:</span>
+                            {others.slice(0, 2).map(o => (
+                              <div key={o.id} className="text-[8px] leading-tight text-slate-600">
                                 {viewType === 'teacher' ? o.sections?.name : o.teachers?.users?.full_name}
                               </div>
                             ))}
-                            {others.length > 3 && <span className="text-[7px]">+{others.length - 3}</span>}
+                            {others.length > 2 && <span className="text-[7px] text-slate-400">+{others.length - 2}</span>}
                           </div>
-                        ) : null}
+                        ) : (
+                          <div className="text-slate-200">-</div>
+                        )}
                       </td>
                     );
                   })}

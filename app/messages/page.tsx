@@ -168,6 +168,8 @@ export default function MessagesPage() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('يجب تسجيل الدخول أولاً');
+      
+      console.log('Fetching messages for user:', user.id);
 
       const { data, error } = await supabase
         .from('messages')
@@ -183,34 +185,14 @@ export default function MessagesPage() {
         .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error fetching messages:', error);
+        throw error;
+      }
+      console.log('Fetched messages:', data);
       setMessages(data || []);
     } catch (error) {
       console.error('Error fetching messages:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchAnnouncements = async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('announcements')
-        .select(`
-          id,
-          title,
-          content,
-          target_role,
-          created_at,
-          author:author_id(full_name, role)
-        `)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setAnnouncements(data || []);
-    } catch (error) {
-      console.error('Error fetching announcements:', error);
     } finally {
       setLoading(false);
     }
@@ -245,7 +227,10 @@ export default function MessagesPage() {
           throw new Error('لا يوجد طلاب في هذا الصف لإرسال الرسالة إليهم');
         }
 
-        const messagesToInsert = filteredStudents.map(student => ({
+        // Deduplicate students based on ID
+        const uniqueStudents = Array.from(new Map(filteredStudents.map(s => [s.id, s])).values());
+
+        const messagesToInsert = uniqueStudents.map(student => ({
           sender_id: user.id,
           receiver_id: student.id,
           subject: newMessage.subject,

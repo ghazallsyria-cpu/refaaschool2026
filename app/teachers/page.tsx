@@ -823,9 +823,6 @@ export default function TeachersPage() {
                         تغيير كلمة المرور لهذا المعلم
                       </button>
                     </div>
-                  </div>
-                </form>
-              </div>
                     <div className="sm:col-span-2 space-y-2">
                       <label className="text-sm font-bold text-slate-700 mr-1">رابط زوم</label>
                       <input 

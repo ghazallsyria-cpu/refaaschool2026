@@ -450,7 +450,7 @@ export default function StudentsPage() {
                       </span>
                     </td>
                     <td className="relative whitespace-nowrap py-6 pl-10 pr-4 text-left">
-                      <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-all translate-x-4 group-hover:translate-x-0">
+                      <div className="flex items-center justify-end gap-2 transition-all">
                         <button 
                           onClick={(e) => { e.stopPropagation(); handleResetPasswordClick(student); }}
                           className="p-2.5 text-slate-400 hover:text-indigo-600 hover:bg-white rounded-xl transition-all shadow-sm hover:shadow-md bg-white/80 border border-white/20 backdrop-blur-sm"
@@ -516,6 +516,13 @@ export default function StudentsPage() {
                   </div>
                   
                   <div className="flex gap-2">
+                    <button 
+                      onClick={() => handleResetPasswordClick(student)}
+                      className="p-3 text-slate-400 hover:text-indigo-600 hover:bg-white rounded-2xl transition-all shadow-sm border border-transparent hover:border-white/20"
+                      title="إعادة تعيين كلمة المرور"
+                    >
+                      <Key className="h-5 w-5" />
+                    </button>
                     <button 
                       onClick={() => handleEditClick(student)}
                       className="p-3 text-slate-400 hover:text-indigo-600 hover:bg-white rounded-2xl transition-all shadow-sm border border-transparent hover:border-white/20"

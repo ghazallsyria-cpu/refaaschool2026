@@ -1,13 +1,11 @@
 -- Create helper function to get user role
 CREATE OR REPLACE FUNCTION public.get_user_role()
 RETURNS text
-LANGUAGE plpgsql
+LANGUAGE sql
 SECURITY DEFINER
-SET row_level_security = off
+SET ROLE postgres
 AS $$
-BEGIN
-  RETURN (SELECT role::text FROM public.users WHERE id = auth.uid());
-END;
+  SELECT role::text FROM public.users WHERE id = auth.uid();
 $$;
 
 -- Create helper function to update modified column

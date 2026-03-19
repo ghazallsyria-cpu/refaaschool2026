@@ -173,7 +173,8 @@ export default function QuizBuilder() {
           });
           const section = Array.isArray(ts?.section) ? ts?.section[0] : ts?.section;
           if (!section) return null;
-          const className = Array.isArray(section.classes) ? section.classes[0]?.name : section.classes?.name;
+          const sectionAny = section as any;
+          const className = Array.isArray(sectionAny.classes) ? sectionAny.classes[0]?.name : sectionAny.classes?.name;
           return {
             id: section.id,
             name: className ? `${className} - ${section.name}` : section.name

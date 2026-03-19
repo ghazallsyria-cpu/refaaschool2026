@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
-import { MessageSquare, Megaphone, Plus, Search, Send, User, Clock, Check, CheckCheck, X, UserPlus, Filter, Mail, Bell, ArrowRight, Users } from 'lucide-react';
+import { MessageSquare, Megaphone, Plus, Search, Send, User, Clock, Check, CheckCheck, X, UserPlus, Filter, Mail, Bell, ArrowRight, Users, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 type Tab = 'messages' | 'announcements';
@@ -10,6 +10,44 @@ type Tab = 'messages' | 'announcements';
 export default function MessagesPage() {
   const [activeTab, setActiveTab] = useState<Tab>('messages');
   const [messages, setMessages] = useState<any[]>([]);
+  const [groupedMessages, setGroupedMessages] = useState<any[]>([]);
+
+  // Group messages logic
+  useEffect(() => {
+    const group = messages.reduce((acc, msg) => {
+      const timestamp = new Date(msg.created_at).getTime();
+      const roundedTimestamp = Math.floor(timestamp / 5000) * 5000; // 5-second window
+      const key = `${msg.sender_id}-${msg.subject}-${msg.content}-${roundedTimestamp}`;
+      
+      if (!acc[key]) {
+        acc[key] = { ...msg, ids: [msg.id], count: 1 };
+      } else {
+        acc[key].ids.push(msg.id);
+        acc[key].count += 1;
+      }
+      return acc;
+    }, {});
+    setGroupedMessages(Object.values(group));
+  }, [messages]);
+
+  const handleDeleteMessage = async (messageIds: string[]) => {
+    if (!confirm('هل أنت متأكد من حذف هذه الرسالة؟')) return;
+    
+    try {
+      const { error } = await supabase
+        .from('messages')
+        .delete()
+        .in('id', messageIds);
+      
+      if (error) throw error;
+      
+      showNotification('success', 'تم حذف الرسالة بنجاح');
+      fetchMessages();
+    } catch (error: any) {
+      console.error('Error deleting message:', error);
+      showNotification('error', 'حدث خطأ أثناء حذف الرسالة');
+    }
+  };
   const [announcements, setAnnouncements] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -454,7 +492,7 @@ export default function MessagesPage() {
         ) : activeTab === 'messages' ? (
           /* Messages List */
           <div className="divide-y divide-slate-50">
-            {filteredMessages.length === 0 ? (
+            {groupedMessages.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-[500px] gap-6">
                 <div className="h-24 w-24 rounded-[2.5rem] bg-slate-50 flex items-center justify-center">
                   <Mail className="h-10 w-10 text-slate-200" />
@@ -465,9 +503,9 @@ export default function MessagesPage() {
                 </div>
               </div>
             ) : (
-              filteredMessages.map((message, idx) => (
+              groupedMessages.map((message, idx) => (
                 <motion.div 
-                  key={message.id}
+                  key={message.ids[0]}
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: idx * 0.05 }}
@@ -487,6 +525,7 @@ export default function MessagesPage() {
                         <div className="flex items-center gap-3">
                           <p className={`text-sm font-black ${!message.is_read ? 'text-slate-900' : 'text-slate-700'}`}>
                             {message.sender?.full_name || 'مستخدم غير معروف'}
+                            {message.count > 1 && <span className="text-xs text-slate-400 mr-2">(رسالة جماعية إلى {message.count} طلاب)</span>}
                           </p>
                           <span className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">
                             {message.sender?.role === 'admin' ? 'إدارة' : message.sender?.role === 'teacher' ? 'معلم' : 'طالب'}
@@ -504,7 +543,13 @@ export default function MessagesPage() {
                         {message.content}
                       </p>
                     </div>
-                    <div className="flex-shrink-0 self-center opacity-0 group-hover:opacity-100 transition-all translate-x-4 group-hover:translate-x-0">
+                    <div className="flex-shrink-0 self-center opacity-0 group-hover:opacity-100 transition-all translate-x-4 group-hover:translate-x-0 flex gap-2">
+                      <div 
+                        onClick={() => handleDeleteMessage(message.ids)}
+                        className="h-10 w-10 rounded-xl bg-white shadow-sm border border-slate-100 flex items-center justify-center text-slate-400 hover:text-red-600 hover:border-red-100 transition-all"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </div>
                       <div className="h-10 w-10 rounded-xl bg-white shadow-sm border border-slate-100 flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:border-indigo-100 transition-all">
                         <Send className="h-4 w-4" />
                       </div>

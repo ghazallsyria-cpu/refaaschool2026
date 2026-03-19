@@ -26,6 +26,8 @@ export default function AttendancePage() {
         .select('section:sections(id, name, classes(name))')
         .eq('teacher_id', user.id);
       
+      console.log('Fetched teacher_sections:', data);
+      
       if (error) throw error;
       
       const sectionsData = (data?.map(ts => ts.section) || []) as any[];

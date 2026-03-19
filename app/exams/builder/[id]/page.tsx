@@ -154,6 +154,11 @@ export default function QuizBuilder() {
       } else {
         // Default first question
         addQuestion('multiple_choice');
+        // Set teacher_id for new exam
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          setExam(prev => ({ ...prev, teacher_id: user.id }));
+        }
       }
     } catch (err) {
       console.error('Error fetching builder data:', err);

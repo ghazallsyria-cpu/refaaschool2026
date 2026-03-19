@@ -57,6 +57,9 @@ export default function MessagesPage() {
   const fetchMessages = async () => {
     setLoading(true);
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('يجب تسجيل الدخول أولاً');
+
       const { data, error } = await supabase
         .from('messages')
         .select(`
@@ -65,8 +68,10 @@ export default function MessagesPage() {
           content,
           is_read,
           created_at,
-          sender:sender_id(full_name, avatar_url, role)
+          sender:sender_id(full_name, avatar_url, role),
+          receiver:receiver_id(full_name)
         `)
+        .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
         .order('created_at', { ascending: false });
 
       if (error) throw error;

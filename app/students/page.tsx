@@ -635,6 +635,19 @@ export default function StudentsPage() {
                         ))}
                       </select>
                     </div>
+                    <div className="sm:col-span-2 pt-4 border-t border-slate-100">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowEditModal(false);
+                          handleResetPasswordClick(editingStudent);
+                        }}
+                        className="inline-flex items-center gap-2 text-sm font-bold text-indigo-600 hover:text-indigo-700 transition-colors"
+                      >
+                        <Key className="h-4 w-4" />
+                        تغيير كلمة المرور لهذا الطالب
+                      </button>
+                    </div>
                   </div>
                 </form>
               </div>

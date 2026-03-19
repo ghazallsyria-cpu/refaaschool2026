@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Plus, Search, Filter, Edit, Trash2, X, Key, BookOpen, AlertCircle, Users, GraduationCap, Briefcase, Save } from 'lucide-react';
+import { Plus, Search, Filter, Edit, Trash2, X, Key, BookOpen, AlertCircle, Users, GraduationCap, Briefcase, Save, Folder, ChevronLeft } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function TeachersPage() {
@@ -32,6 +32,7 @@ export default function TeachersPage() {
   });
 
   const [notification, setNotification] = useState<{type: 'success' | 'error', message: string} | null>(null);
+  const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
 
   const showNotification = (type: 'success' | 'error', message: string) => {
     setNotification({ type, message });
@@ -356,7 +357,7 @@ export default function TeachersPage() {
   ])) as string[];
 
   const filteredTeachers = teachers.filter(teacher => 
-    (activeTab === 'الكل' || teacher.specialization === activeTab) &&
+    (selectedFolder ? (teacher.specialization || 'غير محدد') === selectedFolder : (activeTab === 'الكل' || teacher.specialization === activeTab)) &&
     (teacher.users?.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     teacher.national_id?.includes(searchQuery))
   );
@@ -367,6 +368,9 @@ export default function TeachersPage() {
     acc[spec].push(teacher);
     return acc;
   }, {} as Record<string, any[]>);
+
+  // Get all unique specializations from all teachers (not just filtered)
+  const allSpecializations = Array.from(new Set(teachers.map(t => t.specialization || 'غير محدد'))).sort();
 
   return (
     <div className="space-y-10 relative pb-20">
@@ -400,12 +404,31 @@ export default function TeachersPage() {
           animate={{ opacity: 1, x: 0 }}
           className="space-y-2"
         >
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-indigo-50 text-indigo-600 border border-indigo-100 mb-2">
-            <Briefcase className="h-4 w-4" />
-            <span className="text-[10px] font-black uppercase tracking-[0.2em]">الموارد البشرية</span>
+          <div className="flex items-center gap-4 mb-2">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-indigo-50 text-indigo-600 border border-indigo-100">
+              <Briefcase className="h-4 w-4" />
+              <span className="text-[10px] font-black uppercase tracking-[0.2em]">الموارد البشرية</span>
+            </div>
+            {selectedFolder && (
+              <motion.button
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                onClick={() => setSelectedFolder(null)}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-slate-100 text-slate-600 border border-slate-200 hover:bg-slate-200 transition-all text-[10px] font-black uppercase tracking-[0.2em]"
+              >
+                <ChevronLeft className="h-3 w-3" />
+                العودة للأقسام
+              </motion.button>
+            )}
           </div>
-          <h1 className="text-5xl font-black text-slate-900 tracking-tight leading-tight">إدارة المعلمين</h1>
-          <p className="text-lg font-medium text-slate-400 max-w-lg">تنظيم الهيئة التدريسية، تعيين المواد، ومتابعة البيانات الشخصية للمعلمين.</p>
+          <h1 className="text-5xl font-black text-slate-900 tracking-tight leading-tight">
+            {selectedFolder ? `قسم ${selectedFolder}` : 'إدارة المعلمين'}
+          </h1>
+          <p className="text-lg font-medium text-slate-400 max-w-lg">
+            {selectedFolder 
+              ? `عرض جميع المعلمين المنتمين لقسم ${selectedFolder}.`
+              : 'تنظيم الهيئة التدريسية، تعيين المواد، ومتابعة البيانات الشخصية للمعلمين.'}
+          </p>
         </motion.div>
         
         <motion.button 
@@ -462,253 +485,263 @@ export default function TeachersPage() {
         </div>
       </motion.div>
 
-      <div className="glass-card overflow-hidden rounded-[3rem]">
-        {/* Desktop Table View */}
-        <div className="hidden md:block overflow-x-auto">
-          <table className="min-w-full divide-y divide-slate-100">
-            <thead className="bg-slate-50/50">
-              <tr>
-                <th scope="col" className="py-6 pr-10 pl-4 text-right text-xs font-black text-slate-400 uppercase tracking-[0.2em]">المعلم</th>
-                <th scope="col" className="px-4 py-6 text-right text-xs font-black text-slate-400 uppercase tracking-[0.2em]">الرقم المدني</th>
-                <th scope="col" className="px-4 py-6 text-right text-xs font-black text-slate-400 uppercase tracking-[0.2em]">التخصص</th>
-                <th scope="col" className="px-4 py-6 text-right text-xs font-black text-slate-400 uppercase tracking-[0.2em]">التعيينات</th>
-                <th scope="col" className="px-4 py-6 text-right text-xs font-black text-slate-400 uppercase tracking-[0.2em]">الحالة</th>
-                <th scope="col" className="relative py-6 pl-10 pr-4">
-                  <span className="sr-only">إجراءات</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-50 bg-white">
-              {loading ? (
-                <tr>
-                  <td colSpan={6} className="py-32 text-center">
-                    <div className="flex flex-col items-center gap-4">
-                      <div className="relative h-12 w-12">
-                        <div className="absolute inset-0 rounded-full border-4 border-indigo-50"></div>
-                        <div className="absolute inset-0 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent"></div>
-                      </div>
-                      <span className="text-sm font-bold text-slate-400 uppercase tracking-widest">جاري تحميل البيانات...</span>
+      {!selectedFolder ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          {allSpecializations.map((spec, idx) => {
+            const count = teachers.filter(t => (t.specialization || 'غير محدد') === spec).length;
+            return (
+              <motion.div
+                key={spec}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: idx * 0.05 }}
+                whileHover={{ y: -5, scale: 1.02 }}
+                onClick={() => setSelectedFolder(spec)}
+                className="glass-card p-8 rounded-[2.5rem] cursor-pointer group hover:shadow-2xl hover:shadow-indigo-100 transition-all border-2 border-transparent hover:border-indigo-100"
+              >
+                <div className="flex flex-col items-center text-center space-y-4">
+                  <div className="h-20 w-20 rounded-3xl bg-indigo-50 flex items-center justify-center text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-all duration-500 shadow-inner">
+                    <Folder className="h-10 w-10" />
+                  </div>
+                  <div className="space-y-1">
+                    <h3 className="text-xl font-black text-slate-900 group-hover:text-indigo-600 transition-colors">{spec}</h3>
+                    <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">{count} معلم</p>
+                  </div>
+                  <div className="pt-4 w-full">
+                    <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                      <motion.div 
+                        initial={{ width: 0 }}
+                        animate={{ width: '100%' }}
+                        className="h-full bg-indigo-500"
+                      />
                     </div>
-                  </td>
-                </tr>
-              ) : filteredTeachers.length === 0 ? (
+                  </div>
+                </div>
+              </motion.div>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="glass-card overflow-hidden rounded-[3rem]">
+          {/* Desktop Table View */}
+          <div className="hidden md:block overflow-x-auto">
+            <table className="min-w-full divide-y divide-slate-100">
+              <thead className="bg-slate-50/50">
                 <tr>
-                  <td colSpan={6} className="py-32 text-center">
-                    <div className="flex flex-col items-center gap-6">
-                      <div className="h-24 w-24 rounded-[2rem] bg-slate-50 flex items-center justify-center">
-                        <Search className="h-10 w-10 text-slate-200" />
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-xl font-black text-slate-900">لا يوجد نتائج</p>
-                        <p className="text-sm font-medium text-slate-400">لم نجد أي معلم يطابق معايير البحث الخاصة بك</p>
-                      </div>
-                    </div>
-                  </td>
+                  <th scope="col" className="py-6 pr-10 pl-4 text-right text-xs font-black text-slate-400 uppercase tracking-[0.2em]">المعلم</th>
+                  <th scope="col" className="px-4 py-6 text-right text-xs font-black text-slate-400 uppercase tracking-[0.2em]">الرقم المدني</th>
+                  <th scope="col" className="px-4 py-6 text-right text-xs font-black text-slate-400 uppercase tracking-[0.2em]">التخصص</th>
+                  <th scope="col" className="px-4 py-6 text-right text-xs font-black text-slate-400 uppercase tracking-[0.2em]">التعيينات</th>
+                  <th scope="col" className="px-4 py-6 text-right text-xs font-black text-slate-400 uppercase tracking-[0.2em]">الحالة</th>
+                  <th scope="col" className="relative py-6 pl-10 pr-4">
+                    <span className="sr-only">إجراءات</span>
+                  </th>
                 </tr>
-              ) : (
-                (Object.entries(groupedTeachers) as [string, any[]][]).map(([spec, teachersInSpec], groupIdx) => (
-                  <React.Fragment key={spec}>
-                    <tr className="bg-slate-50/30">
-                      <td colSpan={6} className="px-10 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="h-2 w-2 rounded-full bg-indigo-500" />
-                          <span className="text-xs font-black text-slate-900 uppercase tracking-[0.2em]">{spec}</span>
-                          <span className="text-[10px] font-bold text-slate-400 bg-white px-2 py-0.5 rounded-full border border-slate-100">
-                            {teachersInSpec.length} معلمين
+              </thead>
+              <tbody className="divide-y divide-slate-50 bg-white">
+                {loading ? (
+                  <tr>
+                    <td colSpan={6} className="py-32 text-center">
+                      <div className="flex flex-col items-center gap-4">
+                        <div className="relative h-12 w-12">
+                          <div className="absolute inset-0 rounded-full border-4 border-indigo-50"></div>
+                          <div className="absolute inset-0 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent"></div>
+                        </div>
+                        <span className="text-sm font-bold text-slate-400 uppercase tracking-widest">جاري تحميل البيانات...</span>
+                      </div>
+                    </td>
+                  </tr>
+                ) : filteredTeachers.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="py-32 text-center">
+                      <div className="flex flex-col items-center gap-6">
+                        <div className="h-24 w-24 rounded-[2rem] bg-slate-50 flex items-center justify-center">
+                          <Search className="h-10 w-10 text-slate-200" />
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-xl font-black text-slate-900">لا يوجد نتائج</p>
+                          <p className="text-sm font-medium text-slate-400">لم نجد أي معلم يطابق معايير البحث الخاصة بك</p>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  filteredTeachers.map((teacher, idx) => (
+                    <motion.tr 
+                      key={teacher.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: idx * 0.05 }}
+                      className="hover:bg-slate-50/80 transition-all group cursor-pointer"
+                    >
+                      <td className="whitespace-nowrap py-6 pr-10 pl-4">
+                        <div className="flex items-center gap-4">
+                          <div className="relative">
+                            <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-indigo-50 to-slate-50 flex items-center justify-center text-indigo-600 font-black text-sm border border-indigo-100 shadow-sm group-hover:scale-110 transition-transform">
+                              {teacher.users?.full_name?.charAt(0) || 'م'}
+                            </div>
+                            <div className="absolute -bottom-1 -left-1 w-4 h-4 bg-emerald-500 border-2 border-white rounded-full shadow-sm" />
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-sm font-black text-slate-900 group-hover:text-indigo-600 transition-colors">{teacher.users?.full_name || 'غير محدد'}</span>
+                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">{teacher.users?.email || 'لا يوجد بريد'}</span>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-6">
+                        <span className="text-sm font-bold text-slate-600 font-mono">{teacher.national_id}</span>
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-6">
+                        <span className="inline-flex items-center px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest bg-slate-100 text-slate-600 border border-slate-200">
+                          {teacher.specialization || 'غير محدد'}
+                        </span>
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-6">
+                        <div className="flex items-center gap-2">
+                          <div className="h-8 w-8 rounded-lg bg-indigo-50 flex items-center justify-center">
+                            <BookOpen className="h-4 w-4 text-indigo-500" />
+                          </div>
+                          <span className="text-sm font-black text-indigo-600">
+                            {teacher.teacher_sections?.length || 0} فصول
                           </span>
                         </div>
                       </td>
-                    </tr>
-                    {teachersInSpec.map((teacher, idx) => (
-                      <motion.tr 
-                        key={teacher.id}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: (groupIdx * 0.1) + (idx * 0.05) }}
-                        className="hover:bg-slate-50/80 transition-all group cursor-pointer"
-                      >
-                        <td className="whitespace-nowrap py-6 pr-10 pl-4">
-                          <div className="flex items-center gap-4">
-                            <div className="relative">
-                              <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-indigo-50 to-slate-50 flex items-center justify-center text-indigo-600 font-black text-sm border border-indigo-100 shadow-sm group-hover:scale-110 transition-transform">
-                                {teacher.users?.full_name?.charAt(0) || 'م'}
-                              </div>
-                              <div className="absolute -bottom-1 -left-1 w-4 h-4 bg-emerald-500 border-2 border-white rounded-full shadow-sm" />
-                            </div>
-                            <div className="flex flex-col">
-                              <span className="text-sm font-black text-slate-900 group-hover:text-indigo-600 transition-colors">{teacher.users?.full_name || 'غير محدد'}</span>
-                              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">{teacher.users?.email || 'لا يوجد بريد'}</span>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="whitespace-nowrap px-4 py-6">
-                          <span className="text-sm font-bold text-slate-600 font-mono">{teacher.national_id}</span>
-                        </td>
-                        <td className="whitespace-nowrap px-4 py-6">
-                          <span className="inline-flex items-center px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest bg-slate-100 text-slate-600 border border-slate-200">
-                            {teacher.specialization || 'غير محدد'}
-                          </span>
-                        </td>
-                        <td className="whitespace-nowrap px-4 py-6">
-                          <div className="flex items-center gap-2">
-                            <div className="h-8 w-8 rounded-lg bg-indigo-50 flex items-center justify-center">
-                              <BookOpen className="h-4 w-4 text-indigo-500" />
-                            </div>
-                            <span className="text-sm font-black text-indigo-600">
-                              {teacher.teacher_sections?.length || 0} فصول
-                            </span>
-                          </div>
-                        </td>
-                        <td className="whitespace-nowrap px-4 py-6">
-                          <span className="inline-flex items-center px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-emerald-50 text-emerald-600 border border-emerald-100">
-                            نشط
-                          </span>
-                        </td>
-                        <td className="relative whitespace-nowrap py-6 pl-10 pr-4 text-left">
-                          <div className="flex items-center justify-end gap-2 transition-all">
-                            <button 
-                              onClick={(e) => { e.stopPropagation(); handleAssignmentClick(teacher); }}
-                              className="p-2.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all shadow-sm hover:shadow-md bg-white border border-slate-100"
-                              title="تعيين الفصول والمواد"
-                            >
-                              <BookOpen className="h-4 w-4" />
-                            </button>
-                            <button 
-                              onClick={(e) => { e.stopPropagation(); handleResetPasswordClick(teacher); }}
-                              className="p-2.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all shadow-sm hover:shadow-md bg-white border border-slate-100"
-                              title="إعادة تعيين كلمة المرور"
-                            >
-                              <Key className="h-4 w-4" />
-                            </button>
-                            <button 
-                              onClick={(e) => { e.stopPropagation(); handleEditClick(teacher); }}
-                              className="p-2.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all shadow-sm hover:shadow-md bg-white border border-slate-100"
-                              title="تعديل"
-                            >
-                              <Edit className="h-4 w-4" />
-                            </button>
-                            <button 
-                              onClick={(e) => { e.stopPropagation(); handleDeleteClick(teacher.id); }}
-                              className="p-2.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all shadow-sm hover:shadow-md bg-white border border-slate-100"
-                              title="حذف"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          </div>
-                        </td>
-                      </motion.tr>
-                    ))}
-                  </React.Fragment>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                      <td className="whitespace-nowrap px-4 py-6">
+                        <span className="inline-flex items-center px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-emerald-50 text-emerald-600 border border-emerald-100">
+                          نشط
+                        </span>
+                      </td>
+                      <td className="relative whitespace-nowrap py-6 pl-10 pr-4 text-left">
+                        <div className="flex items-center justify-end gap-2 transition-all">
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); handleAssignmentClick(teacher); }}
+                            className="p-2.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all shadow-sm hover:shadow-md bg-white border border-slate-100"
+                            title="تعيين الفصول والمواد"
+                          >
+                            <BookOpen className="h-4 w-4" />
+                          </button>
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); handleResetPasswordClick(teacher); }}
+                            className="p-2.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all shadow-sm hover:shadow-md bg-white border border-slate-100"
+                            title="إعادة تعيين كلمة المرور"
+                          >
+                            <Key className="h-4 w-4" />
+                          </button>
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); handleEditClick(teacher); }}
+                            className="p-2.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all shadow-sm hover:shadow-md bg-white border border-slate-100"
+                            title="تعديل"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </button>
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); handleDeleteClick(teacher.id); }}
+                            className="p-2.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all shadow-sm hover:shadow-md bg-white border border-slate-100"
+                            title="حذف"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </motion.tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
 
-        {/* Mobile Card View */}
-        <div className="md:hidden p-6 grid gap-6">
-          {loading ? (
-            <div className="py-20 text-center">
-               <div className="h-10 w-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-               <span className="text-sm font-bold text-slate-400 uppercase tracking-widest">جاري التحميل...</span>
-            </div>
-          ) : filteredTeachers.length === 0 ? (
-            <div className="py-20 text-center text-sm font-bold text-slate-400 uppercase tracking-widest">
-              لا يوجد نتائج
-            </div>
-          ) : (
-            (Object.entries(groupedTeachers) as [string, any[]][]).map(([spec, teachersInSpec], groupIdx) => (
-              <React.Fragment key={spec}>
-                <div className="col-span-full px-4 py-2 bg-indigo-50/50 rounded-2xl border border-indigo-100/50">
-                  <div className="flex items-center gap-3">
-                    <div className="h-2 w-2 rounded-full bg-indigo-500" />
-                    <span className="text-xs font-black text-slate-900 uppercase tracking-[0.2em]">{spec}</span>
-                    <span className="text-[10px] font-bold text-slate-400 bg-white px-2 py-0.5 rounded-full border border-slate-100">
-                      {teachersInSpec.length} معلمين
-                    </span>
-                  </div>
-                </div>
-                {teachersInSpec.map((teacher, idx) => (
-                  <motion.div 
-                    key={teacher.id}
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: (groupIdx * 0.1) + (idx * 0.05) }}
-                    className="p-8 rounded-[2.5rem] bg-slate-50/50 border border-slate-100 space-y-8 relative overflow-hidden group"
-                  >
-                    <div className="flex justify-between items-start relative z-10">
-                      <div className="flex items-center gap-5">
-                        <div className="relative">
-                          <div className="h-16 w-16 rounded-3xl bg-white shadow-xl shadow-slate-200/50 flex items-center justify-center text-indigo-600 font-black text-xl border border-slate-100">
-                            {teacher.users?.full_name?.charAt(0) || 'م'}
-                          </div>
-                          <div className="absolute -bottom-1 -left-1 w-5 h-5 bg-emerald-500 border-4 border-white rounded-full" />
+          {/* Mobile Card View */}
+          <div className="md:hidden p-6 grid gap-6">
+            {loading ? (
+              <div className="py-20 text-center">
+                 <div className="h-10 w-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                 <span className="text-sm font-bold text-slate-400 uppercase tracking-widest">جاري التحميل...</span>
+              </div>
+            ) : filteredTeachers.length === 0 ? (
+              <div className="py-20 text-center text-sm font-bold text-slate-400 uppercase tracking-widest">
+                لا يوجد نتائج
+              </div>
+            ) : (
+              filteredTeachers.map((teacher, idx) => (
+                <motion.div 
+                  key={teacher.id}
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: idx * 0.05 }}
+                  className="p-8 rounded-[2.5rem] bg-slate-50/50 border border-slate-100 space-y-8 relative overflow-hidden group"
+                >
+                  <div className="flex justify-between items-start relative z-10">
+                    <div className="flex items-center gap-5">
+                      <div className="relative">
+                        <div className="h-16 w-16 rounded-3xl bg-white shadow-xl shadow-slate-200/50 flex items-center justify-center text-indigo-600 font-black text-xl border border-slate-100">
+                          {teacher.users?.full_name?.charAt(0) || 'م'}
                         </div>
-                        <div>
-                          <h3 className="text-lg font-black text-slate-900 leading-tight">{teacher.users?.full_name || 'غير محدد'}</h3>
-                          <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">{teacher.national_id}</p>
-                        </div>
+                        <div className="absolute -bottom-1 -left-1 w-5 h-5 bg-emerald-500 border-4 border-white rounded-full" />
                       </div>
-                      
-                      <div className="flex gap-2">
-                        <button 
-                          onClick={() => handleResetPasswordClick(teacher)}
-                          className="p-3 text-slate-400 hover:text-indigo-600 hover:bg-white rounded-2xl transition-all shadow-sm border border-transparent hover:border-slate-100"
-                          title="إعادة تعيين كلمة المرور"
-                        >
-                          <Key className="h-5 w-5" />
-                        </button>
-                        <button 
-                          onClick={() => handleEditClick(teacher)}
-                          className="p-3 text-slate-400 hover:text-indigo-600 hover:bg-white rounded-2xl transition-all shadow-sm border border-transparent hover:border-slate-100"
-                        >
-                          <Edit className="h-5 w-5" />
-                        </button>
-                        <button 
-                          onClick={() => handleDeleteClick(teacher.id)}
-                          className="p-3 text-slate-400 hover:text-red-600 hover:bg-white rounded-2xl transition-all shadow-sm border border-transparent hover:border-slate-100"
-                        >
-                          <Trash2 className="h-5 w-5" />
-                        </button>
+                      <div>
+                        <h3 className="text-lg font-black text-slate-900 leading-tight">{teacher.users?.full_name || 'غير محدد'}</h3>
+                        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">{teacher.national_id}</p>
                       </div>
                     </div>
-
-                    <div className="grid grid-cols-2 gap-4 relative z-10">
-                      <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] block mb-2">التخصص</span>
-                        <span className="text-sm font-bold text-slate-900">{teacher.specialization || 'غير محدد'}</span>
-                      </div>
-                      <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] block mb-2">التعيينات</span>
-                        <span className="text-sm font-black text-indigo-600">{teacher.teacher_sections?.length || 0} فصول</span>
-                      </div>
-                      <div className="col-span-2 bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] block mb-2">رقم الهاتف</span>
-                        <div className="flex items-center gap-3">
-                          <div className="h-8 w-8 rounded-xl bg-slate-50 flex items-center justify-center">
-                            <Users className="h-4 w-4 text-slate-400" />
-                          </div>
-                          <span className="text-sm font-bold text-slate-900">{teacher.users?.phone || 'غير محدد'}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <button 
-                      onClick={() => handleAssignmentClick(teacher)}
-                      className="w-full py-5 rounded-[1.5rem] bg-indigo-600 text-white text-xs font-black uppercase tracking-widest hover:bg-indigo-700 transition-all flex items-center justify-center gap-3 shadow-xl shadow-indigo-100"
-                    >
-                      <BookOpen className="h-5 w-5" />
-                      تعيين الفصول والمواد
-                    </button>
                     
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 blur-3xl rounded-full -translate-y-1/2 translate-x-1/2" />
-                  </motion.div>
-                ))}
-              </React.Fragment>
-            ))
-          )}
+                    <div className="flex gap-2">
+                      <button 
+                        onClick={() => handleResetPasswordClick(teacher)}
+                        className="p-3 text-slate-400 hover:text-indigo-600 hover:bg-white rounded-2xl transition-all shadow-sm border border-transparent hover:border-slate-100"
+                        title="إعادة تعيين كلمة المرور"
+                      >
+                        <Key className="h-5 w-5" />
+                      </button>
+                      <button 
+                        onClick={() => handleEditClick(teacher)}
+                        className="p-3 text-slate-400 hover:text-indigo-600 hover:bg-white rounded-2xl transition-all shadow-sm border border-transparent hover:border-slate-100"
+                      >
+                        <Edit className="h-5 w-5" />
+                      </button>
+                      <button 
+                        onClick={() => handleDeleteClick(teacher.id)}
+                        className="p-3 text-slate-400 hover:text-red-600 hover:bg-white rounded-2xl transition-all shadow-sm border border-transparent hover:border-slate-100"
+                      >
+                        <Trash2 className="h-5 w-5" />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 relative z-10">
+                    <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] block mb-2">التخصص</span>
+                      <span className="text-sm font-bold text-slate-900">{teacher.specialization || 'غير محدد'}</span>
+                    </div>
+                    <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] block mb-2">التعيينات</span>
+                      <span className="text-sm font-black text-indigo-600">{teacher.teacher_sections?.length || 0} فصول</span>
+                    </div>
+                    <div className="col-span-2 bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] block mb-2">رقم الهاتف</span>
+                      <div className="flex items-center gap-3">
+                        <div className="h-8 w-8 rounded-xl bg-slate-50 flex items-center justify-center">
+                          <Users className="h-4 w-4 text-slate-400" />
+                        </div>
+                        <span className="text-sm font-bold text-slate-900">{teacher.users?.phone || 'غير محدد'}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <button 
+                    onClick={() => handleAssignmentClick(teacher)}
+                    className="w-full py-5 rounded-[1.5rem] bg-indigo-600 text-white text-xs font-black uppercase tracking-widest hover:bg-indigo-700 transition-all flex items-center justify-center gap-3 shadow-xl shadow-indigo-100"
+                  >
+                    <BookOpen className="h-5 w-5" />
+                    تعيين الفصول والمواد
+                  </button>
+                  
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 blur-3xl rounded-full -translate-y-1/2 translate-x-1/2" />
+                </motion.div>
+              ))
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Edit Teacher Modal */}
       {showEditModal && (
@@ -777,6 +810,22 @@ export default function TeachersPage() {
                         <option value="أخرى">أخرى</option>
                       </select>
                     </div>
+                    <div className="sm:col-span-2 pt-4 border-t border-slate-100">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowEditModal(false);
+                          handleResetPasswordClick(editingTeacher);
+                        }}
+                        className="inline-flex items-center gap-2 text-sm font-bold text-indigo-600 hover:text-indigo-700 transition-colors"
+                      >
+                        <Key className="h-4 w-4" />
+                        تغيير كلمة المرور لهذا المعلم
+                      </button>
+                    </div>
+                  </div>
+                </form>
+              </div>
                     <div className="sm:col-span-2 space-y-2">
                       <label className="text-sm font-bold text-slate-700 mr-1">رابط زوم</label>
                       <input 

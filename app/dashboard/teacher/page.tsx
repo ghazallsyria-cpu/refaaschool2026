@@ -15,6 +15,8 @@ export default function TeacherDashboard() {
   const [sections, setSections] = useState<any[]>([]);
   const [recentExams, setRecentExams] = useState<any[]>([]);
   const [recentAssignments, setRecentAssignments] = useState<any[]>([]);
+  const [schedule, setSchedule] = useState<any[]>([]);
+  const [messages, setMessages] = useState<any[]>([]);
   const [stats, setStats] = useState({
     totalStudents: 0,
     totalExams: 0,
@@ -51,7 +53,7 @@ export default function TeacherDashboard() {
         // Fetch exams for the teacher's sections
         const sectionIds = sectionsData.map((s: any) => s.id);
         
-        const [examsRes, assignmentsRes] = await Promise.all([
+        const [examsRes, assignmentsRes, scheduleRes, messagesRes] = await Promise.all([
           supabase
             .from('exams')
             .select('*, subject:subjects(name), section:sections(name)')
@@ -63,11 +65,25 @@ export default function TeacherDashboard() {
             .select('*, subjects(name), sections(name, classes(name))')
             .in('section_id', sectionIds)
             .order('due_date', { ascending: true })
+            .limit(5),
+          supabase
+            .from('schedules')
+            .select('*, subjects(name), sections(name, classes(name))')
+            .eq('teacher_id', user.id)
+            .order('day_of_week')
+            .order('period'),
+          supabase
+            .from('messages')
+            .select('*, sender:sender_id(full_name)')
+            .eq('receiver_id', user.id)
+            .order('created_at', { ascending: false })
             .limit(5)
         ]);
         
         setRecentExams(examsRes.data || []);
         setRecentAssignments(assignmentsRes.data || []);
+        setSchedule(scheduleRes.data || []);
+        setMessages(messagesRes.data || []);
 
         // Calculate stats
         const totalStudents = sectionsData?.reduce((acc, s) => acc + (s.students?.[0]?.count || 0), 0) || 0;
@@ -293,23 +309,23 @@ export default function TeacherDashboard() {
               الجدول اليومي
             </h2>
             <div className="space-y-4">
-              {[
-                { time: '08:00 ص', subject: 'الرياضيات', class: 'الصف العاشر - أ', active: true },
-                { time: '09:30 ص', subject: 'الفيزياء', class: 'الصف الحادي عشر - ب', active: false },
-                { time: '11:00 ص', subject: 'الرياضيات', class: 'الصف العاشر - ج', active: false },
-              ].map((item, i) => (
-                <div key={i} className={`p-4 rounded-2xl border ${item.active ? 'border-indigo-200 bg-indigo-50/50' : 'border-slate-100'} transition-all`}>
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <p className={`font-bold ${item.active ? 'text-indigo-700' : 'text-slate-900'}`}>{item.subject}</p>
-                      <p className="text-xs text-slate-500 mt-1">{item.class}</p>
+              {schedule.length > 0 ? (
+                schedule.map((item, i) => (
+                  <div key={i} className="p-4 rounded-2xl border border-slate-100 hover:border-indigo-200 bg-slate-50/50 transition-all">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <p className="font-bold text-slate-900">{item.subjects?.name}</p>
+                        <p className="text-xs text-slate-500 mt-1">{item.sections?.classes?.name} - {item.sections?.name}</p>
+                      </div>
+                      <span className="text-xs font-bold px-2 py-1 rounded-lg bg-indigo-600 text-white">
+                        {item.period} - {['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'][item.day_of_week]}
+                      </span>
                     </div>
-                    <span className={`text-xs font-bold px-2 py-1 rounded-lg ${item.active ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500'}`}>
-                      {item.time}
-                    </span>
                   </div>
-                </div>
-              ))}
+                ))
+              ) : (
+                <p className="text-center text-slate-500">لا توجد حصص مجدولة</p>
+              )}
             </div>
           </div>
 
@@ -320,21 +336,22 @@ export default function TeacherDashboard() {
               تواصل أولياء الأمور
             </h2>
             <div className="space-y-4">
-              {[
-                { name: 'أحمد المحمد', message: 'استفسار عن نتيجة اختبار الرياضيات...', time: 'منذ ساعتين' },
-                { name: 'سارة العلي', message: 'شكراً جزيلاً على المتابعة المستمرة...', time: 'منذ 5 ساعات' },
-              ].map((item, i) => (
-                <div key={i} className="flex gap-3 p-3 rounded-2xl hover:bg-slate-50 transition-colors cursor-pointer">
-                  <div className="h-10 w-10 rounded-full bg-slate-100 flex-shrink-0 flex items-center justify-center font-bold text-slate-500">
-                    {item.name[0]}
+              {messages.length > 0 ? (
+                messages.map((item, i) => (
+                  <div key={i} className="flex gap-3 p-3 rounded-2xl hover:bg-slate-50 transition-colors cursor-pointer">
+                    <div className="h-10 w-10 rounded-full bg-slate-100 flex-shrink-0 flex items-center justify-center font-bold text-slate-500">
+                      {item.sender?.full_name?.charAt(0) || 'م'}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold text-slate-900 truncate">{item.sender?.full_name}</p>
+                      <p className="text-xs text-slate-500 truncate mt-0.5">{item.subject}</p>
+                      <p className="text-[10px] text-slate-400 mt-1">{new Date(item.created_at).toLocaleDateString('ar-SA')}</p>
+                    </div>
                   </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-bold text-slate-900 truncate">{item.name}</p>
-                    <p className="text-xs text-slate-500 truncate mt-0.5">{item.message}</p>
-                    <p className="text-[10px] text-slate-400 mt-1">{item.time}</p>
-                  </div>
-                </div>
-              ))}
+                ))
+              ) : (
+                <p className="text-center text-slate-500">لا توجد رسائل جديدة</p>
+              )}
             </div>
             <button className="w-full mt-4 py-2 text-sm font-bold text-indigo-600 border border-indigo-100 rounded-xl hover:bg-indigo-50 transition-all">
               فتح صندوق الرسائل

@@ -205,6 +205,44 @@ CREATE TABLE IF NOT EXISTS public.exam_attempts (
     feedback TEXT
 );
 
+-- Questions Table
+DO $$ BEGIN
+    CREATE TYPE question_type AS ENUM (
+        'multiple_choice', 
+        'true_false', 
+        'multi_select', 
+        'essay', 
+        'fill_in_blank', 
+        'matching', 
+        'ordering'
+    );
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
+
+CREATE TABLE IF NOT EXISTS public.questions (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    exam_id UUID REFERENCES public.exams(id) ON DELETE CASCADE NOT NULL,
+    type question_type NOT NULL,
+    content TEXT NOT NULL,
+    media_url TEXT,
+    media_type TEXT,
+    points NUMERIC DEFAULT 1 NOT NULL,
+    order_index INTEGER NOT NULL,
+    explanation TEXT,
+    metadata JSONB DEFAULT '{}'::JSONB,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
+);
+
+-- Question Options Table
+CREATE TABLE IF NOT EXISTS public.question_options (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    question_id UUID REFERENCES public.questions(id) ON DELETE CASCADE NOT NULL,
+    content TEXT NOT NULL,
+    is_correct BOOLEAN DEFAULT FALSE,
+    order_index INTEGER NOT NULL
+);
+
 -- Grades Table
 CREATE TABLE IF NOT EXISTS public.grades (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,

@@ -4,7 +4,8 @@ import { useState, useEffect, useCallback, use } from 'react';
 import { supabase } from '@/lib/supabase';
 import { FileText, Clock, Link as LinkIcon, Users, User, CheckCircle, AlertCircle, ArrowRight, Upload } from 'lucide-react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import AssignmentForm from '@/components/assignment-form';
+import { Question } from '@/components/assignment-builder';
 
 type Assignment = {
   id: string;
@@ -36,8 +37,10 @@ export default function AssignmentDetailsPage({ params }: { params: Promise<{ id
   
   const router = useRouter();
   const [assignment, setAssignment] = useState<Assignment | null>(null);
+  const [questions, setQuestions] = useState<Question[]>([]);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [mySubmission, setMySubmission] = useState<Submission | null>(null);
+  const [myAnswers, setMyAnswers] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
@@ -102,6 +105,24 @@ export default function AssignmentDetailsPage({ params }: { params: Promise<{ id
       if (assignmentError) throw assignmentError;
       setAssignment((assignmentData as unknown) as Assignment);
 
+      // Fetch questions
+      const { data: qData } = await supabase
+        .from('assignment_questions')
+        .select('*')
+        .eq('assignment_id', assignmentId)
+        .order('order');
+      
+      if (qData) {
+        setQuestions(qData.map(q => ({
+          id: q.id,
+          text: q.question_text,
+          type: q.question_type as any,
+          options: q.options,
+          points: q.points,
+          isRequired: q.is_required
+        })));
+      }
+
       // Fetch submissions based on role
       if (role === 'student') {
         // Fetch only my submission
@@ -116,6 +137,20 @@ export default function AssignmentDetailsPage({ params }: { params: Promise<{ id
           setMySubmission(subData as Submission);
           setContent(subData.content || '');
           setFileUrl(subData.file_url || '');
+
+          // Fetch answers
+          const { data: answersData } = await supabase
+            .from('assignment_answers')
+            .select('*')
+            .eq('submission_id', subData.id);
+          
+          if (answersData) {
+            const answersMap: Record<string, any> = {};
+            answersData.forEach(a => {
+              answersMap[a.question_id] = a.selected_options || a.answer_text;
+            });
+            setMyAnswers(answersMap);
+          }
         }
       } else if (role === 'teacher' || role === 'admin' || role === 'management') {
         // Fetch all submissions for this assignment
@@ -150,41 +185,55 @@ export default function AssignmentDetailsPage({ params }: { params: Promise<{ id
     fetchData();
   }, [fetchData]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!content && !fileUrl) {
-      showNotification('error', 'يرجى إدخال نص الإجابة أو إرفاق ملف');
-      return;
-    }
-
+  const handleSubmitAnswers = async (answers: Record<string, any>) => {
     setIsSubmitting(true);
     try {
-      const payload = {
+      // 1. Create or Update Submission
+      const submissionPayload = {
         assignment_id: assignmentId,
         student_id: studentId,
-        content,
-        file_url: fileUrl,
         status: 'submitted',
         submitted_at: new Date().toISOString()
       };
 
+      let submissionId: string;
       if (mySubmission) {
-        // Update existing
         const { error } = await supabase
           .from('assignment_submissions')
-          .update(payload)
+          .update(submissionPayload)
           .eq('id', mySubmission.id);
         if (error) throw error;
+        submissionId = mySubmission.id;
       } else {
-        // Insert new
-        const { error } = await supabase
+        const { data: newSub, error } = await supabase
           .from('assignment_submissions')
-          .insert([payload]);
+          .insert([submissionPayload])
+          .select()
+          .single();
         if (error) throw error;
+        submissionId = newSub.id;
       }
 
+      // 2. Save Answers
+      // Delete old answers
+      await supabase.from('assignment_answers').delete().eq('submission_id', submissionId);
+
+      const answersPayload = Object.entries(answers).map(([qId, value]) => {
+        const question = questions.find(q => q.id === qId);
+        const isMultiple = question?.type === 'multiple_choice' || question?.type === 'checkbox';
+        return {
+          submission_id: submissionId,
+          question_id: qId,
+          answer_text: isMultiple ? null : value,
+          selected_options: isMultiple ? value : null
+        };
+      });
+
+      const { error: answersError } = await supabase.from('assignment_answers').insert(answersPayload);
+      if (answersError) throw answersError;
+
       showNotification('success', 'تم تسليم الواجب بنجاح!');
-      await fetchData(); // Refresh data
+      await fetchData();
     } catch (error: any) {
       console.error('Error submitting assignment:', error);
       showNotification('error', 'حدث خطأ أثناء التسليم: ' + error.message);
@@ -313,49 +362,59 @@ export default function AssignmentDetailsPage({ params }: { params: Promise<{ id
               </div>
             ) : null}
 
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-2">نص الإجابة (اختياري إذا كان هناك ملف)</label>
-                <textarea
-                  rows={6}
-                  className="block w-full rounded-2xl border-0 py-4 px-4 text-slate-900 bg-slate-50 ring-1 ring-inset ring-slate-200 placeholder:text-slate-400 focus:ring-2 focus:ring-indigo-600 sm:text-sm transition-all resize-none"
-                  placeholder="اكتب إجابتك هنا..."
-                  value={content}
-                  onChange={(e) => setContent(e.target.value)}
-                  disabled={mySubmission?.grade !== undefined && mySubmission?.grade !== null}
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-bold text-slate-700 mb-2">رابط ملف الإجابة (اختياري)</label>
-                <input
-                  type="url"
-                  className="block w-full rounded-2xl border-0 py-4 px-4 text-slate-900 bg-slate-50 ring-1 ring-inset ring-slate-200 placeholder:text-slate-400 focus:ring-2 focus:ring-indigo-600 sm:text-sm transition-all"
-                  placeholder="https://..."
-                  value={fileUrl}
-                  onChange={(e) => setFileUrl(e.target.value)}
-                  disabled={mySubmission?.grade !== undefined && mySubmission?.grade !== null}
-                />
-                <p className="mt-2 text-xs text-slate-500">يمكنك رفع الملف على Google Drive أو أي خدمة سحابية ووضع الرابط هنا.</p>
-              </div>
-
-              {(!mySubmission || (mySubmission.grade === undefined || mySubmission.grade === null)) && (
-                <div className="pt-4">
-                  <button
-                    type="submit"
-                    disabled={isSubmitting}
-                    className="w-full flex justify-center items-center gap-2 rounded-2xl bg-indigo-600 px-8 py-4 text-sm font-black text-white shadow-xl shadow-indigo-200 hover:bg-indigo-700 hover:shadow-indigo-300 transition-all active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed"
-                  >
-                    {isSubmitting ? (
-                      <div className="h-5 w-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    ) : (
-                      <CheckCircle className="h-5 w-5" />
-                    )}
-                    {mySubmission ? 'تحديث التسليم' : 'تسليم الواجب'}
-                  </button>
+            {questions.length > 0 ? (
+              <AssignmentForm 
+                questions={questions} 
+                onSubmit={handleSubmitAnswers} 
+                isSubmitting={isSubmitting}
+                initialAnswers={myAnswers}
+                readOnly={mySubmission?.grade !== undefined && mySubmission?.grade !== null}
+              />
+            ) : (
+              <form onSubmit={(e) => { e.preventDefault(); handleSubmitAnswers({}); }} className="space-y-6">
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-2">نص الإجابة (اختياري إذا كان هناك ملف)</label>
+                  <textarea
+                    rows={6}
+                    className="block w-full rounded-2xl border-0 py-4 px-4 text-slate-900 bg-slate-50 ring-1 ring-inset ring-slate-200 placeholder:text-slate-400 focus:ring-2 focus:ring-indigo-600 sm:text-sm transition-all resize-none"
+                    placeholder="اكتب إجابتك هنا..."
+                    value={content}
+                    onChange={(e) => setContent(e.target.value)}
+                    disabled={mySubmission?.grade !== undefined && mySubmission?.grade !== null}
+                  />
                 </div>
-              )}
-            </form>
+                
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-2">رابط ملف الإجابة (اختياري)</label>
+                  <input
+                    type="url"
+                    className="block w-full rounded-2xl border-0 py-4 px-4 text-slate-900 bg-slate-50 ring-1 ring-inset ring-slate-200 placeholder:text-slate-400 focus:ring-2 focus:ring-indigo-600 sm:text-sm transition-all"
+                    placeholder="https://..."
+                    value={fileUrl}
+                    onChange={(e) => setFileUrl(e.target.value)}
+                    disabled={mySubmission?.grade !== undefined && mySubmission?.grade !== null}
+                  />
+                  <p className="mt-2 text-xs text-slate-500">يمكنك رفع الملف على Google Drive أو أي خدمة سحابية ووضع الرابط هنا.</p>
+                </div>
+
+                {(!mySubmission || (mySubmission.grade === undefined || mySubmission.grade === null)) && (
+                  <div className="pt-4">
+                    <button
+                      type="submit"
+                      disabled={isSubmitting}
+                      className="w-full flex justify-center items-center gap-2 rounded-2xl bg-indigo-600 px-8 py-4 text-sm font-black text-white shadow-xl shadow-indigo-200 hover:bg-indigo-700 hover:shadow-indigo-300 transition-all active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed"
+                    >
+                      {isSubmitting ? (
+                        <div className="h-5 w-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      ) : (
+                        <CheckCircle className="h-5 w-5" />
+                      )}
+                      {mySubmission ? 'تحديث التسليم' : 'تسليم الواجب'}
+                    </button>
+                  </div>
+                )}
+              </form>
+            )}
           </div>
         </div>
       )}

@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { Plus, Search, Edit2, Trash2, FileText, Calendar, Clock, Link as LinkIcon, X, BookOpen, Users, User, AlertCircle } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
 import Link from 'next/link';
+import AssignmentBuilder, { Question } from '@/components/assignment-builder';
 
 type Assignment = {
   id: string;
@@ -34,6 +35,7 @@ export default function AssignmentsPage() {
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentAssignment, setCurrentAssignment] = useState<Partial<Assignment>>({});
+  const [questions, setQuestions] = useState<Question[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [notification, setNotification] = useState<{type: 'success' | 'error', message: string} | null>(null);
@@ -235,6 +237,24 @@ export default function AssignmentsPage() {
           .update(payload)
           .eq('id', currentAssignment.id);
         if (error) throw error;
+
+        // Update Questions
+        // First delete old ones (simple approach)
+        await supabase.from('assignment_questions').delete().eq('assignment_id', currentAssignment.id);
+        
+        if (questions.length > 0) {
+          const questionsPayload = questions.map((q, index) => ({
+            assignment_id: currentAssignment.id,
+            question_text: q.text,
+            question_type: q.type,
+            options: q.options || null,
+            points: q.points,
+            is_required: q.isRequired,
+            order: index
+          }));
+          const { error: qError } = await supabase.from('assignment_questions').insert(questionsPayload);
+          if (qError) console.error('Error saving questions:', qError);
+        }
       } else {
         // Insert
         const { data: newAssignment, error } = await supabase
@@ -243,6 +263,21 @@ export default function AssignmentsPage() {
           .select()
           .single();
         if (error) throw error;
+
+        // Save Questions
+        if (questions.length > 0) {
+          const questionsPayload = questions.map((q, index) => ({
+            assignment_id: newAssignment.id,
+            question_text: q.text,
+            question_type: q.type,
+            options: q.options || null,
+            points: q.points,
+            is_required: q.isRequired,
+            order: index
+          }));
+          const { error: qError } = await supabase.from('assignment_questions').insert(questionsPayload);
+          if (qError) console.error('Error saving questions:', qError);
+        }
 
         // Send Notifications to students in the section
         try {
@@ -305,10 +340,11 @@ export default function AssignmentsPage() {
     const { data: { user } } = await supabase.auth.getUser();
     
     setCurrentAssignment({ due_date: formattedDate, teacher_id: user?.id });
+    setQuestions([]);
     setIsModalOpen(true);
   };
 
-  const openEditModal = (assignment: Assignment) => {
+  const openEditModal = async (assignment: Assignment) => {
     // Format date for datetime-local input
     const dateObj = new Date(assignment.due_date);
     const formattedDate = new Date(dateObj.getTime() - (dateObj.getTimezoneOffset() * 60000))
@@ -319,6 +355,32 @@ export default function AssignmentsPage() {
       ...assignment,
       due_date: formattedDate
     });
+
+    // Fetch questions
+    try {
+      const { data: qData } = await supabase
+        .from('assignment_questions')
+        .select('*')
+        .eq('assignment_id', assignment.id)
+        .order('order');
+      
+      if (qData) {
+        setQuestions(qData.map(q => ({
+          id: q.id,
+          text: q.question_text,
+          type: q.question_type as any,
+          options: q.options,
+          points: q.points,
+          isRequired: q.is_required
+        })));
+      } else {
+        setQuestions([]);
+      }
+    } catch (err) {
+      console.error('Error fetching questions:', err);
+      setQuestions([]);
+    }
+
     setIsModalOpen(true);
   };
 
@@ -646,6 +708,10 @@ export default function AssignmentsPage() {
                       onChange={(e) => setCurrentAssignment({...currentAssignment, file_url: e.target.value})}
                     />
                   </div>
+                </div>
+
+                <div className="pt-8 border-t border-slate-100">
+                  <AssignmentBuilder questions={questions} onChange={setQuestions} />
                 </div>
               </div>
 

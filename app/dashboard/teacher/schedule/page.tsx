@@ -5,11 +5,13 @@ import { supabase } from '@/lib/supabase';
 import { Calendar, Clock } from 'lucide-react';
 
 const DAYS = [
-  { id: 0, name: 'الأحد' },
-  { id: 1, name: 'الإثنين' },
-  { id: 2, name: 'الثلاثاء' },
-  { id: 3, name: 'الأربعاء' },
-  { id: 4, name: 'الخميس' },
+  { id: 0, name: 'السبت' },
+  { id: 1, name: 'الأحد' },
+  { id: 2, name: 'الإثنين' },
+  { id: 3, name: 'الثلاثاء' },
+  { id: 4, name: 'الأربعاء' },
+  { id: 5, name: 'الخميس' },
+  { id: 6, name: 'الجمعة' },
 ];
 
 const PERIODS = [1, 2, 3, 4, 5, 6, 7, 8];
@@ -95,19 +97,23 @@ export default function TeacherSchedulePage() {
                       return (
                         <td key={`${day.id}-${period}`} className="p-3 border-l border-b border-slate-100/50 h-32 min-w-[160px] align-top">
                           {cellData ? (
-                            <div className="h-full flex flex-col justify-between bg-gradient-to-br from-indigo-500 to-purple-600 rounded-3xl p-4 shadow-xl shadow-indigo-200/50 transform group-hover:scale-[1.02] transition-all duration-300 border border-white/20">
-                              <div>
-                                <div className="font-black text-white text-sm leading-tight mb-1">{cellData.subjects?.name}</div>
-                                <div className="text-[10px] text-indigo-100 font-bold uppercase tracking-widest opacity-80">{cellData.sections?.classes?.name}</div>
+                            <div className="h-full flex flex-col justify-between bg-gradient-to-br from-indigo-600 to-violet-700 rounded-3xl p-5 shadow-xl shadow-indigo-200/50 transform group-hover:scale-[1.02] transition-all duration-300 border border-white/20 relative overflow-hidden">
+                              <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -mr-12 -mt-12 blur-2xl" />
+                              <div className="relative z-10">
+                                <div className="font-black text-white text-base leading-tight mb-1">{cellData.subjects?.name}</div>
+                                <div className="text-[11px] text-indigo-100 font-bold uppercase tracking-widest opacity-90">{cellData.sections?.classes?.name}</div>
                               </div>
-                              <div className="flex items-center justify-between mt-2 pt-2 border-t border-white/10">
-                                <span className="text-[10px] font-black text-white/90 bg-white/20 px-2 py-1 rounded-lg">{cellData.sections?.name}</span>
-                                <Clock className="h-3 w-3 text-white/60" />
+                              <div className="relative z-10 flex items-center justify-between mt-2 pt-3 border-t border-white/20">
+                                <span className="text-[11px] font-black text-white bg-white/20 px-3 py-1 rounded-xl backdrop-blur-sm">{cellData.sections?.name}</span>
+                                <div className="flex items-center gap-1 text-white/60">
+                                  <Clock className="h-3.5 w-3.5" />
+                                  <span className="text-[10px] font-bold">الحصة {period}</span>
+                                </div>
                               </div>
                             </div>
                           ) : (
-                            <div className="h-full w-full flex items-center justify-center">
-                              <div className="h-1 w-4 bg-slate-100 rounded-full"></div>
+                            <div className="h-full w-full flex items-center justify-center rounded-3xl border-2 border-dashed border-slate-200 bg-slate-100/30 group-hover:bg-slate-100/50 transition-all duration-300">
+                              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">فارغ</span>
                             </div>
                           )}
                         </td>

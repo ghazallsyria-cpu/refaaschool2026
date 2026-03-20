@@ -102,18 +102,29 @@ export default function ExamsDashboard() {
 
       if (error) throw error;
 
-      // In a real app, we'd use a more complex query or multiple queries to get counts
-      // For this demo, we'll simulate some stats
-      const examsWithStats = data.map(exam => ({
-        ...exam,
-        _count: {
-          questions: Math.floor(Math.random() * 20) + 5,
-          attempts: Math.floor(Math.random() * 30)
-        },
-        stats: {
-          avg_score: Math.floor(Math.random() * 40) + 60,
-          total_students: Math.floor(Math.random() * 30)
-        }
+      // Fetch real stats for each exam
+      const examsWithStats = await Promise.all((data || []).map(async (exam) => {
+        const [questionsRes, attemptsRes] = await Promise.all([
+          supabase.from('questions').select('id', { count: 'exact', head: true }).eq('exam_id', exam.id),
+          supabase.from('exam_attempts').select('score', { count: 'exact' }).eq('exam_id', exam.id)
+        ]);
+
+        const attempts = attemptsRes.data || [];
+        const avgScore = attempts.length > 0 
+          ? Math.round(attempts.reduce((acc, curr) => acc + curr.score, 0) / attempts.length) 
+          : 0;
+
+        return {
+          ...exam,
+          _count: {
+            questions: questionsRes.count || 0,
+            attempts: attemptsRes.count || 0
+          },
+          stats: {
+            avg_score: avgScore,
+            total_students: attemptsRes.count || 0
+          }
+        };
       }));
 
       setExams(examsWithStats);
@@ -324,10 +335,7 @@ export default function ExamsDashboard() {
                                 </Link>
                               </DropdownMenu.Item>
                               <DropdownMenu.Separator className="h-px bg-slate-100 my-3 mx-3" />
-                              <DropdownMenu.Item 
-                                onClick={() => handleDelete(exam.id)}
-                                className="flex items-center gap-4 px-5 py-4 text-sm font-black text-red-600 hover:bg-red-50 rounded-2xl outline-none cursor-pointer transition-colors"
-                              >
+                              <DropdownMenu.Item className="flex items-center gap-4 px-5 py-4 text-sm font-black text-red-600 hover:bg-red-50 rounded-2xl outline-none cursor-pointer transition-colors">
                                 <Trash2 className="h-5 w-5" />
                                 <span>حذف الاختبار</span>
                               </DropdownMenu.Item>

@@ -40,21 +40,28 @@ export default function AdminDashboard() {
   useEffect(() => {
     async function fetchStats() {
       try {
+        const today = new Date().toISOString().split('T')[0];
         const [
           { count: studentsCount },
           { count: teachersCount },
-          { count: sectionsCount }
+          { count: sectionsCount },
+          { data: attendanceToday }
         ] = await Promise.all([
           supabase.from('students').select('*', { count: 'exact', head: true }),
           supabase.from('teachers').select('*', { count: 'exact', head: true }),
-          supabase.from('sections').select('*', { count: 'exact', head: true })
+          supabase.from('sections').select('*', { count: 'exact', head: true }),
+          supabase.from('attendance').select('status').eq('date', today)
         ]);
+
+        const attendanceRate = attendanceToday && attendanceToday.length > 0
+          ? Math.round((attendanceToday.filter(a => a.status === 'present' || a.status === 'late').length / attendanceToday.length) * 100)
+          : 0;
 
         setStats([
           { name: 'إجمالي الطلاب', value: (studentsCount || 0).toString(), icon: Users, color: 'text-indigo-600', bg: 'bg-indigo-50', trend: '+12%' },
           { name: 'إجمالي المعلمين', value: (teachersCount || 0).toString(), icon: GraduationCap, color: 'text-emerald-600', bg: 'bg-emerald-50', trend: '+3' },
           { name: 'إجمالي الفصول', value: (sectionsCount || 0).toString(), icon: BookOpen, color: 'text-amber-600', bg: 'bg-amber-50', trend: '0' },
-          { name: 'حضور اليوم', value: '92%', icon: CalendarDays, color: 'text-sky-600', bg: 'bg-sky-50', trend: '92%' },
+          { name: 'حضور اليوم', value: `${attendanceRate}%`, icon: CalendarDays, color: 'text-sky-600', bg: 'bg-sky-50', trend: `${attendanceRate}%` },
         ]);
       } catch (error) {
         console.error('Error fetching admin stats:', error);

@@ -56,7 +56,7 @@ export default function TeacherDashboard() {
         // Fetch exams for the teacher's sections
         const sectionIds = sectionsData.map((s: any) => s.id);
         
-        const [examsRes, assignmentsRes, scheduleRes, messagesRes] = await Promise.all([
+        const [examsRes, assignmentsRes, scheduleRes, messagesRes, attendanceRes, examsCountRes, assignmentsCountRes] = await Promise.all([
           supabase
             .from('exams')
             .select('*, subject:subjects(name), section:sections(name)')
@@ -80,7 +80,19 @@ export default function TeacherDashboard() {
             .select('*, sender:sender_id(full_name)')
             .eq('receiver_id', user.id)
             .order('created_at', { ascending: false })
-            .limit(5)
+            .limit(5),
+          supabase
+            .from('attendance')
+            .select('status')
+            .in('section_id', sectionIds),
+          supabase
+            .from('exams')
+            .select('id', { count: 'exact', head: true })
+            .in('section_id', sectionIds),
+          supabase
+            .from('assignments')
+            .select('id', { count: 'exact', head: true })
+            .in('section_id', sectionIds)
         ]);
         
         setRecentExams(examsRes.data || []);
@@ -88,13 +100,20 @@ export default function TeacherDashboard() {
         setSchedule(scheduleRes.data || []);
         setMessages(messagesRes.data || []);
 
+        // Calculate real attendance stats
+        const attendanceData = attendanceRes.data || [];
+        const presentCount = attendanceData.filter(a => a.status === 'present' || a.status === 'late').length;
+        const avgAttendance = attendanceData.length > 0 
+          ? Math.round((presentCount / attendanceData.length) * 100) 
+          : 100;
+
         // Calculate stats
         const totalStudents = sectionsData?.reduce((acc, s) => acc + (s.students?.[0]?.count || 0), 0) || 0;
         setStats({
           totalStudents,
-          totalExams: examsRes.data?.length || 0,
-          totalAssignments: assignmentsRes.data?.length || 0,
-          avgAttendance: 94 // Mock for now
+          totalExams: examsCountRes.count || 0,
+          totalAssignments: assignmentsCountRes.count || 0,
+          avgAttendance
         });
       }
     } catch (error) {

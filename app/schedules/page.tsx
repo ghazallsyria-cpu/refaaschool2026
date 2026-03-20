@@ -34,14 +34,16 @@ type Schedule = {
 };
 
 const DAYS = [
-  { id: 0, name: 'الأحد' },
-  { id: 1, name: 'الإثنين' },
-  { id: 2, name: 'الثلاثاء' },
-  { id: 3, name: 'الأربعاء' },
-  { id: 4, name: 'الخميس' },
+  { id: 0, name: 'السبت' },
+  { id: 1, name: 'الأحد' },
+  { id: 2, name: 'الإثنين' },
+  { id: 3, name: 'الثلاثاء' },
+  { id: 4, name: 'الأربعاء' },
+  { id: 5, name: 'الخميس' },
+  { id: 6, name: 'الجمعة' },
 ];
 
-const PERIODS = [1, 2, 3, 4, 5, 6, 7];
+const PERIODS = [1, 2, 3, 4, 5, 6, 7, 8];
 
 export default function SchedulesPage() {
   const [sections, setSections] = useState<Section[]>([]);
@@ -366,8 +368,8 @@ export default function SchedulesPage() {
                               </div>
                             </div>
                           ) : (
-                            <div className="h-full w-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                              <div className="flex items-center gap-1 text-xs font-medium text-indigo-600 bg-indigo-50 px-2 py-1 rounded-full">
+                            <div className="h-full w-full flex items-center justify-center bg-slate-50/50 rounded-xl border border-dashed border-slate-200 transition-all group-hover:bg-indigo-50/50 group-hover:border-indigo-200">
+                              <div className="flex items-center gap-1 text-[10px] font-black text-slate-400 uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">
                                 <Plus className="h-3 w-3" /> إضافة
                               </div>
                             </div>

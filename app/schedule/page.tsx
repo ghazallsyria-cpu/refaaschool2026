@@ -2,9 +2,9 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Printer, User, Users, Info, X } from 'lucide-react';
+import { Printer, User, Users, Info, X, Plus } from 'lucide-react';
 
-const DAYS = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
+const DAYS = ['السبت', 'الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة'];
 const PERIODS = [1, 2, 3, 4, 5, 6, 7, 8];
 
 export default function SchedulePage() {
@@ -617,7 +617,17 @@ export default function SchedulePage() {
                       const displaySlot = slot || (isSwappingFromThisSlot ? swappingFrom : (isCopiedFromThisSlot ? copiedLesson : others[0]));
 
                       return (
-                        <div key={`${day}-${period}`} className={`group p-3 border border-slate-200 rounded-lg bg-white min-h-[100px] flex flex-col items-center justify-center text-center transition-all ${isAdmin ? 'cursor-pointer hover:border-indigo-300 hover:shadow-sm' : ''} ${slot?.teachers?.zoom_link ? 'cursor-pointer hover:bg-indigo-50' : ''} ${swappingFrom?.id === displaySlot?.id && displaySlot ? 'ring-4 ring-indigo-500 bg-indigo-50 z-10 scale-105 shadow-md' : ''} ${copiedLesson?.id === displaySlot?.id && displaySlot ? 'ring-2 ring-emerald-500 bg-emerald-50' : ''}`}
+                        <div key={`${day}-${period}`} className={`group p-3 border rounded-xl min-h-[110px] flex flex-col items-center justify-center text-center transition-all relative overflow-hidden
+                          ${slot 
+                            ? 'bg-gradient-to-br from-indigo-600 to-violet-700 text-white shadow-lg shadow-indigo-200 border-transparent scale-[1.02] z-10' 
+                            : displaySlot 
+                              ? 'bg-slate-100 border-slate-200 text-slate-400' 
+                              : 'bg-slate-50/50 border-dashed border-slate-200 text-slate-300'
+                          }
+                          ${isAdmin ? 'cursor-pointer hover:ring-2 hover:ring-indigo-300' : ''} 
+                          ${slot?.teachers?.zoom_link ? 'cursor-pointer hover:brightness-110' : ''} 
+                          ${swappingFrom?.id === displaySlot?.id && displaySlot ? 'ring-4 ring-amber-500 bg-amber-50 z-20 scale-105 shadow-xl' : ''} 
+                          ${copiedLesson?.id === displaySlot?.id && displaySlot ? 'ring-4 ring-emerald-500 bg-emerald-50 z-20' : ''}`}
                           onClick={() => {
                             if (isAdmin) {
                               if (swappingFrom) {
@@ -645,9 +655,11 @@ export default function SchedulePage() {
                           }}
                         >
                           {displaySlot ? (
-                            <div className={!slot ? 'opacity-40' : ''}>
-                              <span className="font-bold text-indigo-700">{displaySlot.subjects?.name}</span>
-                              <div className="text-sm text-slate-600 mt-1">
+                            <div className="w-full">
+                              <span className={`font-black text-sm block mb-1 ${slot ? 'text-white' : 'text-slate-500'}`}>
+                                {displaySlot.subjects?.name}
+                              </span>
+                              <div className={`text-[10px] font-bold uppercase tracking-wider ${slot ? 'text-indigo-100' : 'text-slate-400'}`}>
                                 {viewType === 'teacher' ? (
                                   `${displaySlot.sections?.classes?.name} - ${displaySlot.sections?.name}`
                                 ) : (
@@ -655,12 +667,15 @@ export default function SchedulePage() {
                                 )}
                               </div>
                               {displaySlot.teachers?.zoom_link && slot && (
-                                <span className="text-xs text-indigo-500 mt-1 block">رابط زوم</span>
+                                <div className="mt-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/20 text-[9px] font-bold text-white backdrop-blur-sm">
+                                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                                  رابط زوم
+                                </div>
                               )}
                               {isAdmin && (
-                                <div className="mt-2 flex flex-wrap justify-center gap-1 no-print">
+                                <div className="mt-3 flex flex-wrap justify-center gap-1 no-print opacity-0 group-hover:opacity-100 transition-opacity">
                                   <button 
-                                    className="text-white text-[10px] bg-indigo-500 hover:bg-indigo-600 px-2 py-0.5 rounded shadow-sm transition-colors" 
+                                    className={`text-[9px] font-bold px-2 py-1 rounded shadow-sm transition-all ${slot ? 'bg-white/20 hover:bg-white/30 text-white' : 'bg-indigo-500 hover:bg-indigo-600 text-white'}`}
                                     onClick={(e) => { 
                                       e.stopPropagation(); 
                                       setCopiedLesson(displaySlot);
@@ -670,7 +685,7 @@ export default function SchedulePage() {
                                     نسخ
                                   </button>
                                   <button 
-                                    className="text-white text-[10px] bg-amber-500 hover:bg-amber-600 px-2 py-0.5 rounded shadow-sm transition-colors" 
+                                    className={`text-[9px] font-bold px-2 py-1 rounded shadow-sm transition-all ${slot ? 'bg-white/20 hover:bg-white/30 text-white' : 'bg-amber-500 hover:bg-amber-600 text-white'}`}
                                     onClick={(e) => { 
                                       e.stopPropagation(); 
                                       setSwappingFrom(displaySlot);
@@ -679,7 +694,7 @@ export default function SchedulePage() {
                                     تبديل
                                   </button>
                                   <button 
-                                    className="text-white text-[10px] bg-blue-500 hover:bg-blue-600 px-2 py-0.5 rounded shadow-sm transition-colors" 
+                                    className={`text-[9px] font-bold px-2 py-1 rounded shadow-sm transition-all ${slot ? 'bg-white/20 hover:bg-white/30 text-white' : 'bg-blue-500 hover:bg-blue-600 text-white'}`}
                                     onClick={(e) => { 
                                       e.stopPropagation(); 
                                       setEditingId(displaySlot.id);
@@ -695,7 +710,7 @@ export default function SchedulePage() {
                                     تعديل
                                   </button>
                                   <button 
-                                    className="text-white text-[10px] bg-red-500 hover:bg-red-600 px-2 py-0.5 rounded shadow-sm transition-colors" 
+                                    className={`text-[9px] font-bold px-2 py-1 rounded shadow-sm transition-all ${slot ? 'bg-white/20 hover:bg-white/30 text-white' : 'bg-red-500 hover:bg-red-600 text-white'}`}
                                     onClick={(e) => { 
                                       e.stopPropagation(); 
                                       handleDeleteSchedule(displaySlot.id); 
@@ -710,7 +725,14 @@ export default function SchedulePage() {
                               )}
                             </div>
                           ) : (
-                            <span className="text-slate-300 text-sm">-</span>
+                            <div className="flex flex-col items-center gap-1">
+                              <span className="text-slate-300 text-xs font-medium">فارغ</span>
+                              {isAdmin && (
+                                <div className="p-1.5 rounded-lg bg-slate-100 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <Plus className="w-4 h-4" />
+                                </div>
+                              )}
+                            </div>
                           )}
                         </div>
                       );

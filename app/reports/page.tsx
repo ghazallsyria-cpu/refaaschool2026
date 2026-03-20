@@ -110,8 +110,32 @@ export default function ReportsPage() {
         setDistributionData(distData);
       }
 
-      // We don't have a grades table yet, so we'll leave it empty for now
-      setGradesData([]);
+      // Fetch grades data
+      const { data: attemptsData } = await supabase
+        .from('exam_attempts')
+        .select('score, exam:exams(subject:subjects(name))');
+
+      if (attemptsData && attemptsData.length > 0) {
+        const subjectGrades: Record<string, { total: number, count: number }> = {};
+        
+        attemptsData.forEach((attempt: any) => {
+          const subjectName = attempt.exam?.subject?.name || 'غير محدد';
+          if (!subjectGrades[subjectName]) {
+            subjectGrades[subjectName] = { total: 0, count: 0 };
+          }
+          subjectGrades[subjectName].total += attempt.score;
+          subjectGrades[subjectName].count += 1;
+        });
+
+        const gData = Object.entries(subjectGrades).map(([subject, stats]) => ({
+          subject,
+          average: Math.round(stats.total / stats.count),
+        }));
+
+        setGradesData(gData);
+      } else {
+        setGradesData([]);
+      }
 
     } catch (error) {
       console.error('Error fetching stats:', error);

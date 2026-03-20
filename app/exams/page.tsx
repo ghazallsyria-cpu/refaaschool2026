@@ -134,6 +134,16 @@ export default function ExamsDashboard() {
     return matchesSearch && matchesStatus;
   });
 
+  const handleDelete = async (examId: string) => {
+    try {
+      const { error } = await supabase.from('exams').delete().eq('id', examId);
+      if (error) throw error;
+      setExams(exams.filter(e => e.id !== examId));
+    } catch (err) {
+      console.error('Error deleting exam:', err);
+    }
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'published': return 'bg-emerald-50 text-emerald-700 border-emerald-100 shadow-emerald-50';

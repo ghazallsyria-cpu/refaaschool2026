@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, use } from 'react';
 import { supabase } from '@/lib/supabase';
 import { FileText, Clock, Link as LinkIcon, Users, User, CheckCircle, AlertCircle, ArrowRight, Upload } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import AssignmentForm from '@/components/assignment-form';
 import { Question } from '@/components/assignment-builder';
 

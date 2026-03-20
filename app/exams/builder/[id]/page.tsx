@@ -305,6 +305,15 @@ export default function QuizBuilder() {
       return;
     }
 
+    // التحقق من أن مجموع درجات الأسئلة يساوي الدرجة الكلية
+    const totalPoints = questions.reduce((sum, q) => sum + (Number(q.points) || 0), 0);
+    const maxScore = Number(exam.max_score) || 0;
+
+    if (totalPoints !== maxScore) {
+      showNotification('error', `مجموع درجات الأسئلة (${totalPoints}) يجب أن يساوي الدرجة الكلية للاختبار (${maxScore})`);
+      return;
+    }
+
     setSaving(true);
     try {
       // 1. Save Exam
@@ -460,6 +469,23 @@ export default function QuizBuilder() {
           </div>
 
           <div className="flex items-center gap-3">
+            {/* مؤشر مجموع الدرجات */}
+            <div className={`hidden lg:flex items-center gap-3 px-5 py-3 rounded-2xl border font-black transition-all ${
+              questions.reduce((sum, q) => sum + (Number(q.points) || 0), 0) === (Number(exam.max_score) || 0)
+                ? 'bg-emerald-50/50 border-emerald-100 text-emerald-600'
+                : 'bg-amber-50/50 border-amber-100 text-amber-600'
+            }`}>
+              <div className={`h-2 w-2 rounded-full ${
+                questions.reduce((sum, q) => sum + (Number(q.points) || 0), 0) === (Number(exam.max_score) || 0)
+                  ? 'bg-emerald-500'
+                  : 'bg-amber-500 animate-pulse'
+              }`} />
+              <span className="text-xs uppercase tracking-widest opacity-60">مجموع الدرجات:</span>
+              <span className="text-lg tracking-tight">
+                {questions.reduce((sum, q) => sum + (Number(q.points) || 0), 0)} / {exam.max_score || 0}
+              </span>
+            </div>
+
             <button 
               onClick={() => router.push(`/exams/take/${params.id}`)}
               className="hidden md:flex items-center gap-3 px-6 py-3 text-sm font-black text-slate-600 hover:bg-white hover:shadow-lg rounded-2xl transition-all active:scale-95 border border-transparent hover:border-slate-100"
@@ -512,7 +538,7 @@ export default function QuizBuilder() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
                       <div className="space-y-3">
                         <label className="text-xs font-black text-slate-400 uppercase tracking-widest">مدة الاختبار (دقيقة)</label>
                         <div className="relative">
@@ -533,6 +559,18 @@ export default function QuizBuilder() {
                             type="number" 
                             value={exam.max_attempts}
                             onChange={(e) => setExam({...exam, max_attempts: parseInt(e.target.value)})}
+                            className="w-full pr-12 pl-4 py-4 rounded-2xl bg-slate-50 border-0 ring-1 ring-inset ring-slate-100 focus:ring-2 focus:ring-indigo-600 outline-none font-black text-slate-900 transition-all"
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-3">
+                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest">الدرجة الكلية</label>
+                        <div className="relative">
+                          <Hash className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
+                          <input 
+                            type="number" 
+                            value={exam.max_score}
+                            onChange={(e) => setExam({...exam, max_score: parseInt(e.target.value)})}
                             className="w-full pr-12 pl-4 py-4 rounded-2xl bg-slate-50 border-0 ring-1 ring-inset ring-slate-100 focus:ring-2 focus:ring-indigo-600 outline-none font-black text-slate-900 transition-all"
                           />
                         </div>
@@ -565,7 +603,7 @@ export default function QuizBuilder() {
               ) : (
                 <Save className="h-5 w-5" />
               )}
-              <span>حفظ الاختبار</span>
+              <span>{exam.status === 'published' ? 'حفظ ونشر الاختبار' : 'حفظ كمسودة'}</span>
             </button>
           </div>
         </div>

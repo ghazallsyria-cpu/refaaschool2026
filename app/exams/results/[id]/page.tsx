@@ -114,6 +114,8 @@ export default function ExamResults() {
     fetchData();
   }, [fetchData]);
 
+  const COLORS = ['#4f46e5', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
+
   const exportToExcel = () => {
     const data = attempts.map(a => ({
       'الطالب': a.student.full_name,

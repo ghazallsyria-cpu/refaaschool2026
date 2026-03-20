@@ -15,6 +15,9 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, 
   Tooltip, ResponsiveContainer, Cell, PieChart, Pie
 } from 'recharts';
+import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 type Attempt = {
   id: string;
@@ -81,6 +84,14 @@ export default function ExamResults() {
           pass_rate: Math.round((scores.filter(s => s >= 50).length / scores.length) * 100),
           total_attempts: scores.length
         });
+      } else {
+        setStats({
+          avg_score: 0,
+          max_score: 0,
+          min_score: 0,
+          pass_rate: 0,
+          total_attempts: 0
+        });
       }
 
       // Mock question analytics
@@ -103,9 +114,38 @@ export default function ExamResults() {
     fetchData();
   }, [fetchData]);
 
-  const COLORS = ['#4f46e5', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
+  const exportToExcel = () => {
+    const data = attempts.map(a => ({
+      'الطالب': a.student.full_name,
+      'البريد الإلكتروني': a.student.email,
+      'تاريخ التقديم': new Date(a.completed_at).toLocaleDateString(),
+      'الدرجة (%)': a.score,
+      'الحالة': a.score >= 50 ? 'ناجح' : 'راسب'
+    }));
 
-  if (loading) {
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'النتائج');
+    XLSX.writeFile(wb, `${exam?.title || 'نتائج_الاختبار'}.xlsx`);
+  };
+
+  const exportToPDF = () => {
+    const doc = new jsPDF();
+    doc.text(`نتائج الاختبار: ${exam?.title || ''}`, 14, 15);
+    
+    autoTable(doc, {
+      head: [['الطالب', 'تاريخ التقديم', 'الدرجة (%)', 'الحالة']],
+      body: attempts.map(a => [
+        a.student.full_name,
+        new Date(a.completed_at).toLocaleDateString(),
+        a.score.toString(),
+        a.score >= 50 ? 'ناجح' : 'راسب'
+      ]),
+      startY: 20,
+    });
+    
+    doc.save(`${exam?.title || 'نتائج_الاختبار'}.pdf`);
+  };
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-600"></div>
@@ -136,11 +176,17 @@ export default function ExamResults() {
           </div>
         </div>
         <div className="flex gap-3 self-start md:self-end">
-          <button className="flex items-center gap-3 px-6 py-4 rounded-2xl glass-card border border-white/60 hover:bg-white/80 text-slate-600 font-black transition-all shadow-xl shadow-slate-200/50 active:scale-95">
+          <button 
+            onClick={exportToExcel}
+            className="flex items-center gap-3 px-6 py-4 rounded-2xl glass-card border border-white/60 hover:bg-white/80 text-slate-600 font-black transition-all shadow-xl shadow-slate-200/50 active:scale-95"
+          >
             <FileSpreadsheet className="h-5 w-5 text-emerald-500" />
             <span>تصدير Excel</span>
           </button>
-          <button className="flex items-center gap-3 px-6 py-4 rounded-2xl bg-indigo-600 text-white hover:bg-indigo-700 font-black transition-all shadow-xl shadow-indigo-200 active:scale-95">
+          <button 
+            onClick={exportToPDF}
+            className="flex items-center gap-3 px-6 py-4 rounded-2xl bg-indigo-600 text-white hover:bg-indigo-700 font-black transition-all shadow-xl shadow-indigo-200 active:scale-95"
+          >
             <Download className="h-5 w-5" />
             <span>تقرير PDF</span>
           </button>

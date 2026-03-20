@@ -4,7 +4,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Printer, User, Users, Info, X, Plus } from 'lucide-react';
 
-const DAYS = ['السبت', 'الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة'];
+const DAYS = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
 const PERIODS = [1, 2, 3, 4, 5];
 
 export default function SchedulePage() {
@@ -801,6 +801,17 @@ export default function SchedulePage() {
               ))}
             </tbody>
           </table>
+          
+          {/* Print Footer */}
+          <div className="mt-8 pt-6 border-t border-slate-200 flex justify-between items-center">
+            <div className="text-right">
+              <p className="text-xs font-bold text-slate-900">منصة مدرستي الرقمية</p>
+              <p className="text-[10px] text-slate-500 mt-1">نظام إدارة التعليم المتكامل</p>
+            </div>
+            <div className="text-left">
+              <p className="text-[10px] text-slate-400">تم استخراج هذا الجدول بتاريخ {new Date().toLocaleDateString('ar-EG')}</p>
+            </div>
+          </div>
         </div>
       </div>
     </div>

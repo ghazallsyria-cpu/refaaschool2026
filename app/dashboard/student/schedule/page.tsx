@@ -6,13 +6,11 @@ import { Calendar, Clock, BookOpen, User } from 'lucide-react';
 import { motion } from 'motion/react';
 
 const DAYS = [
-  { id: 0, name: 'السبت' },
   { id: 1, name: 'الأحد' },
   { id: 2, name: 'الإثنين' },
   { id: 3, name: 'الثلاثاء' },
   { id: 4, name: 'الأربعاء' },
   { id: 5, name: 'الخميس' },
-  { id: 6, name: 'الجمعة' },
 ];
 
 const PERIODS = [1, 2, 3, 4, 5];

@@ -10,9 +10,65 @@ type Tab = 'messages' | 'announcements';
 export default function MessagesPage() {
   const [activeTab, setActiveTab] = useState<Tab>('messages');
   const [messages, setMessages] = useState<any[]>([]);
-  const [groupedMessages, setGroupedMessages] = useState<any[]>([]);
+  const [activeThread, setActiveThread] = useState<any | null>(null);
+  const [threadMessages, setThreadMessages] = useState<any[]>([]);
+  const [replyContent, setReplyContent] = useState('');
+  const [isReplying, setIsReplying] = useState(false);
 
-  // Group messages logic
+  const handleSendReply = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!replyContent.trim() || !activeThread) return;
+
+    setIsReplying(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('يجب تسجيل الدخول أولاً');
+
+      const { error } = await supabase
+        .from('messages')
+        .insert([{
+          sender_id: user.id,
+          receiver_id: activeThread.sender_id === user.id ? activeThread.receiver_id : activeThread.sender_id,
+          subject: `رد على: ${activeThread.subject}`,
+          content: replyContent,
+          parent_id: activeThread.ids[0],
+          is_read: false
+        }]);
+
+      if (error) throw error;
+
+      setReplyContent('');
+      fetchThread(activeThread.ids[0]);
+      showNotification('success', 'تم إرسال الرد بنجاح');
+    } catch (error: any) {
+      console.error('Error sending reply:', error);
+      showNotification('error', 'حدث خطأ أثناء إرسال الرد');
+    } finally {
+      setIsReplying(false);
+    }
+  };
+    try {
+      const { data, error } = await supabase
+        .from('messages')
+        .select(`
+          id,
+          subject,
+          content,
+          is_read,
+          created_at,
+          parent_id,
+          sender:sender_id(full_name, avatar_url, role)
+        `)
+        .eq('parent_id', parentId)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+      setThreadMessages(data || []);
+    } catch (error) {
+      console.error('Error fetching thread:', error);
+      showNotification('error', 'حدث خطأ أثناء تحميل النقاش');
+    }
+  };
   useEffect(() => {
     const group = messages.reduce((acc, msg) => {
       const timestamp = new Date(msg.created_at).getTime();
@@ -208,7 +264,7 @@ export default function MessagesPage() {
       
       console.log('Fetching messages for user:', user.id);
 
-      const { data, error } = await supabase
+      let query = supabase
         .from('messages')
         .select(`
           id,
@@ -216,11 +272,18 @@ export default function MessagesPage() {
           content,
           is_read,
           created_at,
+          parent_id,
           sender:sender_id(full_name, avatar_url, role),
           receiver:receiver_id(full_name)
         `)
-        .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
         .order('created_at', { ascending: false });
+
+      // Admin can see all messages, others only their own
+      if (currentUser?.role !== 'admin') {
+        query = query.or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`);
+      }
+
+      const { data, error } = await query;
 
       if (error) {
         console.error('Supabase error fetching messages:', error);
@@ -550,8 +613,11 @@ export default function MessagesPage() {
                       >
                         <Trash2 className="h-4 w-4" />
                       </div>
-                      <div className="h-10 w-10 rounded-xl bg-white shadow-sm border border-slate-100 flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:border-indigo-100 transition-all cursor-pointer">
-                        <Send className="h-4 w-4" />
+                      <div 
+                        onClick={() => { setActiveThread(message); fetchThread(message.ids[0]); }}
+                        className="h-10 w-10 rounded-xl bg-white shadow-sm border border-slate-100 flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:border-indigo-100 transition-all cursor-pointer"
+                      >
+                        <MessageSquare className="h-4 w-4" />
                       </div>
                     </div>
                   </div>
@@ -625,9 +691,70 @@ export default function MessagesPage() {
         )}
       </motion.div>
 
-      {/* New Message Modal */}
+      {/* Thread Modal */}
       <AnimatePresence>
-        {showNewMessage && (
+        {activeThread && (
+          <div className="fixed inset-0 z-50 overflow-y-auto">
+            <div className="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" 
+                onClick={() => setActiveThread(null)}
+              />
+              
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                className="relative transform overflow-hidden rounded-[2.5rem] bg-white text-right shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-2xl border border-white"
+              >
+                <div className="bg-white px-8 pb-8 pt-10 sm:p-10">
+                  <div className="flex items-center justify-between mb-10">
+                    <h3 className="text-2xl font-black text-slate-900 tracking-tight">
+                      {activeThread.subject}
+                    </h3>
+                    <button onClick={() => setActiveThread(null)} className="p-2 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-50 transition-all">
+                      <X className="h-6 w-6" />
+                    </button>
+                  </div>
+                  
+                  <div className="space-y-6 max-h-[400px] overflow-y-auto mb-8">
+                    <div className="p-4 bg-indigo-50 rounded-2xl">
+                      <p className="font-bold text-slate-900">{activeThread.sender?.full_name}</p>
+                      <p className="text-sm text-slate-600">{activeThread.content}</p>
+                    </div>
+                    {threadMessages.map(msg => (
+                      <div key={msg.id} className="p-4 bg-slate-50 rounded-2xl">
+                        <p className="font-bold text-slate-900">{msg.sender?.full_name}</p>
+                        <p className="text-sm text-slate-600">{msg.content}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  <form onSubmit={handleSendReply} className="flex gap-2">
+                    <input 
+                      type="text"
+                      value={replyContent}
+                      onChange={(e) => setReplyContent(e.target.value)}
+                      placeholder="اكتب رداً..."
+                      className="flex-1 rounded-2xl border-0 py-3 px-4 text-slate-900 bg-slate-50 ring-1 ring-inset ring-slate-100 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-indigo-500 sm:text-sm transition-all"
+                    />
+                    <button 
+                      type="submit"
+                      disabled={isReplying}
+                      className="rounded-2xl bg-indigo-600 px-6 py-3 text-sm font-bold text-white hover:bg-indigo-700 transition-all"
+                    >
+                      {isReplying ? 'جاري الإرسال...' : 'إرسال'}
+                    </button>
+                  </form>
+                </div>
+              </motion.div>
+            </div>
+          </div>
+        )}
+      </AnimatePresence>
           <div className="fixed inset-0 z-50 overflow-y-auto">
             <div className="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
               <motion.div 

@@ -2,10 +2,12 @@
 
 import { useState, useEffect, useCallback, use } from 'react';
 import { supabase } from '@/lib/supabase';
-import { FileText, Clock, Link as LinkIcon, Users, User, CheckCircle, AlertCircle, ArrowRight, Upload } from 'lucide-react';
+import { FileText, Clock, Link as LinkIcon, Users, User, CheckCircle, AlertCircle, ArrowRight, Upload, Edit2, Trash2, Settings, Share2, BarChart3, MoreVertical, Eye, X, Calendar } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import * as Dialog from '@radix-ui/react-dialog';
 import AssignmentForm from '@/components/assignment-form';
+import AssignmentBuilder from '@/components/assignment-builder';
 import { Question } from '@/components/assignment-builder';
 
 type Assignment = {
@@ -46,6 +48,16 @@ export default function AssignmentDetailsPage({ params }: { params: Promise<{ id
   const [userRole, setUserRole] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [studentId, setStudentId] = useState<string | null>(null);
+
+  // Management State
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<'submissions' | 'preview'>('submissions');
+  const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
+  const [editData, setEditData] = useState<Partial<Assignment>>({});
+  const [subjects, setSubjects] = useState<any[]>([]);
+  const [sections, setSections] = useState<any[]>([]);
+  const [teachers, setTeachers] = useState<any[]>([]);
 
   // Submission Form State
   const [content, setContent] = useState('');
@@ -105,6 +117,7 @@ export default function AssignmentDetailsPage({ params }: { params: Promise<{ id
 
       if (assignmentError) throw assignmentError;
       setAssignment((assignmentData as unknown) as Assignment);
+      setEditData(assignmentData as any);
 
       // Fetch questions
       const { data: qData } = await supabase
@@ -167,6 +180,21 @@ export default function AssignmentDetailsPage({ params }: { params: Promise<{ id
         if (!subsError && subsData) {
           setSubmissions(subsData as unknown as Submission[]);
         }
+      }
+
+      // Fetch form data for edit modal
+      if (role === 'teacher' || role === 'admin' || role === 'management') {
+        const [subjectsRes, sectionsRes, teachersRes] = await Promise.all([
+          supabase.from('subjects').select('id, name').order('name'),
+          supabase.from('sections').select('id, name, classes(name)').order('name'),
+          supabase.from('teachers').select('id, users(full_name)')
+        ]);
+        setSubjects(subjectsRes.data || []);
+        setSections((sectionsRes.data || []).map((s: any) => ({
+          ...s,
+          classes: Array.isArray(s.classes) ? s.classes[0] : s.classes
+        })));
+        setTeachers(teachersRes.data || []);
       }
 
     } catch (error: any) {
@@ -243,6 +271,64 @@ export default function AssignmentDetailsPage({ params }: { params: Promise<{ id
     }
   };
 
+  const handleUpdateAssignment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmittingEdit(true);
+    try {
+      const payload = {
+        title: editData.title,
+        description: editData.description || null,
+        due_date: new Date(editData.due_date!).toISOString(),
+      };
+
+      const { error } = await supabase
+        .from('assignments')
+        .update(payload)
+        .eq('id', assignmentId);
+
+      if (error) throw error;
+
+      // Update Questions
+      await supabase.from('assignment_questions').delete().eq('assignment_id', assignmentId);
+      if (questions.length > 0) {
+        const questionsPayload = questions.map((q, index) => ({
+          assignment_id: assignmentId,
+          question_text: q.text,
+          question_type: q.type,
+          options: q.options || null,
+          points: q.points,
+          is_required: q.isRequired,
+          order: index
+        }));
+        await supabase.from('assignment_questions').insert(questionsPayload);
+      }
+
+      showNotification('success', 'تم تحديث الواجب بنجاح');
+      setIsEditModalOpen(false);
+      await fetchData();
+    } catch (error: any) {
+      showNotification('error', 'خطأ في التحديث: ' + error.message);
+    } finally {
+      setIsSubmittingEdit(false);
+    }
+  };
+
+  const handleDeleteAssignment = async () => {
+    try {
+      const { error } = await supabase.from('assignments').delete().eq('id', assignmentId);
+      if (error) throw error;
+      router.push('/assignments');
+    } catch (error: any) {
+      showNotification('error', 'خطأ في الحذف: ' + error.message);
+    }
+  };
+
+  const copyAssignmentLink = () => {
+    const url = window.location.href;
+    navigator.clipboard.writeText(url);
+    showNotification('success', 'تم نسخ رابط الواجب');
+  };
+
   if (loading) {
     return (
       <div className="flex flex-col justify-center items-center py-32 gap-4">
@@ -279,13 +365,52 @@ export default function AssignmentDetailsPage({ params }: { params: Promise<{ id
       )}
 
       {/* Header */}
-      <div className="flex items-center gap-4">
-        <Link href="/assignments" className="h-12 w-12 flex items-center justify-center rounded-2xl bg-white shadow-sm border border-slate-100 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition-all">
-          <ArrowRight className="h-6 w-6" />
-        </Link>
-        <div>
-          <h1 className="text-3xl font-black text-slate-900 tracking-tight">{assignment.title}</h1>
-          <p className="text-slate-500 font-medium mt-1">{assignment.subjects?.name} - {assignment.sections?.classes?.name} {assignment.sections?.name}</p>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div className="flex items-center gap-4">
+          <Link href="/assignments" className="h-12 w-12 flex items-center justify-center rounded-2xl bg-white shadow-sm border border-slate-100 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition-all">
+            <ArrowRight className="h-6 w-6" />
+          </Link>
+          <div>
+            <div className="flex items-center gap-3">
+              <h1 className="text-3xl font-black text-slate-900 tracking-tight">{assignment.title}</h1>
+              {new Date(assignment.due_date) < new Date() ? (
+                <span className="px-3 py-1 bg-red-50 text-red-600 border border-red-100 rounded-full text-[10px] font-black uppercase tracking-wider">منتهي</span>
+              ) : (
+                <span className="px-3 py-1 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-full text-[10px] font-black uppercase tracking-wider">نشط</span>
+              )}
+            </div>
+            <p className="text-slate-500 font-medium mt-1">{assignment.subjects?.name} - {assignment.sections?.classes?.name} {assignment.sections?.name}</p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={copyAssignmentLink}
+            className="h-12 px-4 rounded-2xl bg-white border border-slate-100 text-slate-600 hover:text-indigo-600 hover:bg-indigo-50 transition-all flex items-center gap-2 shadow-sm font-bold"
+            title="نسخ الرابط"
+          >
+            <Share2 className="h-5 w-5" />
+            <span className="hidden sm:inline">مشاركة</span>
+          </button>
+
+          {(userRole === 'teacher' || userRole === 'admin' || userRole === 'management') && (
+            <>
+              <button 
+                onClick={() => setIsEditModalOpen(true)}
+                className="h-12 px-6 rounded-2xl bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-all flex items-center gap-2 font-black shadow-sm"
+              >
+                <Edit2 className="h-5 w-5" />
+                <span>تعديل</span>
+              </button>
+              <button 
+                onClick={() => setIsDeleteModalOpen(true)}
+                className="h-12 w-12 flex items-center justify-center rounded-2xl bg-red-50 text-red-600 hover:bg-red-100 transition-all shadow-sm"
+                title="حذف"
+              >
+                <Trash2 className="h-5 w-5" />
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -420,66 +545,236 @@ export default function AssignmentDetailsPage({ params }: { params: Promise<{ id
         </div>
       )}
 
-      {/* Teacher View: Submissions List */}
+      {/* Teacher View: Submissions List & Preview */}
       {(userRole === 'teacher' || userRole === 'admin' || userRole === 'management') && (
-        <div className="glass-card rounded-4xl shadow-xl shadow-slate-200/50 border border-white/60 overflow-hidden">
-          <div className="p-8 border-b border-slate-100/50 bg-slate-50/50 flex items-center justify-between">
-            <h2 className="text-2xl font-black text-slate-900 flex items-center gap-3">
-              <div className="p-3 bg-indigo-100 text-indigo-600 rounded-2xl">
-                <Users className="h-6 w-6" />
-              </div>
-              تسليمات الطلاب
-            </h2>
-            <div className="px-4 py-2 bg-white rounded-xl shadow-sm border border-slate-100 text-sm font-bold text-slate-600">
-              الإجمالي: {submissions.length}
-            </div>
+        <div className="space-y-8">
+          <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-2xl w-fit">
+            <button 
+              onClick={() => setActiveTab('submissions')}
+              className={`px-6 py-2.5 rounded-xl text-sm font-black transition-all flex items-center gap-2 ${activeTab === 'submissions' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              <Users className="h-4 w-4" />
+              التسليمات
+            </button>
+            <button 
+              onClick={() => setActiveTab('preview')}
+              className={`px-6 py-2.5 rounded-xl text-sm font-black transition-all flex items-center gap-2 ${activeTab === 'preview' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              <Eye className="h-4 w-4" />
+              معاينة الطالب
+            </button>
           </div>
-          
-          <div className="p-0">
-            {submissions.length === 0 ? (
-              <div className="text-center py-16">
-                <div className="h-16 w-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <FileText className="h-8 w-8 text-slate-300" />
-                </div>
-                <p className="text-slate-500 font-medium">لم يقم أي طالب بتسليم الواجب حتى الآن.</p>
-              </div>
-            ) : (
-              <div className="divide-y divide-slate-100">
-                {submissions.map((sub) => (
-                  <div key={sub.id} className="p-6 hover:bg-slate-50/50 transition-colors">
-                    <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
-                      <div>
-                        <h3 className="font-bold text-slate-900 text-lg">{sub.students?.users?.full_name || 'طالب غير معروف'}</h3>
-                        <p className="text-sm text-slate-500 mt-1 flex items-center gap-2">
-                          <Clock className="h-4 w-4" />
-                          {new Date(sub.submitted_at).toLocaleString('ar-EG')}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        {sub.grade !== null && sub.grade !== undefined ? (
-                          <span className="px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-lg text-sm font-bold">
-                            الدرجة: {sub.grade}
-                          </span>
-                        ) : (
-                          <span className="px-3 py-1 bg-amber-50 text-amber-700 border border-amber-100 rounded-lg text-sm font-bold">
-                            بانتظار التقييم
-                          </span>
-                        )}
-                        <Link 
-                          href={`/assignments/${assignmentId}/submissions/${sub.id}`}
-                          className="px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-xl text-sm font-bold hover:bg-slate-50 hover:text-indigo-600 transition-colors"
-                        >
-                          عرض وتقييم
-                        </Link>
-                      </div>
-                    </div>
+
+          {activeTab === 'submissions' ? (
+            <div className="glass-card rounded-4xl shadow-xl shadow-slate-200/50 border border-white/60 overflow-hidden">
+              <div className="p-8 border-b border-slate-100/50 bg-slate-50/50 flex items-center justify-between">
+                <h2 className="text-2xl font-black text-slate-900 flex items-center gap-3">
+                  <div className="p-3 bg-indigo-100 text-indigo-600 rounded-2xl">
+                    <Users className="h-6 w-6" />
                   </div>
-                ))}
+                  تسليمات الطلاب
+                </h2>
+                <div className="flex items-center gap-4">
+                  <div className="px-4 py-2 bg-white rounded-xl shadow-sm border border-slate-100 text-sm font-bold text-slate-600">
+                    الإجمالي: {submissions.length}
+                  </div>
+                  <div className="px-4 py-2 bg-emerald-50 text-emerald-700 rounded-xl shadow-sm border border-emerald-100 text-sm font-bold">
+                    تم التقييم: {submissions.filter(s => s.grade !== null).length}
+                  </div>
+                </div>
               </div>
-            )}
-          </div>
+              
+              <div className="p-0">
+                {submissions.length === 0 ? (
+                  <div className="text-center py-16">
+                    <div className="h-16 w-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <FileText className="h-8 w-8 text-slate-300" />
+                    </div>
+                    <p className="text-slate-500 font-medium">لم يقم أي طالب بتسليم الواجب حتى الآن.</p>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-slate-100">
+                    {submissions.map((sub) => (
+                      <div key={sub.id} className="p-6 hover:bg-slate-50/50 transition-colors">
+                        <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+                          <div className="flex items-center gap-4">
+                            <div className="h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
+                              <User className="h-6 w-6" />
+                            </div>
+                            <div>
+                              <h3 className="font-bold text-slate-900 text-lg">{sub.students?.users?.full_name || 'طالب غير معروف'}</h3>
+                              <p className="text-sm text-slate-500 mt-1 flex items-center gap-2">
+                                <Clock className="h-4 w-4" />
+                                {new Date(sub.submitted_at).toLocaleString('ar-EG')}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            {sub.grade !== null && sub.grade !== undefined ? (
+                              <div className="flex flex-col items-end">
+                                <span className="px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-lg text-xs font-black">
+                                  الدرجة: {sub.grade}
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="px-3 py-1 bg-amber-50 text-amber-700 border border-amber-100 rounded-lg text-xs font-black">
+                                بانتظار التقييم
+                              </span>
+                            )}
+                            <Link 
+                              href={`/assignments/${assignmentId}/submissions/${sub.id}`}
+                              className="h-10 px-6 rounded-xl bg-white border border-slate-200 text-slate-700 text-sm font-black hover:bg-indigo-600 hover:text-white hover:border-indigo-600 transition-all flex items-center shadow-sm"
+                            >
+                              تقييم الإجابة
+                            </Link>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="max-w-3xl mx-auto">
+              <div className="mb-8 p-4 rounded-2xl bg-amber-50 border border-amber-100 text-amber-700 text-sm font-bold flex items-center gap-3">
+                <AlertCircle className="h-5 w-5" />
+                هذه معاينة لما يراه الطالب. لن يتم حفظ أي إجابات تقوم بإدخالها هنا.
+              </div>
+              <AssignmentForm 
+                questions={questions} 
+                onSubmit={() => showNotification('success', 'هذه معاينة فقط، لم يتم حفظ الإجابة')} 
+                readOnly={false}
+              />
+            </div>
+          )}
         </div>
       )}
+
+      {/* Delete Confirmation Modal */}
+      <Dialog.Root open={isDeleteModalOpen} onOpenChange={setIsDeleteModalOpen}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-40 animate-in fade-in duration-300" />
+          <Dialog.Content className="fixed left-[50%] top-[50%] z-50 w-full max-w-md translate-x-[-50%] translate-y-[-50%] rounded-4xl bg-white p-8 shadow-2xl focus:outline-none animate-in zoom-in-95 duration-300" dir="rtl">
+            <div className="h-16 w-16 bg-red-50 rounded-3xl flex items-center justify-center mb-6">
+              <Trash2 className="h-8 w-8 text-red-500" />
+            </div>
+            <Dialog.Title className="text-2xl font-black text-slate-900 mb-2 tracking-tight">
+              تأكيد الحذف
+            </Dialog.Title>
+            <p className="text-slate-500 font-medium mb-8 leading-relaxed">هل أنت متأكد من رغبتك في حذف هذا الواجب؟ لا يمكن التراجع عن هذا الإجراء وسيتم حذف جميع تسليمات الطلاب المرتبطة به.</p>
+            <div className="flex flex-col sm:flex-row justify-end gap-3">
+              <Dialog.Close asChild>
+                <button className="flex-1 rounded-2xl bg-slate-50 px-6 py-4 text-sm font-black text-slate-700 hover:bg-slate-100 transition-all active:scale-95">
+                  إلغاء
+                </button>
+              </Dialog.Close>
+              <button
+                onClick={handleDeleteAssignment}
+                className="flex-1 rounded-2xl bg-red-600 px-6 py-4 text-sm font-black text-white shadow-xl shadow-red-100 hover:bg-red-700 hover:shadow-red-200 transition-all active:scale-95"
+              >
+                تأكيد الحذف
+              </button>
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
+
+      {/* Edit Assignment Modal */}
+      <Dialog.Root open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-40 animate-in fade-in duration-300" />
+          <Dialog.Content className="fixed left-[50%] top-[50%] z-50 w-full max-w-3xl translate-x-[-50%] translate-y-[-50%] rounded-4xl bg-white p-8 shadow-2xl focus:outline-none max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-300" dir="rtl">
+            <div className="flex items-center justify-between mb-8">
+              <div className="flex items-center gap-4">
+                <div className="h-12 w-12 rounded-2xl bg-indigo-50 flex items-center justify-center">
+                  <Edit2 className="h-6 w-6 text-indigo-600" />
+                </div>
+                <div>
+                  <Dialog.Title className="text-2xl font-black text-slate-900 tracking-tight">
+                    تعديل الواجب
+                  </Dialog.Title>
+                  <p className="text-sm text-slate-500 font-bold">تعديل تفاصيل الواجب والأسئلة</p>
+                </div>
+              </div>
+              <Dialog.Close className="h-10 w-10 flex items-center justify-center rounded-xl hover:bg-slate-50 text-slate-400 transition-colors">
+                <X className="h-6 w-6" />
+              </Dialog.Close>
+            </div>
+            
+            <form onSubmit={handleUpdateAssignment} className="space-y-8">
+              <div className="space-y-6">
+                <div>
+                  <label className="block text-sm font-black text-slate-700 mb-2 mr-1">عنوان الواجب <span className="text-red-500">*</span></label>
+                  <input 
+                    type="text" 
+                    required
+                    className="block w-full rounded-2xl border-0 py-4 px-5 text-slate-900 bg-slate-50 ring-1 ring-inset ring-slate-100 placeholder:text-slate-400 focus:ring-2 focus:ring-indigo-600 sm:text-sm transition-all font-bold"
+                    value={editData.title || ''}
+                    onChange={(e) => setEditData({...editData, title: e.target.value})}
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-black text-slate-700 mb-2 mr-1">الوصف والتفاصيل</label>
+                  <textarea 
+                    rows={4}
+                    className="block w-full rounded-2xl border-0 py-4 px-5 text-slate-900 bg-slate-50 ring-1 ring-inset ring-slate-100 placeholder:text-slate-400 focus:ring-2 focus:ring-indigo-600 sm:text-sm transition-all font-bold resize-none"
+                    value={editData.description || ''}
+                    onChange={(e) => setEditData({...editData, description: e.target.value})}
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                  <div>
+                    <label className="block text-sm font-black text-slate-700 mb-2 mr-1">تاريخ ووقت التسليم <span className="text-red-500">*</span></label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none text-slate-400">
+                        <Calendar className="h-5 w-5" />
+                      </div>
+                      <input 
+                        type="datetime-local" 
+                        required
+                        className="block w-full rounded-2xl border-0 py-4 pr-12 pl-4 text-slate-900 bg-slate-50 ring-1 ring-inset ring-slate-100 focus:ring-2 focus:ring-indigo-600 sm:text-sm transition-all font-bold text-left"
+                        dir="ltr"
+                        value={editData.due_date ? new Date(new Date(editData.due_date).getTime() - (new Date().getTimezoneOffset() * 60000)).toISOString().slice(0, 16) : ''}
+                        onChange={(e) => setEditData({...editData, due_date: e.target.value})}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-8 border-t border-slate-100">
+                  <AssignmentBuilder questions={questions} onChange={setQuestions} />
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row justify-end gap-3 pt-6 border-t border-slate-100">
+                <Dialog.Close asChild>
+                  <button
+                    type="button"
+                    className="rounded-2xl bg-slate-50 px-8 py-4 text-sm font-black text-slate-700 hover:bg-slate-100 transition-all active:scale-95"
+                  >
+                    إلغاء
+                  </button>
+                </Dialog.Close>
+                <button
+                  type="submit"
+                  disabled={isSubmittingEdit}
+                  className="rounded-2xl bg-indigo-600 px-8 py-4 text-sm font-black text-white shadow-xl shadow-indigo-100 hover:bg-indigo-700 hover:shadow-indigo-200 transition-all active:scale-95 disabled:opacity-50 disabled:pointer-events-none flex items-center justify-center gap-2"
+                >
+                  {isSubmittingEdit ? (
+                    <>
+                      <div className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      جاري الحفظ...
+                    </>
+                  ) : 'حفظ التعديلات'}
+                </button>
+              </div>
+            </form>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
     </div>
   );
 }

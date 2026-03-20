@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Plus, Search, Edit2, Trash2, FileText, Calendar, Clock, Link as LinkIcon, X, BookOpen, Users, User, AlertCircle } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, FileText, Calendar, Clock, Link as LinkIcon, X, BookOpen, Users, User, AlertCircle, Share2, Eye } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
 import Link from 'next/link';
 import AssignmentBuilder, { Question } from '@/components/assignment-builder';
@@ -470,17 +470,35 @@ export default function AssignmentsPage() {
                       {assignment.subjects?.name}
                     </span>
                     {(userRole === 'teacher' || userRole === 'admin' || userRole === 'management') && (
-                      <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-all translate-x-4 group-hover:translate-x-0">
+                      <div className="flex gap-2">
+                        <Link 
+                          href={`/assignments/${assignment.id}`}
+                          className="h-10 w-10 flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100"
+                          title="عرض التفاصيل"
+                        >
+                          <Eye className="h-5 w-5" />
+                        </Link>
+                        <button 
+                          onClick={() => {
+                            const url = `${window.location.origin}/assignments/${assignment.id}`;
+                            navigator.clipboard.writeText(url);
+                            setNotification({ type: 'success', message: 'تم نسخ رابط الواجب' });
+                          }}
+                          className="h-10 w-10 flex items-center justify-center text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100"
+                          title="نسخ الرابط"
+                        >
+                          <Share2 className="h-5 w-5" />
+                        </button>
                         <button 
                           onClick={() => openEditModal(assignment)}
-                          className="h-10 w-10 flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all shadow-sm bg-white"
+                          className="h-10 w-10 flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100"
                           title="تعديل الواجب"
                         >
                           <Edit2 className="h-5 w-5" />
                         </button>
                         <button 
                           onClick={() => setAssignmentToDelete(assignment.id)}
-                          className="h-10 w-10 flex items-center justify-center text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all shadow-sm bg-white"
+                          className="h-10 w-10 flex items-center justify-center text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100"
                           title="حذف الواجب"
                         >
                           <Trash2 className="h-5 w-5" />

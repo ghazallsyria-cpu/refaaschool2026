@@ -44,6 +44,7 @@ export default function ExamResults() {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<ExamStats | null>(null);
   const [questionAnalytics, setQuestionAnalytics] = useState<any[]>([]);
+  const [scoreDistribution, setScoreDistribution] = useState<any[]>([]);
 
   const fetchData = useCallback(async () => {
     try {
@@ -73,17 +74,61 @@ export default function ExamResults() {
       }));
       setAttempts(formattedAttempts);
 
-      // Generate mock stats for demo
+      // Fetch Questions and Answers for real analytics
+      const { data: questionsData } = await supabase
+        .from('questions')
+        .select('*')
+        .eq('exam_id', params.id)
+        .order('order_index');
+
+      const { data: answersData } = await supabase
+        .from('student_answers')
+        .select('*')
+        .in('attempt_id', formattedAttempts.map(a => a.id));
+
+      // Calculate real stats
       if (formattedAttempts.length > 0) {
         const scores = formattedAttempts.map(a => a.score);
-        const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
+        const maxPossibleScore = examData.max_score || 100;
+        const percentageScores = scores.map(s => (s / maxPossibleScore) * 100);
+        
+        const avg = percentageScores.reduce((a, b) => a + b, 0) / percentageScores.length;
         setStats({
           avg_score: Math.round(avg),
-          max_score: Math.max(...scores),
-          min_score: Math.min(...scores),
-          pass_rate: Math.round((scores.filter(s => s >= 50).length / scores.length) * 100),
+          max_score: Math.round(Math.max(...percentageScores)),
+          min_score: Math.round(Math.min(...percentageScores)),
+          pass_rate: Math.round((percentageScores.filter(s => s >= 50).length / percentageScores.length) * 100),
           total_attempts: scores.length
         });
+
+        // Calculate Question Analytics
+        if (questionsData && answersData) {
+          const analytics = questionsData.map((q, idx) => {
+            const qAnswers = answersData.filter(a => a.question_id === q.id);
+            const correctCount = qAnswers.filter(a => a.is_correct).length;
+            const accuracy = qAnswers.length > 0 ? Math.round((correctCount / qAnswers.length) * 100) : 0;
+            return {
+              name: `سؤال ${idx + 1}`,
+              correct: accuracy,
+              type: q.type,
+              id: q.id
+            };
+          });
+          setQuestionAnalytics(analytics);
+        }
+
+        // Calculate Score Distribution for Pie Chart
+        const distribution = [
+          { name: 'ممتاز', value: percentageScores.filter(s => s >= 90).length },
+          { name: 'جيد جداً', value: percentageScores.filter(s => s >= 80 && s < 90).length },
+          { name: 'جيد', value: percentageScores.filter(s => s >= 70 && s < 80).length },
+          { name: 'مقبول', value: percentageScores.filter(s => s >= 50 && s < 70).length },
+          { name: 'ضعيف', value: percentageScores.filter(s => s < 50).length },
+        ].filter(d => d.value > 0);
+        
+        // If all are 0 (shouldn't happen if length > 0), provide a default
+        setScoreDistribution(distribution.length > 0 ? distribution : [{ name: 'لا توجد بيانات', value: 1 }]);
+
       } else {
         setStats({
           avg_score: 0,
@@ -92,16 +137,9 @@ export default function ExamResults() {
           pass_rate: 0,
           total_attempts: 0
         });
+        setQuestionAnalytics([]);
+        setScoreDistribution([]);
       }
-
-      // Mock question analytics
-      setQuestionAnalytics([
-        { name: 'سؤال 1', correct: 85, type: 'multiple_choice' },
-        { name: 'سؤال 2', correct: 42, type: 'multiple_choice' },
-        { name: 'سؤال 3', correct: 78, type: 'true_false' },
-        { name: 'سؤال 4', correct: 30, type: 'multi_select' },
-        { name: 'سؤال 5', correct: 92, type: 'essay' },
-      ]);
 
     } catch (err) {
       console.error('Error fetching results:', err);
@@ -200,10 +238,10 @@ export default function ExamResults() {
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
         {[
-          { label: 'متوسط الدرجات', value: `${stats?.avg_score}%`, icon: BarChart2, color: 'text-indigo-600', bg: 'bg-indigo-50', trend: '+5%', trendUp: true },
-          { label: 'نسبة النجاح', value: `${stats?.pass_rate}%`, icon: CheckCircle, color: 'text-emerald-600', bg: 'bg-emerald-50', trend: '+2%', trendUp: true },
-          { label: 'أعلى درجة', value: `${stats?.max_score}%`, icon: TrendingUp, color: 'text-blue-600', bg: 'bg-blue-50', trend: 'ثابت', trendUp: null },
-          { label: 'إجمالي المحاولات', value: stats?.total_attempts, icon: Users, color: 'text-amber-600', bg: 'bg-amber-50', trend: '+12', trendUp: true },
+          { label: 'متوسط الدرجات', value: `${stats?.avg_score}%`, icon: BarChart2, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+          { label: 'نسبة النجاح', value: `${stats?.pass_rate}%`, icon: CheckCircle, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+          { label: 'أعلى درجة', value: `${stats?.max_score}%`, icon: TrendingUp, color: 'text-blue-600', bg: 'bg-blue-50' },
+          { label: 'إجمالي المحاولات', value: stats?.total_attempts, icon: Users, color: 'text-amber-600', bg: 'bg-amber-50' },
         ].map((stat, i) => (
           <motion.div
             key={i}
@@ -217,12 +255,6 @@ export default function ExamResults() {
               <div className={`h-14 w-14 rounded-2xl ${stat.bg} flex items-center justify-center shadow-inner`}>
                 <stat.icon className={`h-7 w-7 ${stat.color}`} />
               </div>
-              {stat.trendUp !== null && (
-                <div className={`flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-black ${stat.trendUp ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-red-50 text-red-600 border border-red-100'}`}>
-                  {stat.trendUp ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-                  <span>{stat.trend}</span>
-                </div>
-              )}
             </div>
             <p className="text-sm font-black text-slate-500 mb-1 uppercase tracking-widest">{stat.label}</p>
             <p className="text-4xl font-black text-slate-900 tracking-tighter">{stat.value}</p>
@@ -273,15 +305,22 @@ export default function ExamResults() {
               </BarChart>
             </ResponsiveContainer>
           </div>
-          <div className="bg-red-50/50 p-6 rounded-3xl border border-red-100 flex items-start gap-4 animate-pulse">
-            <div className="h-12 w-12 rounded-2xl bg-red-100 flex items-center justify-center shrink-0">
-              <AlertCircle className="h-6 w-6 text-red-600" />
+          
+          {questionAnalytics.length > 0 && questionAnalytics.some(q => q.correct < 50) && (
+            <div className="bg-red-50/50 p-6 rounded-3xl border border-red-100 flex items-start gap-4 animate-pulse">
+              <div className="h-12 w-12 rounded-2xl bg-red-100 flex items-center justify-center shrink-0">
+                <AlertCircle className="h-6 w-6 text-red-600" />
+              </div>
+              <div>
+                <p className="text-lg font-black text-red-900 tracking-tight">
+                  تنبيه: {questionAnalytics.sort((a, b) => a.correct - b.correct)[0].name} يحتاج مراجعة
+                </p>
+                <p className="text-sm text-red-700 font-bold leading-relaxed">
+                  نسبة الإجابة الصحيحة منخفضة جداً ({questionAnalytics.sort((a, b) => a.correct - b.correct)[0].correct}%). قد يكون السؤال غير واضح أو صعب جداً أو يحتاج لإعادة صياغة.
+                </p>
+              </div>
             </div>
-            <div>
-              <p className="text-lg font-black text-red-900 tracking-tight">تنبيه: السؤال رقم 4 يحتاج مراجعة</p>
-              <p className="text-sm text-red-700 font-bold leading-relaxed">نسبة الإجابة الصحيحة منخفضة جداً (30%). قد يكون السؤال غير واضح أو صعب جداً أو يحتاج لإعادة صياغة.</p>
-            </div>
-          </div>
+          )}
         </div>
 
         {/* Score Distribution */}
@@ -294,19 +333,13 @@ export default function ExamResults() {
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
-                  data={[
-                    { name: 'ممتاز', value: 40 },
-                    { name: 'جيد جداً', value: 30 },
-                    { name: 'جيد', value: 20 },
-                    { name: 'مقبول', value: 7 },
-                    { name: 'ضعيف', value: 3 },
-                  ]}
+                  data={scoreDistribution}
                   innerRadius={75}
                   outerRadius={100}
                   paddingAngle={8}
                   dataKey="value"
                 >
-                  {[0, 1, 2, 3, 4].map((entry, index) => (
+                  {scoreDistribution.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} stroke="none" />
                   ))}
                 </Pie>
@@ -321,18 +354,15 @@ export default function ExamResults() {
             </div>
           </div>
           <div className="space-y-4">
-            {[
-              { label: 'ممتاز (90-100)', value: '40%', color: 'bg-indigo-600' },
-              { label: 'جيد جداً (80-89)', value: '30%', color: 'bg-emerald-500' },
-              { label: 'جيد (70-79)', value: '20%', color: 'bg-amber-500' },
-              { label: 'ضعيف (أقل من 50)', value: '3%', color: 'bg-red-500' },
-            ].map((item, i) => (
+            {scoreDistribution.map((item, i) => (
               <div key={i} className="flex items-center justify-between p-3 rounded-2xl hover:bg-slate-50 transition-colors">
                 <div className="flex items-center gap-3">
-                  <div className={`w-3 h-3 rounded-full ${item.color} shadow-sm`} />
-                  <span className="text-sm font-bold text-slate-600">{item.label}</span>
+                  <div className={`w-3 h-3 rounded-full shadow-sm`} style={{ backgroundColor: COLORS[i % COLORS.length] }} />
+                  <span className="text-sm font-bold text-slate-600">{item.name}</span>
                 </div>
-                <span className="text-sm font-black text-slate-900">{item.value}</span>
+                <span className="text-sm font-black text-slate-900">
+                  {Math.round((item.value / (stats?.total_attempts || 1)) * 100)}%
+                </span>
               </div>
             ))}
           </div>
@@ -387,7 +417,9 @@ export default function ExamResults() {
                   <td className="px-8 py-6 text-sm font-bold text-slate-600">
                     <div className="flex items-center gap-2">
                       <Clock className="h-4 w-4 text-slate-400" />
-                      <span>14 دقيقة</span>
+                      <span>
+                        {Math.round((new Date(attempt.completed_at).getTime() - new Date(attempt.started_at).getTime()) / 60000)} دقيقة
+                      </span>
                     </div>
                   </td>
                   <td className="px-8 py-6">

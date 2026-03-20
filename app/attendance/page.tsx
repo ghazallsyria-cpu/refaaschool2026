@@ -12,42 +12,56 @@ export default function AttendancePage() {
   const [date, setDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [students, setStudents] = useState<any[]>([]);
   const [attendance, setAttendance] = useState<Record<string, AttendanceStatus>>({});
+  const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState({ text: '', type: '' });
 
-  const fetchSections = useCallback(async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data, error } = await supabase
-        .from('teacher_sections')
-        .select('section:sections(id, name, classes(name))')
-        .eq('teacher_id', user.id);
-      
-      console.log('Fetched teacher_sections:', data);
-      
-      if (error) throw error;
-      
-      const sectionsData = (data?.map(ts => ts.section) || []) as any[];
-      setSections(sectionsData);
-      
-      if (sectionsData && sectionsData.length > 0) {
-        setSelectedSection(sectionsData[0].id);
-      }
-    } catch (error) {
-      console.error('Error fetching sections:', error);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchSections();
-  }, [fetchSections]);
-
   const fetchStudentsAndAttendance = useCallback(async () => {
     setLoading(true);
     setMessage({ text: '', type: '' });
+
+    const calculateStats = (attendanceData: any[], studentsData: any[]) => {
+      const now = new Date();
+      const thirtyDaysAgo = new Date(new Date().setDate(now.getDate() - 30));
+      const sevenDaysAgo = new Date(new Date().setDate(now.getDate() - 7));
+
+      const stats = {
+        daily: { present: 0, absent: 0, late: 0, excused: 0 },
+        weekly: { present: 0, absent: 0, late: 0, excused: 0 },
+        monthly: { present: 0, absent: 0, late: 0, excused: 0 },
+        students: {} as Record<string, any>
+      };
+
+      attendanceData.forEach(a => {
+        const aDate = new Date(a.date);
+        const status = a.status as AttendanceStatus;
+
+        // Daily (for selected date)
+        if (a.date === date) {
+          stats.daily[status]++;
+        }
+
+        // Weekly
+        if (aDate >= sevenDaysAgo) {
+          stats.weekly[status]++;
+        }
+
+        // Monthly
+        if (aDate >= thirtyDaysAgo) {
+          stats.monthly[status]++;
+        }
+
+        // Student stats
+        if (!stats.students[a.student_id]) {
+          stats.students[a.student_id] = { present: 0, absent: 0, late: 0, excused: 0 };
+        }
+        stats.students[a.student_id][status]++;
+      });
+
+      setStats(stats);
+    };
+
     try {
       // Fetch students for the section
       const { data: studentsData, error: studentsError } = await supabase
@@ -61,13 +75,13 @@ export default function AttendancePage() {
       // Fetch existing attendance for this date and section
       const { data: attendanceData, error: attendanceError } = await supabase
         .from('attendance')
-        .select('student_id, status')
+        .select('student_id, status, date')
         .eq('section_id', selectedSection)
-        .eq('date', date);
+        .gte('date', new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0]);
 
       if (attendanceError) throw attendanceError;
 
-      // Initialize attendance state
+      // Initialize attendance state for the selected date
       const newAttendance: Record<string, AttendanceStatus> = {};
       
       // Default all to present
@@ -75,12 +89,14 @@ export default function AttendancePage() {
         newAttendance[s.id] = 'present';
       });
 
-      // Override with saved data
-      attendanceData?.forEach(a => {
+      // Override with saved data for the selected date
+      attendanceData?.filter(a => a.date === date).forEach(a => {
         newAttendance[a.student_id] = a.status as AttendanceStatus;
       });
 
       setAttendance(newAttendance);
+      
+      calculateStats(attendanceData || [], studentsData || []);
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
@@ -214,6 +230,40 @@ export default function AttendancePage() {
             </div>
           </div>
         </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        {stats && (
+          <>
+            <div className="glass-card p-8 rounded-4xl shadow-2xl shadow-slate-200/50 border border-white/60">
+              <h3 className="text-xl font-black text-slate-900 mb-4">يومي</h3>
+              <div className="grid grid-cols-2 gap-4 text-sm font-bold">
+                <div className="text-emerald-600">حاضر: {stats.daily.present}</div>
+                <div className="text-red-600">غائب: {stats.daily.absent}</div>
+                <div className="text-amber-600">متأخر: {stats.daily.late}</div>
+                <div className="text-blue-600">مستأذن: {stats.daily.excused}</div>
+              </div>
+            </div>
+            <div className="glass-card p-8 rounded-4xl shadow-2xl shadow-slate-200/50 border border-white/60">
+              <h3 className="text-xl font-black text-slate-900 mb-4">أسبوعي</h3>
+              <div className="grid grid-cols-2 gap-4 text-sm font-bold">
+                <div className="text-emerald-600">حاضر: {stats.weekly.present}</div>
+                <div className="text-red-600">غائب: {stats.weekly.absent}</div>
+                <div className="text-amber-600">متأخر: {stats.weekly.late}</div>
+                <div className="text-blue-600">مستأذن: {stats.weekly.excused}</div>
+              </div>
+            </div>
+            <div className="glass-card p-8 rounded-4xl shadow-2xl shadow-slate-200/50 border border-white/60">
+              <h3 className="text-xl font-black text-slate-900 mb-4">شهري</h3>
+              <div className="grid grid-cols-2 gap-4 text-sm font-bold">
+                <div className="text-emerald-600">حاضر: {stats.monthly.present}</div>
+                <div className="text-red-600">غائب: {stats.monthly.absent}</div>
+                <div className="text-amber-600">متأخر: {stats.monthly.late}</div>
+                <div className="text-blue-600">مستأذن: {stats.monthly.excused}</div>
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
       <div className="glass-card rounded-4xl shadow-2xl shadow-slate-200/50 border border-white/60 overflow-hidden">

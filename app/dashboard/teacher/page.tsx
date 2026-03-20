@@ -253,7 +253,7 @@ export default function TeacherDashboard() {
             <div className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
               {sections.length > 0 ? (
                 sections.map((section) => (
-                  <Link href={`/classes/${section.id}`} key={section.id} className="block group">
+                  <Link href={`/classes`} key={section.id} className="block group">
                     <div className="p-5 rounded-2xl bg-white border border-slate-200 hover:border-indigo-300 hover:shadow-md transition-all h-full flex flex-col">
                       <div className="flex justify-between items-start mb-4">
                         <div>

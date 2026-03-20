@@ -59,7 +59,8 @@ export default function MessagesPage() {
           is_read,
           created_at,
           parent_id,
-          sender:sender_id(full_name, avatar_url, role)
+          sender:sender_id(full_name, avatar_url, role),
+          receiver:receiver_id(full_name)
         `)
         .eq('parent_id', parentId)
         .order('created_at', { ascending: true });
@@ -590,7 +591,7 @@ export default function MessagesPage() {
                       <div className="flex items-center justify-between mb-1">
                         <div className="flex items-center gap-3">
                           <p className={`text-sm font-black ${!message.is_read ? 'text-slate-900' : 'text-slate-700'}`}>
-                            {message.sender?.full_name || 'مستخدم غير معروف'}
+                            {message.sender_id === currentUser?.id ? (message.receiver?.full_name || 'مستخدم غير معروف') : (message.sender?.full_name || 'مستخدم غير معروف')}
                             {message.count > 1 && <span className="text-xs text-slate-400 mr-2">(رسالة جماعية إلى {message.count} طلاب)</span>}
                           </p>
                           <span className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">
@@ -617,7 +618,13 @@ export default function MessagesPage() {
                         <Trash2 className="h-4 w-4" />
                       </div>
                       <div 
-                        onClick={() => { setActiveThread(message); fetchThread(message.ids[0]); }}
+                        onClick={() => { 
+                          setActiveThread({
+                            ...message,
+                            displayName: message.sender_id === currentUser?.id ? (message.receiver?.full_name || 'مستخدم غير معروف') : (message.sender?.full_name || 'مستخدم غير معروف')
+                          }); 
+                          fetchThread(message.ids[0]); 
+                        }}
                         className="h-10 w-10 rounded-xl bg-white shadow-sm border border-slate-100 flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:border-indigo-100 transition-all cursor-pointer"
                       >
                         <MessageSquare className="h-4 w-4" />
@@ -725,12 +732,14 @@ export default function MessagesPage() {
                   
                   <div className="space-y-6 max-h-[400px] overflow-y-auto mb-8">
                     <div className="p-4 bg-indigo-50 rounded-2xl">
-                      <p className="font-bold text-slate-900">{activeThread.sender?.full_name}</p>
+                      <p className="font-bold text-slate-900">{activeThread.displayName}</p>
                       <p className="text-sm text-slate-600">{activeThread.content}</p>
                     </div>
                     {threadMessages.map(msg => (
                       <div key={msg.id} className="p-4 bg-slate-50 rounded-2xl">
-                        <p className="font-bold text-slate-900">{msg.sender?.full_name}</p>
+                        <p className="font-bold text-slate-900">
+                          {msg.sender_id === currentUser?.id ? (msg.receiver?.full_name || 'مستخدم غير معروف') : (msg.sender?.full_name || 'مستخدم غير معروف')}
+                        </p>
                         <p className="text-sm text-slate-600">{msg.content}</p>
                       </div>
                     ))}

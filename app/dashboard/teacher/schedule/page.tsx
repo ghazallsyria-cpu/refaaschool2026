@@ -14,7 +14,7 @@ const DAYS = [
   { id: 6, name: 'الجمعة' },
 ];
 
-const PERIODS = [1, 2, 3, 4, 5, 6, 7, 8];
+const PERIODS = [1, 2, 3, 4, 5];
 
 export default function TeacherSchedulePage() {
   const [schedule, setSchedule] = useState<any[]>([]);
@@ -79,10 +79,10 @@ export default function TeacherSchedulePage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-full border-collapse">
+            <table className="min-w-full border-collapse table-fixed">
               <thead>
                 <tr className="bg-slate-50/50 backdrop-blur-md">
-                  <th className="py-6 px-6 text-center text-xs font-black text-slate-400 uppercase tracking-[0.2em] border-b border-l border-slate-100/50 w-40 bg-slate-100/30">اليوم / الحصة</th>
+                  <th className="py-6 px-6 text-center text-xs font-black text-slate-400 uppercase tracking-[0.2em] border-b border-l border-slate-100/50 w-32 bg-slate-100/30">اليوم / الحصة</th>
                   {PERIODS.map(period => (
                     <th key={period} className="py-6 px-4 text-center text-xs font-black text-slate-400 uppercase tracking-[0.2em] border-b border-l border-slate-100/50">الحصة {period}</th>
                   ))}

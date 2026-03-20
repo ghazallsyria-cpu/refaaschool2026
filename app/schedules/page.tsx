@@ -43,7 +43,7 @@ const DAYS = [
   { id: 6, name: 'الجمعة' },
 ];
 
-const PERIODS = [1, 2, 3, 4, 5, 6, 7, 8];
+const PERIODS = [1, 2, 3, 4, 5];
 
 export default function SchedulesPage() {
   const [sections, setSections] = useState<Section[]>([]);
@@ -317,7 +317,7 @@ export default function SchedulesPage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-slate-200 border-collapse">
+            <table className="min-w-full divide-y divide-slate-200 border-collapse table-fixed">
               <thead className="bg-slate-50">
                 <tr>
                   <th scope="col" className="py-3.5 px-4 text-center text-sm font-semibold text-slate-900 border-l border-slate-200 w-32 bg-slate-100">

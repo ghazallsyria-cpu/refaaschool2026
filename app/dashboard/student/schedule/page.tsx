@@ -6,14 +6,16 @@ import { Calendar, Clock, BookOpen, User } from 'lucide-react';
 import { motion } from 'motion/react';
 
 const DAYS = [
-  { id: 0, name: 'الأحد' },
-  { id: 1, name: 'الإثنين' },
-  { id: 2, name: 'الثلاثاء' },
-  { id: 3, name: 'الأربعاء' },
-  { id: 4, name: 'الخميس' },
+  { id: 0, name: 'السبت' },
+  { id: 1, name: 'الأحد' },
+  { id: 2, name: 'الإثنين' },
+  { id: 3, name: 'الثلاثاء' },
+  { id: 4, name: 'الأربعاء' },
+  { id: 5, name: 'الخميس' },
+  { id: 6, name: 'الجمعة' },
 ];
 
-const PERIODS = [1, 2, 3, 4, 5, 6, 7];
+const PERIODS = [1, 2, 3, 4, 5];
 
 export default function StudentSchedulePage() {
   const [schedule, setSchedule] = useState<any[]>([]);
@@ -92,7 +94,7 @@ export default function StudentSchedulePage() {
 
       <div className="bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-200 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-slate-200 border-collapse">
+          <table className="min-w-full divide-y divide-slate-200 border-collapse table-fixed">
             <thead className="bg-slate-50">
               <tr>
                 <th className="py-5 px-4 text-center text-sm font-black text-slate-900 border-l border-slate-200 w-32 bg-slate-100/50">اليوم / الحصة</th>

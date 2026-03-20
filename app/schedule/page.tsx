@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { Printer, User, Users, Info, X, Plus } from 'lucide-react';
 
 const DAYS = ['السبت', 'الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة'];
-const PERIODS = [1, 2, 3, 4, 5, 6, 7, 8];
+const PERIODS = [1, 2, 3, 4, 5];
 
 export default function SchedulePage() {
   const [viewType, setViewType] = useState<'teacher' | 'section'>('teacher');
@@ -746,7 +746,7 @@ export default function SchedulePage() {
 
         {/* Vertical Table for Print (Days as Rows) */}
         <div className="hidden print:block p-4">
-          <table className="print-table">
+          <table className="print-table table-fixed w-full">
             <thead>
               <tr>
                 <th className="w-32">اليوم / الحصة</th>

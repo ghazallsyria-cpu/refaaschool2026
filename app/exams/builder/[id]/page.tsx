@@ -44,7 +44,8 @@ type ExamData = {
   teacher_id?: string;
   duration: number;
   max_attempts: number;
-  exam_date: string; // Added exam_date
+  max_score: number; // Added max_score
+  exam_date: string;
   status: 'draft' | 'published';
   settings: {
     shuffle_questions: boolean;
@@ -65,7 +66,8 @@ export default function QuizBuilder() {
     subject_id: '',
     duration: 30,
     max_attempts: 1,
-    exam_date: new Date().toISOString().split('T')[0], // Default to today
+    max_score: 100, // Default to 100
+    exam_date: new Date().toISOString().split('T')[0],
     status: 'draft',
     settings: {
       shuffle_questions: false,
@@ -319,17 +321,19 @@ export default function QuizBuilder() {
       }
 
       if (isNew) {
+        console.log('Inserting exam:', { ...exam, max_score: exam.max_score || 100, teacher_id: finalTeacherId });
         const { data: newExam, error } = await supabase
           .from('exams')
-          .insert([{ ...exam, teacher_id: finalTeacherId }])
+          .insert([{ ...exam, max_score: exam.max_score || 100, teacher_id: finalTeacherId }])
           .select()
           .single();
         if (error) throw error;
         examId = newExam.id;
       } else {
+        console.log('Updating exam:', { ...exam, max_score: exam.max_score || 100, teacher_id: finalTeacherId });
         const { error } = await supabase
           .from('exams')
-          .update({ ...exam, teacher_id: finalTeacherId })
+          .update({ ...exam, max_score: exam.max_score || 100, teacher_id: finalTeacherId })
           .eq('id', examId);
         if (error) throw error;
       }
@@ -600,6 +604,15 @@ export default function QuizBuilder() {
                 </select>
               </div>
             )}
+            <div className="space-y-3">
+              <label className="text-xs font-black text-slate-400 uppercase tracking-widest block">الدرجة العظمى</label>
+              <input 
+                type="number"
+                value={exam.max_score}
+                onChange={(e) => setExam({...exam, max_score: parseInt(e.target.value)})}
+                className="w-full px-5 py-4 rounded-2xl bg-slate-50 border-0 ring-1 ring-inset ring-slate-100 focus:ring-2 focus:ring-indigo-600 outline-none font-bold text-slate-700 transition-all appearance-none"
+              />
+            </div>
             <div className="space-y-3">
               <label className="text-xs font-black text-slate-400 uppercase tracking-widest block">تاريخ الاختبار</label>
               <input 

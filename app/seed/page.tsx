@@ -61,6 +61,29 @@ CREATE TABLE IF NOT EXISTS public.classes (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
 );
 
+-- Academic Years Table
+CREATE TABLE IF NOT EXISTS public.academic_years (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    name TEXT NOT NULL, -- e.g., '2023-2024'
+    start_date DATE NOT NULL,
+    end_date DATE NOT NULL,
+    is_active BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
+);
+
+-- Semesters Table
+CREATE TABLE IF NOT EXISTS public.semesters (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    academic_year_id UUID REFERENCES public.academic_years(id) ON DELETE CASCADE NOT NULL,
+    name TEXT NOT NULL, -- e.g., 'First Semester', 'Second Semester'
+    start_date DATE NOT NULL,
+    end_date DATE NOT NULL,
+    is_active BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
+);
+
 -- Sections Table
 CREATE TABLE IF NOT EXISTS public.sections (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
@@ -118,7 +141,9 @@ CREATE TABLE IF NOT EXISTS public.teachers (
 CREATE TABLE IF NOT EXISTS public.teacher_subjects (
     teacher_id UUID REFERENCES public.teachers(id) ON DELETE CASCADE,
     subject_id UUID REFERENCES public.subjects(id) ON DELETE CASCADE,
-    PRIMARY KEY (teacher_id, subject_id)
+    academic_year_id UUID REFERENCES public.academic_years(id) ON DELETE CASCADE,
+    semester_id UUID REFERENCES public.semesters(id) ON DELETE CASCADE,
+    PRIMARY KEY (teacher_id, subject_id, academic_year_id, semester_id)
 );
 
 -- Teacher Sections
@@ -126,7 +151,9 @@ CREATE TABLE IF NOT EXISTS public.teacher_sections (
     teacher_id UUID REFERENCES public.teachers(id) ON DELETE CASCADE,
     section_id UUID REFERENCES public.sections(id) ON DELETE CASCADE,
     subject_id UUID REFERENCES public.subjects(id) ON DELETE CASCADE,
-    PRIMARY KEY (teacher_id, section_id, subject_id)
+    academic_year_id UUID REFERENCES public.academic_years(id) ON DELETE CASCADE,
+    semester_id UUID REFERENCES public.semesters(id) ON DELETE CASCADE,
+    PRIMARY KEY (teacher_id, section_id, subject_id, academic_year_id, semester_id)
 );
 
 -- Attendance Table
@@ -134,13 +161,15 @@ CREATE TABLE IF NOT EXISTS public.attendance (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
     student_id UUID REFERENCES public.students(id) ON DELETE CASCADE NOT NULL,
     section_id UUID REFERENCES public.sections(id) ON DELETE CASCADE NOT NULL,
+    academic_year_id UUID REFERENCES public.academic_years(id) ON DELETE SET NULL,
+    semester_id UUID REFERENCES public.semesters(id) ON DELETE SET NULL,
     date DATE NOT NULL,
     status attendance_status NOT NULL,
     notes TEXT,
     recorded_by UUID REFERENCES public.users(id),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
-    UNIQUE(student_id, date)
+    UNIQUE(student_id, date, section_id)
 );
 
 -- Exams Table
@@ -150,10 +179,30 @@ CREATE TABLE IF NOT EXISTS public.exams (
     subject_id UUID REFERENCES public.subjects(id) ON DELETE CASCADE NOT NULL,
     section_id UUID REFERENCES public.sections(id) ON DELETE CASCADE NOT NULL,
     teacher_id UUID REFERENCES public.teachers(id) ON DELETE CASCADE NOT NULL,
+    academic_year_id UUID REFERENCES public.academic_years(id) ON DELETE SET NULL,
+    semester_id UUID REFERENCES public.semesters(id) ON DELETE SET NULL,
     exam_date DATE NOT NULL,
     max_score NUMERIC NOT NULL,
+    start_at TIMESTAMP WITH TIME ZONE,
+    end_at TIMESTAMP WITH TIME ZONE,
+    status TEXT DEFAULT 'draft',
+    max_attempts INTEGER DEFAULT 1,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
+);
+
+-- Exam Attempts Table
+CREATE TABLE IF NOT EXISTS public.exam_attempts (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    exam_id UUID REFERENCES public.exams(id) ON DELETE CASCADE NOT NULL,
+    student_id UUID REFERENCES public.students(id) ON DELETE CASCADE NOT NULL,
+    academic_year_id UUID REFERENCES public.academic_years(id) ON DELETE SET NULL,
+    semester_id UUID REFERENCES public.semesters(id) ON DELETE SET NULL,
+    started_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
+    completed_at TIMESTAMP WITH TIME ZONE,
+    score NUMERIC DEFAULT 0,
+    status TEXT DEFAULT 'ongoing' CHECK (status IN ('ongoing', 'completed', 'graded')),
+    feedback TEXT
 );
 
 -- Grades Table
@@ -161,6 +210,8 @@ CREATE TABLE IF NOT EXISTS public.grades (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
     exam_id UUID REFERENCES public.exams(id) ON DELETE CASCADE NOT NULL,
     student_id UUID REFERENCES public.students(id) ON DELETE CASCADE NOT NULL,
+    academic_year_id UUID REFERENCES public.academic_years(id) ON DELETE SET NULL,
+    semester_id UUID REFERENCES public.semesters(id) ON DELETE SET NULL,
     score NUMERIC NOT NULL,
     notes TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
@@ -176,10 +227,28 @@ CREATE TABLE IF NOT EXISTS public.assignments (
     subject_id UUID REFERENCES public.subjects(id) ON DELETE CASCADE NOT NULL,
     section_id UUID REFERENCES public.sections(id) ON DELETE CASCADE NOT NULL,
     teacher_id UUID REFERENCES public.teachers(id) ON DELETE CASCADE NOT NULL,
+    academic_year_id UUID REFERENCES public.academic_years(id) ON DELETE SET NULL,
+    semester_id UUID REFERENCES public.semesters(id) ON DELETE SET NULL,
     due_date TIMESTAMP WITH TIME ZONE NOT NULL,
     file_url TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
+);
+
+-- Assignment Submissions Table
+CREATE TABLE IF NOT EXISTS public.assignment_submissions (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    assignment_id UUID REFERENCES public.assignments(id) ON DELETE CASCADE NOT NULL,
+    student_id UUID REFERENCES public.students(id) ON DELETE CASCADE NOT NULL,
+    academic_year_id UUID REFERENCES public.academic_years(id) ON DELETE SET NULL,
+    semester_id UUID REFERENCES public.semesters(id) ON DELETE SET NULL,
+    content TEXT,
+    file_url TEXT,
+    grade NUMERIC,
+    feedback TEXT,
+    submitted_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
+    UNIQUE(assignment_id, student_id)
 );
 
 -- Schedules Table
@@ -188,6 +257,8 @@ CREATE TABLE IF NOT EXISTS public.schedules (
     section_id UUID REFERENCES public.sections(id) ON DELETE CASCADE NOT NULL,
     subject_id UUID REFERENCES public.subjects(id) ON DELETE CASCADE NOT NULL,
     teacher_id UUID REFERENCES public.teachers(id) ON DELETE CASCADE NOT NULL,
+    academic_year_id UUID REFERENCES public.academic_years(id) ON DELETE SET NULL,
+    semester_id UUID REFERENCES public.semesters(id) ON DELETE SET NULL,
     day_of_week INTEGER NOT NULL CHECK (day_of_week BETWEEN 0 AND 6),
     period INTEGER NOT NULL,
     start_time TIME,
@@ -205,6 +276,8 @@ CREATE TABLE IF NOT EXISTS public.announcements (
     content TEXT NOT NULL,
     author_id UUID REFERENCES public.users(id) ON DELETE SET NULL,
     target_role user_role,
+    academic_year_id UUID REFERENCES public.academic_years(id) ON DELETE SET NULL,
+    semester_id UUID REFERENCES public.semesters(id) ON DELETE SET NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
 );
@@ -220,6 +293,18 @@ CREATE TABLE IF NOT EXISTS public.messages (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
 );
 
+-- Notifications Table
+CREATE TABLE IF NOT EXISTS public.notifications (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    user_id UUID REFERENCES public.users(id) ON DELETE CASCADE NOT NULL,
+    title TEXT NOT NULL,
+    message TEXT NOT NULL,
+    type TEXT NOT NULL, -- e.g., 'exam', 'assignment', 'grade', 'attendance', 'system'
+    link TEXT, -- Optional link to the related resource
+    is_read BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
+);
+
 -- Documents Table
 CREATE TABLE IF NOT EXISTS public.documents (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
@@ -227,11 +312,15 @@ CREATE TABLE IF NOT EXISTS public.documents (
     file_url TEXT NOT NULL,
     owner_id UUID REFERENCES public.users(id) ON DELETE CASCADE NOT NULL,
     document_type TEXT,
+    academic_year_id UUID REFERENCES public.academic_years(id) ON DELETE SET NULL,
+    semester_id UUID REFERENCES public.semesters(id) ON DELETE SET NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
 );
 
 -- Enable RLS
 ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.academic_years ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.semesters ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.classes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.sections ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.subjects ENABLE ROW LEVEL SECURITY;
@@ -242,11 +331,14 @@ ALTER TABLE public.teacher_subjects ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.teacher_sections ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.attendance ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.exams ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.exam_attempts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.grades ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.assignments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.assignment_submissions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.schedules ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.announcements ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.documents ENABLE ROW LEVEL SECURITY;
 
 -- Basic Policies (Allow all for demo purposes, restrict in production)
@@ -254,6 +346,8 @@ DO $$
 BEGIN
     -- Drop existing policies if they exist to avoid errors
     DROP POLICY IF EXISTS "Allow all on users" ON public.users;
+    DROP POLICY IF EXISTS "Allow all on academic_years" ON public.academic_years;
+    DROP POLICY IF EXISTS "Allow all on semesters" ON public.semesters;
     DROP POLICY IF EXISTS "Allow all on classes" ON public.classes;
     DROP POLICY IF EXISTS "Allow all on sections" ON public.sections;
     DROP POLICY IF EXISTS "Allow all on subjects" ON public.subjects;
@@ -264,34 +358,235 @@ BEGIN
     DROP POLICY IF EXISTS "Allow all on teacher_sections" ON public.teacher_sections;
     DROP POLICY IF EXISTS "Allow all on attendance" ON public.attendance;
     DROP POLICY IF EXISTS "Allow all on exams" ON public.exams;
+    DROP POLICY IF EXISTS "Allow all on exam_attempts" ON public.exam_attempts;
     DROP POLICY IF EXISTS "Allow all on grades" ON public.grades;
     DROP POLICY IF EXISTS "Allow all on assignments" ON public.assignments;
+    DROP POLICY IF EXISTS "Allow all on assignment_submissions" ON public.assignment_submissions;
     DROP POLICY IF EXISTS "Allow all on schedules" ON public.schedules;
     DROP POLICY IF EXISTS "Allow all on announcements" ON public.announcements;
     DROP POLICY IF EXISTS "Allow all on messages" ON public.messages;
+    DROP POLICY IF EXISTS "Allow all on notifications" ON public.notifications;
     DROP POLICY IF EXISTS "Allow all on documents" ON public.documents;
+    
+    -- Drop new specific policies
+    DROP POLICY IF EXISTS "Teachers manage own sections attendance" ON public.attendance;
+    DROP POLICY IF EXISTS "Parent views child attendance" ON public.attendance;
+    DROP POLICY IF EXISTS "Students view own attendance" ON public.attendance;
+    DROP POLICY IF EXISTS "Teachers manage own exams" ON public.exams;
+    DROP POLICY IF EXISTS "Students can view their section exams" ON public.exams;
+    DROP POLICY IF EXISTS "Students can create their own attempts" ON public.exam_attempts;
+    DROP POLICY IF EXISTS "Students can view their own attempts" ON public.exam_attempts;
+    DROP POLICY IF EXISTS "Teachers can view attempts for their exams" ON public.exam_attempts;
+    DROP POLICY IF EXISTS "Teachers view section grades" ON public.grades;
+    DROP POLICY IF EXISTS "Students view own grades" ON public.grades;
+    DROP POLICY IF EXISTS "Parent views child grades" ON public.grades;
+    DROP POLICY IF EXISTS "Teachers manage own assignments" ON public.assignments;
+    DROP POLICY IF EXISTS "Students view section assignments" ON public.assignments;
+    DROP POLICY IF EXISTS "Parent views child assignments" ON public.assignments;
+    DROP POLICY IF EXISTS "Students submit assignments" ON public.assignment_submissions;
+    DROP POLICY IF EXISTS "Students view own submissions" ON public.assignment_submissions;
+    DROP POLICY IF EXISTS "Teachers manage section submissions" ON public.assignment_submissions;
+    DROP POLICY IF EXISTS "Parent views child submissions" ON public.assignment_submissions;
+    DROP POLICY IF EXISTS "Users can view their own messages" ON public.messages;
+    DROP POLICY IF EXISTS "Users can send messages" ON public.messages;
+    DROP POLICY IF EXISTS "Users view own notifications" ON public.notifications;
+    DROP POLICY IF EXISTS "System can insert notifications" ON public.notifications;
+    DROP POLICY IF EXISTS "Anyone can view schedules" ON public.schedules;
+    DROP POLICY IF EXISTS "Admin and management can manage schedules" ON public.schedules;
+    DROP POLICY IF EXISTS "Anyone can view announcements" ON public.announcements;
+    DROP POLICY IF EXISTS "Admin and management can manage announcements" ON public.announcements;
+    DROP POLICY IF EXISTS "Users can view their own documents" ON public.documents;
+    DROP POLICY IF EXISTS "Users can manage their own documents" ON public.documents;
+    DROP POLICY IF EXISTS "Anyone can view users" ON public.users;
+    DROP POLICY IF EXISTS "Users can update their own profile" ON public.users;
+    DROP POLICY IF EXISTS "Admin and management can manage users" ON public.users;
+    DROP POLICY IF EXISTS "Anyone can view academic_years" ON public.academic_years;
+    DROP POLICY IF EXISTS "Admin and management can manage academic_years" ON public.academic_years;
+    DROP POLICY IF EXISTS "Anyone can view semesters" ON public.semesters;
+    DROP POLICY IF EXISTS "Admin and management can manage semesters" ON public.semesters;
+    DROP POLICY IF EXISTS "Anyone can view classes" ON public.classes;
+    DROP POLICY IF EXISTS "Admin and management can manage classes" ON public.classes;
+    DROP POLICY IF EXISTS "Anyone can view sections" ON public.sections;
+    DROP POLICY IF EXISTS "Admin and management can manage sections" ON public.sections;
+    DROP POLICY IF EXISTS "Anyone can view subjects" ON public.subjects;
+    DROP POLICY IF EXISTS "Admin and management can manage subjects" ON public.subjects;
+    DROP POLICY IF EXISTS "Anyone can view parents" ON public.parents;
+    DROP POLICY IF EXISTS "Parents can update their own profile" ON public.parents;
+    DROP POLICY IF EXISTS "Admin and management can manage parents" ON public.parents;
+    DROP POLICY IF EXISTS "Anyone can view students" ON public.students;
+    DROP POLICY IF EXISTS "Students can update their own profile" ON public.students;
+    DROP POLICY IF EXISTS "Admin and management can manage students" ON public.students;
+    DROP POLICY IF EXISTS "Anyone can view teachers" ON public.teachers;
+    DROP POLICY IF EXISTS "Teachers can update their own profile" ON public.teachers;
+    DROP POLICY IF EXISTS "Admin and management can manage teachers" ON public.teachers;
+    DROP POLICY IF EXISTS "Anyone can view teacher_subjects" ON public.teacher_subjects;
+    DROP POLICY IF EXISTS "Admin and management can manage teacher_subjects" ON public.teacher_subjects;
+    DROP POLICY IF EXISTS "Anyone can view teacher_sections" ON public.teacher_sections;
+    DROP POLICY IF EXISTS "Admin and management can manage teacher_sections" ON public.teacher_sections;
 EXCEPTION WHEN OTHERS THEN
     -- Ignore errors if policies don't exist
 END
 $$;
 
-CREATE POLICY "Allow all on users" ON public.users FOR ALL USING (true);
-CREATE POLICY "Allow all on classes" ON public.classes FOR ALL USING (true);
-CREATE POLICY "Allow all on sections" ON public.sections FOR ALL USING (true);
-CREATE POLICY "Allow all on subjects" ON public.subjects FOR ALL USING (true);
-CREATE POLICY "Allow all on parents" ON public.parents FOR ALL USING (true);
-CREATE POLICY "Allow all on students" ON public.students FOR ALL USING (true);
-CREATE POLICY "Allow all on teachers" ON public.teachers FOR ALL USING (true);
-CREATE POLICY "Allow all on teacher_subjects" ON public.teacher_subjects FOR ALL USING (true);
-CREATE POLICY "Allow all on teacher_sections" ON public.teacher_sections FOR ALL USING (true);
-CREATE POLICY "Allow all on attendance" ON public.attendance FOR ALL USING (true);
-CREATE POLICY "Allow all on exams" ON public.exams FOR ALL USING (true);
-CREATE POLICY "Allow all on grades" ON public.grades FOR ALL USING (true);
-CREATE POLICY "Allow all on assignments" ON public.assignments FOR ALL USING (true);
-CREATE POLICY "Allow all on schedules" ON public.schedules FOR ALL USING (true);
-CREATE POLICY "Allow all on announcements" ON public.announcements FOR ALL USING (true);
-CREATE POLICY "Allow all on messages" ON public.messages FOR ALL USING (true);
-CREATE POLICY "Allow all on documents" ON public.documents FOR ALL USING (true);
+CREATE POLICY "Anyone can view users" ON public.users FOR SELECT USING (true);
+CREATE POLICY "Users can update their own profile" ON public.users FOR UPDATE USING (id = auth.uid());
+CREATE POLICY "Admin and management can manage users" ON public.users FOR ALL USING (public.get_user_role() IN ('admin', 'management'));
+
+CREATE POLICY "Anyone can view academic_years" ON public.academic_years FOR SELECT USING (true);
+CREATE POLICY "Admin and management can manage academic_years" ON public.academic_years FOR ALL USING (public.get_user_role() IN ('admin', 'management'));
+
+CREATE POLICY "Anyone can view semesters" ON public.semesters FOR SELECT USING (true);
+CREATE POLICY "Admin and management can manage semesters" ON public.semesters FOR ALL USING (public.get_user_role() IN ('admin', 'management'));
+
+CREATE POLICY "Anyone can view classes" ON public.classes FOR SELECT USING (true);
+CREATE POLICY "Admin and management can manage classes" ON public.classes FOR ALL USING (public.get_user_role() IN ('admin', 'management'));
+
+CREATE POLICY "Anyone can view sections" ON public.sections FOR SELECT USING (true);
+CREATE POLICY "Admin and management can manage sections" ON public.sections FOR ALL USING (public.get_user_role() IN ('admin', 'management'));
+
+CREATE POLICY "Anyone can view subjects" ON public.subjects FOR SELECT USING (true);
+CREATE POLICY "Admin and management can manage subjects" ON public.subjects FOR ALL USING (public.get_user_role() IN ('admin', 'management'));
+
+CREATE POLICY "Anyone can view parents" ON public.parents FOR SELECT USING (true);
+CREATE POLICY "Parents can update their own profile" ON public.parents FOR UPDATE USING (id = auth.uid());
+CREATE POLICY "Admin and management can manage parents" ON public.parents FOR ALL USING (public.get_user_role() IN ('admin', 'management'));
+
+CREATE POLICY "Anyone can view students" ON public.students FOR SELECT USING (true);
+CREATE POLICY "Students can update their own profile" ON public.students FOR UPDATE USING (id = auth.uid());
+CREATE POLICY "Admin and management can manage students" ON public.students FOR ALL USING (public.get_user_role() IN ('admin', 'management'));
+
+CREATE POLICY "Anyone can view teachers" ON public.teachers FOR SELECT USING (true);
+CREATE POLICY "Teachers can update their own profile" ON public.teachers FOR UPDATE USING (id = auth.uid());
+CREATE POLICY "Admin and management can manage teachers" ON public.teachers FOR ALL USING (public.get_user_role() IN ('admin', 'management'));
+
+CREATE POLICY "Anyone can view teacher_subjects" ON public.teacher_subjects FOR SELECT USING (true);
+CREATE POLICY "Admin and management can manage teacher_subjects" ON public.teacher_subjects FOR ALL USING (public.get_user_role() IN ('admin', 'management'));
+
+CREATE POLICY "Anyone can view teacher_sections" ON public.teacher_sections FOR SELECT USING (true);
+CREATE POLICY "Admin and management can manage teacher_sections" ON public.teacher_sections FOR ALL USING (public.get_user_role() IN ('admin', 'management'));
+
+-- Attendance Policies
+CREATE POLICY "Teachers manage own sections attendance" ON public.attendance FOR ALL USING (
+  public.get_user_role() IN ('admin','management')
+  OR section_id IN (
+    SELECT section_id FROM public.teacher_sections
+    WHERE teacher_id = auth.uid()
+  )
+);
+CREATE POLICY "Parent views child attendance" ON public.attendance FOR SELECT USING (
+  student_id IN (
+    SELECT id FROM public.students 
+    WHERE parent_id = auth.uid()
+  )
+);
+CREATE POLICY "Students view own attendance" ON public.attendance FOR SELECT USING (student_id = auth.uid());
+
+-- Exams Policies
+CREATE POLICY "Teachers manage own exams" ON public.exams FOR ALL USING (teacher_id = auth.uid() OR public.get_user_role() IN ('admin', 'management'));
+CREATE POLICY "Students can view their section exams" ON public.exams FOR SELECT USING (
+  status = 'published'
+  AND section_id IN (
+    SELECT section_id FROM public.students 
+    WHERE id = auth.uid()
+  )
+  AND (start_at IS NULL OR NOW() >= start_at)
+  AND (end_at IS NULL OR NOW() <= end_at)
+);
+
+-- Exam Attempts Policies
+CREATE POLICY "Students can create their own attempts" ON public.exam_attempts FOR INSERT WITH CHECK (
+  student_id = auth.uid()
+  AND EXISTS (
+    SELECT 1 FROM public.exams e
+    WHERE e.id = exam_id
+    AND e.status = 'published'
+    AND (e.start_at IS NULL OR NOW() >= e.start_at)
+    AND (e.end_at IS NULL OR NOW() <= e.end_at)
+    AND (
+      SELECT COUNT(*) FROM public.exam_attempts
+      WHERE exam_id = e.id AND student_id = auth.uid()
+    ) < COALESCE(e.max_attempts, 1)
+  )
+);
+CREATE POLICY "Students can view their own attempts" ON public.exam_attempts FOR SELECT USING (student_id = auth.uid());
+CREATE POLICY "Teachers can view attempts for their exams" ON public.exam_attempts FOR SELECT USING (exam_id IN (SELECT id FROM public.exams WHERE teacher_id = auth.uid()) OR public.get_user_role() IN ('admin', 'management'));
+
+-- Grades Policies
+CREATE POLICY "Teachers view section grades" ON public.grades FOR SELECT USING (
+  exam_id IN (
+    SELECT id FROM public.exams 
+    WHERE teacher_id = auth.uid()
+  )
+  OR public.get_user_role() IN ('admin', 'management')
+);
+CREATE POLICY "Students view own grades" ON public.grades FOR SELECT USING (student_id = auth.uid());
+CREATE POLICY "Parent views child grades" ON public.grades FOR SELECT USING (
+  student_id IN (
+    SELECT id FROM public.students 
+    WHERE parent_id = auth.uid()
+  )
+);
+
+-- Assignments Policies
+CREATE POLICY "Teachers manage own assignments" ON public.assignments FOR ALL USING (teacher_id = auth.uid() OR public.get_user_role() IN ('admin', 'management'));
+CREATE POLICY "Students view section assignments" ON public.assignments FOR SELECT USING (
+  section_id IN (
+    SELECT section_id FROM public.students
+    WHERE id = auth.uid()
+  )
+);
+CREATE POLICY "Parent views child assignments" ON public.assignments FOR SELECT USING (
+  section_id IN (
+    SELECT section_id FROM public.students 
+    WHERE parent_id = auth.uid()
+  )
+);
+
+-- Assignment Submissions Policies
+CREATE POLICY "Students submit assignments" ON public.assignment_submissions FOR INSERT WITH CHECK (
+  student_id = auth.uid()
+  AND EXISTS (
+    SELECT 1 FROM public.assignments a
+    WHERE a.id = assignment_id
+    AND NOW() <= a.due_date
+  )
+);
+CREATE POLICY "Students view own submissions" ON public.assignment_submissions FOR SELECT USING (student_id = auth.uid());
+CREATE POLICY "Teachers manage section submissions" ON public.assignment_submissions FOR ALL USING (
+  assignment_id IN (
+    SELECT id FROM public.assignments
+    WHERE teacher_id = auth.uid()
+  )
+  OR public.get_user_role() IN ('admin', 'management')
+);
+CREATE POLICY "Parent views child submissions" ON public.assignment_submissions FOR SELECT USING (
+  student_id IN (
+    SELECT id FROM public.students 
+    WHERE parent_id = auth.uid()
+  )
+);
+
+-- Schedules Policies
+CREATE POLICY "Anyone can view schedules" ON public.schedules FOR SELECT USING (true);
+CREATE POLICY "Admin and management can manage schedules" ON public.schedules FOR ALL USING (public.get_user_role() IN ('admin', 'management'));
+
+-- Announcements Policies
+CREATE POLICY "Anyone can view announcements" ON public.announcements FOR SELECT USING (true);
+CREATE POLICY "Admin and management can manage announcements" ON public.announcements FOR ALL USING (public.get_user_role() IN ('admin', 'management'));
+
+-- Messages Policies
+CREATE POLICY "Users can view their own messages" ON public.messages FOR SELECT USING (sender_id = auth.uid() OR receiver_id = auth.uid() OR public.get_user_role() IN ('admin', 'management'));
+CREATE POLICY "Users can send messages" ON public.messages FOR INSERT WITH CHECK (sender_id = auth.uid());
+
+-- Notifications Policies
+CREATE POLICY "Users view own notifications" ON public.notifications FOR SELECT USING (user_id = auth.uid());
+CREATE POLICY "System can insert notifications" ON public.notifications FOR INSERT WITH CHECK (
+  public.get_user_role() IN ('admin', 'management', 'teacher')
+);
+
+-- Documents Policies
+CREATE POLICY "Users can view their own documents" ON public.documents FOR SELECT USING (owner_id = auth.uid() OR public.get_user_role() IN ('admin', 'management'));
+CREATE POLICY "Users can manage their own documents" ON public.documents FOR ALL USING (owner_id = auth.uid() OR public.get_user_role() IN ('admin', 'management'));
 
 `;
 

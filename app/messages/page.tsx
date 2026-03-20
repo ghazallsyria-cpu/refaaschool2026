@@ -256,6 +256,7 @@ export default function MessagesPage() {
       fetchMessages();
     }
     // Removed fetchAnnouncements() as it is not defined in this component
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
 
   const fetchMessages = async () => {

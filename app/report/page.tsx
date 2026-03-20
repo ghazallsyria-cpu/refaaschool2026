@@ -1,11 +1,20 @@
+'use client';
+
 import { useState } from "react";
+import { motion, AnimatePresence } from "motion/react";
+import { 
+  AlertTriangle, CheckCircle2, XCircle, AlertCircle, Info, 
+  ChevronDown, ChevronUp, ShieldAlert, FileWarning, 
+  Users, Database, Lock, Zap, LayoutDashboard, Calendar,
+  Bell, FileText, BarChart3, Clock, Plus
+} from "lucide-react";
 
 const problems = [
   {
     id: 1,
     severity: "critical",
     category: "الأدوار والصلاحيات",
-    icon: "🔴",
+    icon: <ShieldAlert className="w-6 h-6" />,
     title: "دور management موجود في DB لكن غير موجود في Middleware",
     current: `// في middleware.ts لا يوجد أي توجيه لدور management
 if (user.role === 'admin') → /dashboard
@@ -25,7 +34,7 @@ if (user.role === 'management')
     id: 2,
     severity: "critical",
     category: "الحضور والغياب",
-    icon: "🔴",
+    icon: <Database className="w-6 h-6" />,
     title: "UNIQUE على (student_id, date) يكسر منطق تسجيل الحضور",
     current: `UNIQUE(student_id, date)
 -- ❌ طالب لديه 6 حصص يومياً
@@ -42,7 +51,7 @@ UNIQUE(student_id, date, period)
     id: 3,
     severity: "critical",
     category: "الاختبارات",
-    icon: "🔴",
+    icon: <FileWarning className="w-6 h-6" />,
     title: "الطالب يرى اختبارات كل الشعب وليس شعبته فقط",
     current: `-- سياسة RLS الحالية:
 CREATE POLICY "Students can view published exams"
@@ -66,7 +75,7 @@ CREATE POLICY "Students can view their section exams"
     id: 4,
     severity: "critical",
     category: "ولي الأمر",
-    icon: "🔴",
+    icon: <Users className="w-6 h-6" />,
     title: "ولي الأمر لا يرى درجات ولا حضور أبنائه",
     current: `-- لا توجد سياسة RLS لولي الأمر على:
 -- ❌ جدول attendance (الحضور)
@@ -96,7 +105,7 @@ CREATE POLICY "Parent views child grades"
     id: 5,
     severity: "critical",
     category: "الدرجات",
-    icon: "🔴",
+    icon: <BarChart3 className="w-6 h-6" />,
     title: "لا توجد سياسة لرؤية الطالب لدرجاته الخاصة!",
     current: `-- جدول grades في complete_system_schema.sql
 -- RLS مفعّل لكن لا يوجد SELECT policy للطلاب
@@ -119,7 +128,7 @@ CREATE POLICY "Teachers view section grades"
     id: 6,
     severity: "high",
     category: "المعلم",
-    icon: "🟠",
+    icon: <Users className="w-6 h-6" />,
     title: "المعلم يسجّل حضور أي طالب في أي فصل",
     current: `-- سياسة الحضور الحالية:
 CREATE POLICY "Teachers can manage attendance"
@@ -141,7 +150,7 @@ CREATE POLICY "Teachers can manage attendance"
     id: 7,
     severity: "high",
     category: "الاختبارات",
-    icon: "🟠",
+    icon: <Clock className="w-6 h-6" />,
     title: "لا يوجد تحقق من وقت الاختبار عند الدخول",
     current: `-- طالب يمكنه إنشاء exam_attempt حتى لو:
 -- ❌ الاختبار لم يبدأ بعد (قبل start_at)
@@ -169,7 +178,7 @@ CREATE POLICY "Students can create their own attempts"
     id: 8,
     severity: "high",
     category: "الواجبات",
-    icon: "🟠",
+    icon: <FileText className="w-6 h-6" />,
     title: "الطالب لا يرى الواجبات المخصصة لشعبته",
     current: `-- لا توجد SELECT policy للطلاب على جدول assignments
 -- ❌ الطالب لا يرى واجباته
@@ -194,7 +203,7 @@ CREATE POLICY "Teachers manage own assignments"
     id: 9,
     severity: "high",
     category: "الرسائل",
-    icon: "🟠",
+    icon: <Bell className="w-6 h-6" />,
     title: "أي مستخدم يرسل رسالة لأي مستخدم آخر",
     current: `CREATE POLICY "Users can send messages"
   ON public.messages FOR INSERT
@@ -214,7 +223,7 @@ CREATE POLICY "Teachers manage own assignments"
     id: 10,
     severity: "medium",
     category: "قاعدة البيانات",
-    icon: "🟡",
+    icon: <Database className="w-6 h-6" />,
     title: "لا يوجد مفهوم السنة الدراسية / الفصل الدراسي",
     current: `-- كل البيانات بلا سياق زمني:
 -- ❌ الجداول، الحضور، الدرجات كلها بلا academic_year
@@ -234,7 +243,7 @@ CREATE POLICY "Teachers manage own assignments"
     id: 11,
     severity: "medium",
     category: "الأمان",
-    icon: "🟡",
+    icon: <Lock className="w-6 h-6" />,
     title: "getSession() مهجور وغير آمن في Server-side",
     current: `// middleware.ts
 const { data: { session } } = 
@@ -252,7 +261,7 @@ const { data: { user }, error } =
     id: 12,
     severity: "medium",
     category: "الأداء",
-    icon: "🟡",
+    icon: <Zap className="w-6 h-6" />,
     title: "استعلام DB في كل request يُبطّئ التطبيق",
     current: `// كل طلب HTTP يستدعي:
 const { data: user } = await supabase
@@ -273,7 +282,7 @@ const role = user.user_metadata?.role;
     id: 13,
     severity: "low",
     category: "قاعدة البيانات",
-    icon: "🔵",
+    icon: <Database className="w-6 h-6" />,
     title: "ENUM 'all' كدور مستخدم لا منطق له",
     current: `CREATE TYPE user_role AS ENUM (
   'admin', 'management', 'teacher', 
@@ -296,9 +305,9 @@ const architecture = [
   {
     role: "مدير النظام",
     emoji: "👑",
-    color: "#dc2626",
-    bg: "#fef2f2",
-    border: "#fca5a5",
+    color: "text-red-600",
+    bg: "bg-red-50",
+    border: "border-red-200",
     can: [
       "إنشاء وتعديل وحذف جميع المستخدمين",
       "إدارة الصفوف والشعب والمواد",
@@ -316,9 +325,9 @@ const architecture = [
   {
     role: "الإدارة / management",
     emoji: "🏫",
-    color: "#7c3aed",
-    bg: "#f5f3ff",
-    border: "#c4b5fd",
+    color: "text-purple-600",
+    bg: "bg-purple-50",
+    border: "border-purple-200",
     can: [
       "رؤية تقارير الحضور والغياب",
       "رؤية نتائج جميع الطلاب",
@@ -336,9 +345,9 @@ const architecture = [
   {
     role: "المعلم",
     emoji: "📚",
-    color: "#0369a1",
-    bg: "#f0f9ff",
-    border: "#7dd3fc",
+    color: "text-sky-600",
+    bg: "bg-sky-50",
+    border: "border-sky-200",
     can: [
       "تسجيل حضور طلاب فصوله فقط",
       "إنشاء اختبارات لفصوله فقط",
@@ -356,9 +365,9 @@ const architecture = [
   {
     role: "الطالب",
     emoji: "🎒",
-    color: "#15803d",
-    bg: "#f0fdf4",
-    border: "#86efac",
+    color: "text-green-600",
+    bg: "bg-green-50",
+    border: "border-green-200",
     can: [
       "رؤية جدوله الدراسي الخاص",
       "أداء اختبارات شعبته في وقتها فقط",
@@ -377,9 +386,9 @@ const architecture = [
   {
     role: "ولي الأمر",
     emoji: "👨‍👩‍👧",
-    color: "#b45309",
-    bg: "#fffbeb",
-    border: "#fcd34d",
+    color: "text-amber-600",
+    bg: "bg-amber-50",
+    border: "border-amber-200",
     can: [
       "رؤية حضور وغياب أبنائه فقط",
       "رؤية درجات ونتائج أبنائه",
@@ -397,24 +406,24 @@ const architecture = [
 ];
 
 const missingFeatures = [
-  { icon: "📅", title: "السنة الدراسية", desc: "academic_years table — ضروري للأرشفة" },
-  { icon: "📬", title: "الإشعارات", desc: "notifications table — لتنبيهات الحضور والدرجات" },
-  { icon: "📋", title: "تسليم الواجبات", desc: "assignment_submissions — ملف SQL موجود لكن غير مدمج" },
-  { icon: "📊", title: "التقارير", desc: "views/functions للإحصائيات — لا تُحسب من الكود" },
-  { icon: "🔔", title: "تنبيه ولي الأمر", desc: "عند غياب الطالب أو انخفاض الدرجات" },
-  { icon: "🗓️", title: "الفصل الدراسي", desc: "semester — لتقسيم النتائج بشكل صحيح" },
+  { icon: <Calendar className="w-6 h-6 text-indigo-500" />, title: "السنة الدراسية", desc: "academic_years table — ضروري للأرشفة" },
+  { icon: <Bell className="w-6 h-6 text-amber-500" />, title: "الإشعارات", desc: "notifications table — لتنبيهات الحضور والدرجات" },
+  { icon: <FileText className="w-6 h-6 text-emerald-500" />, title: "تسليم الواجبات", desc: "assignment_submissions — ملف SQL موجود لكن غير مدمج" },
+  { icon: <BarChart3 className="w-6 h-6 text-sky-500" />, title: "التقارير", desc: "views/functions للإحصائيات — لا تُحسب من الكود" },
+  { icon: <AlertCircle className="w-6 h-6 text-rose-500" />, title: "تنبيه ولي الأمر", desc: "عند غياب الطالب أو انخفاض الدرجات" },
+  { icon: <Calendar className="w-6 h-6 text-purple-500" />, title: "الفصل الدراسي", desc: "semester — لتقسيم النتائج بشكل صحيح" },
 ];
 
-const severityColors = {
-  critical: { bg: "#fef2f2", border: "#fca5a5", badge: "#dc2626", label: "حرجة" },
-  high: { bg: "#fff7ed", border: "#fdba74", badge: "#ea580c", label: "عالية" },
-  medium: { bg: "#fefce8", border: "#fde047", badge: "#ca8a04", label: "متوسطة" },
-  low: { bg: "#eff6ff", border: "#93c5fd", badge: "#2563eb", label: "منخفضة" },
+const severityColors: Record<string, any> = {
+  critical: { bg: "bg-red-50", border: "border-red-200", badge: "bg-red-600", text: "text-red-600", label: "حرجة" },
+  high: { bg: "bg-orange-50", border: "border-orange-200", badge: "bg-orange-600", text: "text-orange-600", label: "عالية" },
+  medium: { bg: "bg-yellow-50", border: "border-yellow-200", badge: "bg-yellow-600", text: "text-yellow-600", label: "متوسطة" },
+  low: { bg: "bg-blue-50", border: "border-blue-200", badge: "bg-blue-600", text: "text-blue-600", label: "منخفضة" },
 };
 
 export default function SchoolAnalysis() {
   const [activeTab, setActiveTab] = useState("problems");
-  const [expandedId, setExpandedId] = useState(null);
+  const [expandedId, setExpandedId] = useState<number | null>(null);
   const [filterSeverity, setFilterSeverity] = useState("all");
 
   const filtered = filterSeverity === "all"
@@ -429,173 +438,213 @@ export default function SchoolAnalysis() {
   };
 
   return (
-    <div dir="rtl" style={{ fontFamily: "'Segoe UI', Tahoma, Arial, sans-serif", background: "#f8fafc", minHeight: "100vh" }}>
+    <div dir="rtl" className="min-h-screen bg-slate-50 font-sans">
       {/* Header */}
-      <div style={{ background: "linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%)", padding: "32px 24px", color: "white" }}>
-        <div style={{ maxWidth: 900, margin: "0 auto" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
-            <span style={{ fontSize: 32 }}>🏫</span>
+      <div className="bg-gradient-to-br from-slate-900 to-slate-800 text-white py-12 px-6">
+        <div className="max-w-5xl mx-auto">
+          <div className="flex items-center gap-4 mb-6">
+            <div className="p-3 bg-white/10 rounded-2xl backdrop-blur-sm">
+              <LayoutDashboard className="w-8 h-8 text-indigo-400" />
+            </div>
             <div>
-              <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>تقرير تدقيق — مدرسة الرفعة النموذجية</h1>
-              <p style={{ margin: "4px 0 0", opacity: 0.7, fontSize: 13 }}>refaaschool2026 · تحليل منطق النظام المدرسي</p>
+              <h1 className="text-3xl font-black tracking-tight">تقرير تدقيق — مدرسة الرفعة النموذجية</h1>
+              <p className="text-slate-400 mt-1 font-medium">refaaschool2026 · تحليل منطق النظام المدرسي</p>
             </div>
           </div>
 
           {/* Summary counts */}
-          <div style={{ display: "flex", gap: 12, marginTop: 20, flexWrap: "wrap" }}>
+          <div className="flex flex-wrap gap-4 mt-8">
             {[
-              { label: "مشاكل حرجة", count: counts.critical, color: "#ef4444" },
-              { label: "مشاكل عالية", count: counts.high, color: "#f97316" },
-              { label: "مشاكل متوسطة", count: counts.medium, color: "#eab308" },
-              { label: "مشاكل منخفضة", count: counts.low, color: "#3b82f6" },
+              { label: "مشاكل حرجة", count: counts.critical, color: "text-red-400", bg: "bg-red-400/10" },
+              { label: "مشاكل عالية", count: counts.high, color: "text-orange-400", bg: "bg-orange-400/10" },
+              { label: "مشاكل متوسطة", count: counts.medium, color: "text-yellow-400", bg: "bg-yellow-400/10" },
+              { label: "مشاكل منخفضة", count: counts.low, color: "text-blue-400", bg: "bg-blue-400/10" },
             ].map(s => (
-              <div key={s.label} style={{ background: "rgba(255,255,255,0.1)", borderRadius: 10, padding: "10px 18px", textAlign: "center", minWidth: 110 }}>
-                <div style={{ fontSize: 26, fontWeight: 800, color: s.color }}>{s.count}</div>
-                <div style={{ fontSize: 11, opacity: 0.8, marginTop: 2 }}>{s.label}</div>
+              <div key={s.label} className={`rounded-2xl px-6 py-4 text-center min-w-[140px] border border-white/5 ${s.bg}`}>
+                <div className={`text-4xl font-black ${s.color}`}>{s.count}</div>
+                <div className="text-sm font-bold text-slate-300 mt-2">{s.label}</div>
               </div>
             ))}
-            <div style={{ background: "rgba(255,255,255,0.1)", borderRadius: 10, padding: "10px 18px", textAlign: "center", minWidth: 110 }}>
-              <div style={{ fontSize: 26, fontWeight: 800, color: "#a78bfa" }}>{missingFeatures.length}</div>
-              <div style={{ fontSize: 11, opacity: 0.8, marginTop: 2 }}>ميزات مفقودة</div>
+            <div className="rounded-2xl px-6 py-4 text-center min-w-[140px] border border-white/5 bg-purple-400/10">
+              <div className="text-4xl font-black text-purple-400">{missingFeatures.length}</div>
+              <div className="text-sm font-bold text-slate-300 mt-2">ميزات مفقودة</div>
             </div>
           </div>
         </div>
       </div>
 
       {/* Tabs */}
-      <div style={{ background: "white", borderBottom: "1px solid #e2e8f0", position: "sticky", top: 0, zIndex: 10 }}>
-        <div style={{ maxWidth: 900, margin: "0 auto", display: "flex", gap: 0 }}>
+      <div className="bg-white border-b border-slate-200 sticky top-0 z-10 shadow-sm">
+        <div className="max-w-5xl mx-auto flex overflow-x-auto hide-scrollbar">
           {[
-            { id: "problems", label: "🔍 المشاكل المكتشفة" },
-            { id: "roles", label: "👥 منطق الأدوار الصحيح" },
-            { id: "missing", label: "➕ ميزات مفقودة" },
+            { id: "problems", label: "المشاكل المكتشفة", icon: <AlertTriangle className="w-4 h-4" /> },
+            { id: "roles", label: "منطق الأدوار الصحيح", icon: <Users className="w-4 h-4" /> },
+            { id: "missing", label: "ميزات مفقودة", icon: <Plus className="w-4 h-4" /> },
           ].map(tab => (
-            <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-              style={{
-                padding: "14px 20px", border: "none", background: "none", cursor: "pointer",
-                fontSize: 13, fontWeight: 600, color: activeTab === tab.id ? "#1e3a5f" : "#64748b",
-                borderBottom: activeTab === tab.id ? "3px solid #1e3a5f" : "3px solid transparent",
-                transition: "all 0.2s", fontFamily: "inherit"
-              }}>
+            <button 
+              key={tab.id} 
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex items-center gap-2 px-6 py-5 text-sm font-bold whitespace-nowrap transition-all border-b-2 ${
+                activeTab === tab.id 
+                  ? "border-indigo-600 text-indigo-600 bg-indigo-50/50" 
+                  : "border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50"
+              }`}
+            >
+              {tab.icon}
               {tab.label}
             </button>
           ))}
         </div>
       </div>
 
-      <div style={{ maxWidth: 900, margin: "0 auto", padding: "24px 16px" }}>
+      <div className="max-w-5xl mx-auto py-10 px-6">
 
         {/* PROBLEMS TAB */}
         {activeTab === "problems" && (
-          <div>
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
             {/* Filter */}
-            <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
-              <span style={{ fontSize: 13, color: "#64748b", alignSelf: "center", marginLeft: 4 }}>فلترة:</span>
+            <div className="flex items-center gap-3 flex-wrap bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+              <span className="text-sm font-bold text-slate-500 ml-2">تصفية حسب الخطورة:</span>
               {["all", "critical", "high", "medium", "low"].map(s => (
-                <button key={s} onClick={() => setFilterSeverity(s)}
-                  style={{
-                    padding: "6px 14px", borderRadius: 20, border: "1px solid",
-                    borderColor: filterSeverity === s ? "#1e3a5f" : "#e2e8f0",
-                    background: filterSeverity === s ? "#1e3a5f" : "white",
-                    color: filterSeverity === s ? "white" : "#64748b",
-                    cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit"
-                  }}>
+                <button 
+                  key={s} 
+                  onClick={() => setFilterSeverity(s)}
+                  className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${
+                    filterSeverity === s 
+                      ? "bg-slate-800 text-white shadow-md" 
+                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  }`}
+                >
                   {s === "all" ? "الكل" : severityColors[s].label}
                 </button>
               ))}
             </div>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {filtered.map(problem => {
-                const sc = severityColors[problem.severity];
-                const isOpen = expandedId === problem.id;
-                return (
-                  <div key={problem.id}
-                    style={{ background: "white", borderRadius: 12, border: `1px solid #e2e8f0`, overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
-                    <div onClick={() => setExpandedId(isOpen ? null : problem.id)}
-                      style={{ padding: "16px 20px", cursor: "pointer", display: "flex", alignItems: "flex-start", gap: 12, borderRight: `4px solid ${sc.badge}` }}>
-                      <span style={{ fontSize: 20, flexShrink: 0 }}>{problem.icon}</span>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
-                          <span style={{ background: sc.badge, color: "white", borderRadius: 6, padding: "2px 8px", fontSize: 11, fontWeight: 700 }}>{sc.label}</span>
-                          <span style={{ background: "#f1f5f9", color: "#475569", borderRadius: 6, padding: "2px 8px", fontSize: 11 }}>{problem.category}</span>
-                          <span style={{ fontSize: 12, color: "#94a3b8" }}>#{problem.id}</span>
+            <div className="space-y-4">
+              <AnimatePresence>
+                {filtered.map(problem => {
+                  const sc = severityColors[problem.severity];
+                  const isOpen = expandedId === problem.id;
+                  return (
+                    <motion.div 
+                      layout
+                      initial={{ opacity: 0, scale: 0.98 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.98 }}
+                      key={problem.id}
+                      className={`bg-white rounded-2xl border ${sc.border} overflow-hidden shadow-sm hover:shadow-md transition-shadow`}
+                    >
+                      <div 
+                        onClick={() => setExpandedId(isOpen ? null : problem.id)}
+                        className="p-5 cursor-pointer flex items-start gap-4 relative"
+                      >
+                        <div className={`absolute right-0 top-0 bottom-0 w-1 ${sc.badge}`}></div>
+                        <div className={`p-3 rounded-xl ${sc.bg} ${sc.text} shrink-0`}>
+                          {problem.icon}
                         </div>
-                        <div style={{ fontWeight: 600, fontSize: 14, color: "#1e293b", lineHeight: 1.4 }}>{problem.title}</div>
-                        <div style={{ fontSize: 12, color: "#ef4444", marginTop: 4, display: "flex", alignItems: "center", gap: 4 }}>
-                          <span>⚡</span> <span>{problem.impact}</span>
+                        <div className="flex-1 min-w-0 pt-1">
+                          <div className="flex items-center gap-2 flex-wrap mb-2">
+                            <span className={`${sc.badge} text-white rounded-lg px-2.5 py-1 text-xs font-black tracking-wide`}>
+                              {sc.label}
+                            </span>
+                            <span className="bg-slate-100 text-slate-600 rounded-lg px-2.5 py-1 text-xs font-bold">
+                              {problem.category}
+                            </span>
+                            <span className="text-xs font-bold text-slate-400">#{problem.id}</span>
+                          </div>
+                          <h3 className="font-black text-lg text-slate-900 leading-snug">{problem.title}</h3>
+                          <div className="text-sm text-red-500 mt-2 flex items-center gap-1.5 font-medium">
+                            <AlertTriangle className="w-4 h-4" /> 
+                            <span>{problem.impact}</span>
+                          </div>
+                        </div>
+                        <div className="shrink-0 pt-2 text-slate-400">
+                          {isOpen ? <ChevronUp className="w-6 h-6" /> : <ChevronDown className="w-6 h-6" />}
                         </div>
                       </div>
-                      <span style={{ fontSize: 18, color: "#94a3b8", flexShrink: 0 }}>{isOpen ? "▲" : "▼"}</span>
-                    </div>
 
-                    {isOpen && (
-                      <div style={{ padding: "0 20px 20px", borderTop: "1px solid #f1f5f9" }}>
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginTop: 16 }}>
-                          <div>
-                            <div style={{ fontSize: 12, fontWeight: 700, color: "#ef4444", marginBottom: 8, display: "flex", alignItems: "center", gap: 4 }}>
-                              ❌ الكود الحالي (المشكلة)
+                      <AnimatePresence>
+                        {isOpen && (
+                          <motion.div 
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: "auto", opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            className="overflow-hidden"
+                          >
+                            <div className="p-6 pt-0 border-t border-slate-100 bg-slate-50/50">
+                              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+                                <div>
+                                  <div className="text-sm font-black text-red-500 mb-3 flex items-center gap-2">
+                                    <XCircle className="w-5 h-5" /> الكود الحالي (المشكلة)
+                                  </div>
+                                  <pre className="bg-slate-900 text-red-200 rounded-2xl p-5 text-sm overflow-x-auto leading-relaxed border border-red-900/30 shadow-inner" dir="ltr">
+                                    <code>{problem.current}</code>
+                                  </pre>
+                                </div>
+                                <div>
+                                  <div className="text-sm font-black text-emerald-500 mb-3 flex items-center gap-2">
+                                    <CheckCircle2 className="w-5 h-5" /> الكود المقترح (الإصلاح)
+                                  </div>
+                                  <pre className="bg-slate-900 text-emerald-200 rounded-2xl p-5 text-sm overflow-x-auto leading-relaxed border border-emerald-900/30 shadow-inner" dir="ltr">
+                                    <code>{problem.fix}</code>
+                                  </pre>
+                                </div>
+                              </div>
                             </div>
-                            <pre style={{
-                              background: "#1e1e2e", color: "#cdd6f4", borderRadius: 8, padding: 14,
-                              fontSize: 11, overflow: "auto", margin: 0, lineHeight: 1.6,
-                              border: "1px solid #ef4444", direction: "ltr", textAlign: "left"
-                            }}>{problem.current}</pre>
-                          </div>
-                          <div>
-                            <div style={{ fontSize: 12, fontWeight: 700, color: "#16a34a", marginBottom: 8, display: "flex", alignItems: "center", gap: 4 }}>
-                              ✅ الكود المقترح (الإصلاح)
-                            </div>
-                            <pre style={{
-                              background: "#1e1e2e", color: "#a6e3a1", borderRadius: 8, padding: 14,
-                              fontSize: 11, overflow: "auto", margin: 0, lineHeight: 1.6,
-                              border: "1px solid #16a34a", direction: "ltr", textAlign: "left"
-                            }}>{problem.fix}</pre>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </motion.div>
+                  );
+                })}
+              </AnimatePresence>
             </div>
-          </div>
+          </motion.div>
         )}
 
         {/* ROLES TAB */}
         {activeTab === "roles" && (
-          <div>
-            <div style={{ background: "white", borderRadius: 12, padding: "16px 20px", marginBottom: 20, border: "1px solid #e2e8f0", borderRight: "4px solid #1e3a5f" }}>
-              <div style={{ fontWeight: 700, color: "#1e3a5f", marginBottom: 6 }}>🧠 مبدأ أساسي في المنطق المدرسي</div>
-              <div style={{ fontSize: 13, color: "#475569", lineHeight: 1.7 }}>
-                كل دور يرى <strong>فقط ما يخصه</strong>. المعلم لا يرى فصولاً غير فصوله، والطالب لا يرى شعباً غير شعبته، وولي الأمر لا يرى سوى أبنائه المسجلين. هذا المبدأ يجب أن ينعكس في كل سياسة RLS.
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
+            <div className="bg-indigo-50 rounded-2xl p-6 border border-indigo-100 flex gap-4 items-start shadow-sm">
+              <div className="p-3 bg-indigo-100 text-indigo-600 rounded-xl shrink-0">
+                <Info className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="font-black text-indigo-900 mb-2 text-lg">مبدأ أساسي في المنطق المدرسي</h3>
+                <p className="text-indigo-800/80 leading-relaxed font-medium">
+                  كل دور يرى <strong>فقط ما يخصه</strong>. المعلم لا يرى فصولاً غير فصوله، والطالب لا يرى شعباً غير شعبته، وولي الأمر لا يرى سوى أبنائه المسجلين. هذا المبدأ يجب أن ينعكس في كل سياسة RLS.
+                </p>
               </div>
             </div>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <div className="grid grid-cols-1 gap-6">
               {architecture.map(role => (
-                <div key={role.role} style={{ background: "white", borderRadius: 12, border: `1px solid ${role.border}`, overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
-                  <div style={{ background: role.bg, padding: "14px 20px", borderBottom: `1px solid ${role.border}`, display: "flex", alignItems: "center", gap: 10 }}>
-                    <span style={{ fontSize: 28 }}>{role.emoji}</span>
-                    <div style={{ fontWeight: 700, fontSize: 16, color: role.color }}>{role.role}</div>
+                <div key={role.role} className={`bg-white rounded-3xl border ${role.border} overflow-hidden shadow-sm`}>
+                  <div className={`${role.bg} p-5 border-b ${role.border} flex items-center gap-4`}>
+                    <span className="text-4xl">{role.emoji}</span>
+                    <h3 className={`font-black text-xl ${role.color}`}>{role.role}</h3>
                   </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", padding: 20, gap: 20 }}>
+                  <div className="grid grid-cols-1 md:grid-cols-2 p-6 gap-8">
                     <div>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: "#16a34a", marginBottom: 10 }}>✅ يمكنه</div>
-                      <ul style={{ margin: 0, padding: 0, listStyle: "none" }}>
+                      <div className="text-sm font-black text-emerald-600 mb-4 flex items-center gap-2">
+                        <CheckCircle2 className="w-5 h-5" /> يمكنه
+                      </div>
+                      <ul className="space-y-3">
                         {role.can.map((item, i) => (
-                          <li key={i} style={{ fontSize: 13, color: "#374151", padding: "5px 0", borderBottom: "1px solid #f1f5f9", display: "flex", alignItems: "flex-start", gap: 6 }}>
-                            <span style={{ color: "#16a34a", flexShrink: 0, marginTop: 1 }}>•</span> {item}
+                          <li key={i} className="text-sm text-slate-700 font-medium flex items-start gap-3 bg-slate-50 p-3 rounded-xl border border-slate-100">
+                            <span className="text-emerald-500 shrink-0 mt-0.5">•</span> {item}
                           </li>
                         ))}
                       </ul>
                     </div>
                     <div>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: "#ef4444", marginBottom: 10 }}>🚫 لا يمكنه</div>
-                      <ul style={{ margin: 0, padding: 0, listStyle: "none" }}>
+                      <div className="text-sm font-black text-red-600 mb-4 flex items-center gap-2">
+                        <XCircle className="w-5 h-5" /> لا يمكنه
+                      </div>
+                      <ul className="space-y-3">
                         {role.cannot.map((item, i) => (
-                          <li key={i} style={{ fontSize: 13, color: "#374151", padding: "5px 0", borderBottom: "1px solid #f1f5f9", display: "flex", alignItems: "flex-start", gap: 6 }}>
-                            <span style={{ color: "#ef4444", flexShrink: 0, marginTop: 1 }}>×</span> {item}
+                          <li key={i} className="text-sm text-slate-700 font-medium flex items-start gap-3 bg-slate-50 p-3 rounded-xl border border-slate-100">
+                            <span className="text-red-500 shrink-0 mt-0.5">×</span> {item}
                           </li>
                         ))}
                       </ul>
@@ -606,21 +655,22 @@ export default function SchoolAnalysis() {
             </div>
 
             {/* RLS Matrix */}
-            <div style={{ marginTop: 24, background: "white", borderRadius: 12, border: "1px solid #e2e8f0", overflow: "hidden" }}>
-              <div style={{ padding: "14px 20px", background: "#f8fafc", borderBottom: "1px solid #e2e8f0", fontWeight: 700, fontSize: 14, color: "#1e293b" }}>
-                📊 مصفوفة الصلاحيات المقترحة (RLS Matrix)
+            <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm mt-10">
+              <div className="p-5 bg-slate-50 border-b border-slate-200 flex items-center gap-3">
+                <Database className="w-5 h-5 text-slate-500" />
+                <h3 className="font-black text-slate-900">مصفوفة الصلاحيات المقترحة (RLS Matrix)</h3>
               </div>
-              <div style={{ overflowX: "auto" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm text-right">
                   <thead>
-                    <tr style={{ background: "#1e3a5f", color: "white" }}>
-                      <th style={{ padding: "10px 14px", textAlign: "right", fontWeight: 600 }}>الجدول</th>
+                    <tr className="bg-slate-800 text-white">
+                      <th className="p-4 font-bold">الجدول</th>
                       {["مدير", "إدارة", "معلم", "طالب", "ولي أمر"].map(r => (
-                        <th key={r} style={{ padding: "10px 14px", textAlign: "center", fontWeight: 600 }}>{r}</th>
+                        <th key={r} className="p-4 font-bold text-center">{r}</th>
                       ))}
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody className="divide-y divide-slate-100">
                     {[
                       { table: "users", perms: ["CRUD", "R", "R(self)", "R(self)", "R(self)"] },
                       { table: "students", perms: ["CRUD", "R", "R(section)", "R(self)", "R(children)"] },
@@ -632,54 +682,60 @@ export default function SchoolAnalysis() {
                       { table: "messages", perms: ["CRUD", "CRUD", "CRU(rules)", "CRU(rules)", "CRU(rules)"] },
                       { table: "announcements", perms: ["CRUD", "CRU", "R", "R", "R"] },
                     ].map((row, i) => (
-                      <tr key={row.table} style={{ background: i % 2 === 0 ? "white" : "#f8fafc" }}>
-                        <td style={{ padding: "9px 14px", fontFamily: "monospace", color: "#1e3a5f", fontWeight: 600 }}>{row.table}</td>
+                      <tr key={row.table} className={i % 2 === 0 ? "bg-white" : "bg-slate-50/50"}>
+                        <td className="p-4 font-mono font-bold text-indigo-600">{row.table}</td>
                         {row.perms.map((p, j) => (
-                          <td key={j} style={{ padding: "9px 14px", textAlign: "center" }}>
-                            <span style={{
-                              display: "inline-block", padding: "2px 8px", borderRadius: 6, fontSize: 11, fontWeight: 600,
-                              background: p === "CRUD" ? "#dcfce7" : p === "—" ? "#f1f5f9" : "#fef9c3",
-                              color: p === "CRUD" ? "#15803d" : p === "—" ? "#94a3b8" : "#854d0e"
-                            }}>{p}</span>
+                          <td key={j} className="p-4 text-center">
+                            <span className={`
+                              inline-block px-3 py-1 rounded-lg text-xs font-black tracking-wide
+                              ${p === "CRUD" ? "bg-emerald-100 text-emerald-700" : 
+                                p === "—" ? "bg-slate-100 text-slate-400" : 
+                                "bg-amber-100 text-amber-700"}
+                            `}>
+                              {p}
+                            </span>
                           </td>
                         ))}
                       </tr>
                     ))}
                   </tbody>
                 </table>
-                <div style={{ padding: "10px 14px", fontSize: 11, color: "#64748b", borderTop: "1px solid #e2e8f0" }}>
+                <div className="p-4 text-xs font-medium text-slate-500 border-t border-slate-200 bg-slate-50">
                   CRUD = إنشاء+قراءة+تعديل+حذف | R = قراءة فقط | (section) = فصوله فقط | (self) = بياناته فقط | (children) = أبناؤه فقط | (rules) = بقواعد محددة
                 </div>
               </div>
             </div>
-          </div>
+          </motion.div>
         )}
 
         {/* MISSING FEATURES TAB */}
         {activeTab === "missing" && (
-          <div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 24 }}>
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {missingFeatures.map((f, i) => (
-                <div key={i} style={{ background: "white", borderRadius: 12, padding: "18px 20px", border: "1px solid #e2e8f0", display: "flex", gap: 14, alignItems: "flex-start", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
-                  <span style={{ fontSize: 28, flexShrink: 0 }}>{f.icon}</span>
+                <div key={i} className="bg-white rounded-2xl p-6 border border-slate-200 flex gap-5 items-start shadow-sm hover:shadow-md transition-shadow">
+                  <div className="p-3 bg-slate-50 rounded-xl shrink-0 border border-slate-100">
+                    {f.icon}
+                  </div>
                   <div>
-                    <div style={{ fontWeight: 700, fontSize: 14, color: "#1e293b", marginBottom: 4 }}>{f.title}</div>
-                    <div style={{ fontSize: 12, color: "#64748b", lineHeight: 1.5 }}>{f.desc}</div>
+                    <h3 className="font-black text-slate-900 text-lg mb-1">{f.title}</h3>
+                    <p className="text-sm text-slate-500 font-medium leading-relaxed">{f.desc}</p>
                   </div>
                 </div>
               ))}
             </div>
 
             {/* Priority roadmap */}
-            <div style={{ background: "white", borderRadius: 12, border: "1px solid #e2e8f0", overflow: "hidden" }}>
-              <div style={{ padding: "14px 20px", background: "#f8fafc", borderBottom: "1px solid #e2e8f0", fontWeight: 700, fontSize: 14 }}>
-                🗺️ خارطة طريق الإصلاح المقترحة
+            <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm mt-10">
+              <div className="p-5 bg-slate-50 border-b border-slate-200 flex items-center gap-3">
+                <LayoutDashboard className="w-5 h-5 text-slate-500" />
+                <h3 className="font-black text-slate-900">خارطة طريق الإصلاح المقترحة</h3>
               </div>
-              <div style={{ padding: 20 }}>
+              <div className="p-6 space-y-6">
                 {[
                   {
                     phase: "المرحلة 1 — حرجة (أسبوع 1)",
-                    color: "#dc2626", bg: "#fef2f2",
+                    color: "text-red-600", bg: "bg-red-50", border: "border-red-200", icon: <ShieldAlert className="w-5 h-5" />,
                     items: [
                       "إصلاح UNIQUE في جدول attendance → (student_id, subject_id, date, period)",
                       "إضافة RLS لولي الأمر على attendance + grades + assignments",
@@ -690,7 +746,7 @@ export default function SchoolAnalysis() {
                   },
                   {
                     phase: "المرحلة 2 — عالية (أسبوع 2)",
-                    color: "#ea580c", bg: "#fff7ed",
+                    color: "text-orange-600", bg: "bg-orange-50", border: "border-orange-200", icon: <AlertTriangle className="w-5 h-5" />,
                     items: [
                       "إضافة dashboard للـ management + توجيه Middleware",
                       "تقييد الرسائل بقواعد العلاقات (معلم↔طالب فصله فقط)",
@@ -701,7 +757,7 @@ export default function SchoolAnalysis() {
                   },
                   {
                     phase: "المرحلة 3 — تحسين (أسبوع 3-4)",
-                    color: "#ca8a04", bg: "#fefce8",
+                    color: "text-yellow-600", bg: "bg-yellow-50", border: "border-yellow-200", icon: <Zap className="w-5 h-5" />,
                     items: [
                       "إنشاء جدول academic_years وربطه بكل الجداول",
                       "نقل الدور إلى JWT custom claims (Supabase Hook)",
@@ -712,7 +768,7 @@ export default function SchoolAnalysis() {
                   },
                   {
                     phase: "المرحلة 4 — تنظيف (أسبوع 4)",
-                    color: "#2563eb", bg: "#eff6ff",
+                    color: "text-blue-600", bg: "bg-blue-50", border: "border-blue-200", icon: <CheckCircle2 className="w-5 h-5" />,
                     items: [
                       "حذف firebase-tools و@google/genai من package.json",
                       "فصل ENUM user_role عن announcement_target",
@@ -721,12 +777,14 @@ export default function SchoolAnalysis() {
                     ]
                   },
                 ].map(phase => (
-                  <div key={phase.phase} style={{ marginBottom: 16, background: phase.bg, borderRadius: 10, padding: "14px 18px", border: `1px solid ${phase.color}30` }}>
-                    <div style={{ fontWeight: 700, color: phase.color, marginBottom: 10, fontSize: 14 }}>{phase.phase}</div>
-                    <ul style={{ margin: 0, padding: 0, listStyle: "none" }}>
+                  <div key={phase.phase} className={`${phase.bg} rounded-2xl p-6 border ${phase.border}`}>
+                    <div className={`font-black ${phase.color} mb-4 text-lg flex items-center gap-2`}>
+                      {phase.icon} {phase.phase}
+                    </div>
+                    <ul className="space-y-3">
                       {phase.items.map((item, i) => (
-                        <li key={i} style={{ fontSize: 13, color: "#374151", padding: "4px 0", display: "flex", alignItems: "flex-start", gap: 8 }}>
-                          <span style={{ color: phase.color, flexShrink: 0 }}>→</span> {item}
+                        <li key={i} className="text-sm text-slate-700 font-medium flex items-start gap-3 bg-white/60 p-3 rounded-xl border border-white">
+                          <span className={`${phase.color} shrink-0 mt-0.5`}>→</span> {item}
                         </li>
                       ))}
                     </ul>
@@ -734,7 +792,7 @@ export default function SchoolAnalysis() {
                 ))}
               </div>
             </div>
-          </div>
+          </motion.div>
         )}
       </div>
     </div>

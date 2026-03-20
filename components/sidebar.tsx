@@ -40,6 +40,7 @@ const navigation = [
   { name: 'الإعلانات', href: '/announcements', icon: Bell },
   { name: 'المستندات', href: '/documents', icon: FolderOpen },
   { name: 'استيراد البيانات', href: '/seed', icon: Database },
+  { name: 'تقرير التدقيق', href: '/report', icon: FileText },
   { name: 'الإعدادات', href: '/settings', icon: Settings },
 ];
 

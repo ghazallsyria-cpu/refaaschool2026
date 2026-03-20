@@ -117,6 +117,9 @@ export default function AdminDashboard() {
               <Link href="/admin/teacher-assignments" className="bg-white text-indigo-600 px-6 py-3 rounded-2xl font-bold hover:bg-indigo-50 transition-all shadow-lg shadow-indigo-900/20 flex items-center gap-2 group">
                 <Plus className="h-5 w-5 group-hover:rotate-90 transition-transform" /> إدارة التعيينات
               </Link>
+              <Link href="/report" className="bg-white/10 backdrop-blur-md text-white border border-white/20 px-6 py-3 rounded-2xl font-bold hover:bg-white/20 transition-all flex items-center gap-2">
+                <Activity className="h-5 w-5" /> تقرير التدقيق
+              </Link>
               <button className="bg-white/10 backdrop-blur-md text-white border border-white/20 px-6 py-3 rounded-2xl font-bold hover:bg-white/20 transition-all flex items-center gap-2">
                 <Bell className="h-5 w-5" /> التنبيهات الأخيرة
               </button>

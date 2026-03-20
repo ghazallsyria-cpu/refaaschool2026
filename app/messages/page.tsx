@@ -543,14 +543,14 @@ export default function MessagesPage() {
                         {message.content}
                       </p>
                     </div>
-                    <div className="flex-shrink-0 self-center opacity-0 group-hover:opacity-100 transition-all translate-x-4 group-hover:translate-x-0 flex gap-2">
+                    <div className="flex-shrink-0 self-center flex gap-2">
                       <div 
                         onClick={() => handleDeleteMessage(message.ids)}
-                        className="h-10 w-10 rounded-xl bg-white shadow-sm border border-slate-100 flex items-center justify-center text-slate-400 hover:text-red-600 hover:border-red-100 transition-all"
+                        className="h-10 w-10 rounded-xl bg-white shadow-sm border border-slate-100 flex items-center justify-center text-slate-400 hover:text-red-600 hover:border-red-100 transition-all cursor-pointer"
                       >
                         <Trash2 className="h-4 w-4" />
                       </div>
-                      <div className="h-10 w-10 rounded-xl bg-white shadow-sm border border-slate-100 flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:border-indigo-100 transition-all">
+                      <div className="h-10 w-10 rounded-xl bg-white shadow-sm border border-slate-100 flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:border-indigo-100 transition-all cursor-pointer">
                         <Send className="h-4 w-4" />
                       </div>
                     </div>

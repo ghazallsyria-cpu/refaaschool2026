@@ -65,19 +65,34 @@ export default function ClassesPage() {
     try {
       setLoading(true);
       
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // جلب دور المستخدم
+      const { data: userData } = await supabase.from('users').select('role').eq('id', user.id).single();
+      const isTeacher = userData?.role === 'teacher' || (typeof userData?.role === 'string' && userData?.role.includes('teacher'));
+
       // Fetch classes
-      const { data: classesData, error: classesError } = await supabase
-        .from('classes')
-        .select('*')
-        .order('level');
+      let classesQuery = supabase.from('classes').select('*').order('level');
+      const { data: classesData, error: classesError } = await classesQuery;
         
       if (classesError) throw classesError;
 
       // Fetch sections
-      const { data: sectionsData, error: sectionsError } = await supabase
-        .from('sections')
-        .select('*')
-        .order('name');
+      let sectionsQuery = supabase.from('sections').select('*').order('name');
+      
+      // إذا كان معلماً، نجلب فصوله فقط
+      if (isTeacher) {
+        const { data: teacherSections } = await supabase
+          .from('teacher_sections')
+          .select('section_id')
+          .eq('teacher_id', user.id);
+        
+        const sectionIds = teacherSections?.map(ts => ts.section_id) || [];
+        sectionsQuery = sectionsQuery.in('id', sectionIds);
+      }
+
+      const { data: sectionsData, error: sectionsError } = await sectionsQuery;
         
       if (sectionsError) throw sectionsError;
 
@@ -119,7 +134,7 @@ export default function ClassesPage() {
           ...cls,
           sections: classSections
         };
-      });
+      }).filter((cls: any) => cls.sections.length > 0); // إخفاء الفصول التي لا تحتوي على أقسام للمعلم
 
       setClasses(organizedClasses);
       

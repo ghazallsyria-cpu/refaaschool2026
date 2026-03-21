@@ -76,7 +76,9 @@ export default function MessagesPage() {
     const group = messages.reduce((acc, msg) => {
       const timestamp = new Date(msg.created_at).getTime();
       const roundedTimestamp = Math.floor(timestamp / 5000) * 5000; // 5-second window
-      const key = `${msg.sender_id}-${msg.subject}-${msg.content}-${roundedTimestamp}`;
+      const key = msg.section_id 
+        ? `${msg.sender_id}-${msg.subject}-${msg.content}-${msg.section_id}-${roundedTimestamp}`
+        : `${msg.sender_id}-${msg.receiver_id}-${msg.subject}-${msg.content}-${roundedTimestamp}`;
       
       if (!acc[key]) {
         acc[key] = { ...msg, ids: [msg.id], count: 1 };
@@ -277,8 +279,10 @@ export default function MessagesPage() {
           is_read,
           created_at,
           parent_id,
+          section_id,
           sender:sender_id(full_name, avatar_url, role),
-          receiver:receiver_id(full_name)
+          receiver:receiver_id(full_name),
+          section:section_id(name, classes(name))
         `)
         .order('created_at', { ascending: false });
 
@@ -419,10 +423,16 @@ export default function MessagesPage() {
     }
   };
 
-  const filteredMessages = messages.filter(m => 
-    m.subject?.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    m.sender?.full_name?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredMessages = groupedMessages.filter(m => {
+    const searchLower = searchTerm.toLowerCase();
+    const subjectMatch = m.subject?.toLowerCase().includes(searchLower);
+    const senderMatch = m.sender?.full_name?.toLowerCase().includes(searchLower);
+    const receiverMatch = m.receiver?.full_name?.toLowerCase().includes(searchLower);
+    const sectionMatch = m.section?.name?.toLowerCase().includes(searchLower) || 
+                        m.section?.classes?.name?.toLowerCase().includes(searchLower);
+    
+    return subjectMatch || senderMatch || receiverMatch || sectionMatch;
+  });
 
   const filteredAnnouncements = announcements.filter(a => 
     a.title?.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -591,8 +601,16 @@ export default function MessagesPage() {
                       <div className="flex items-center justify-between mb-1">
                         <div className="flex items-center gap-3">
                           <p className={`text-sm font-black ${!message.is_read ? 'text-slate-900' : 'text-slate-700'}`}>
-                            {message.sender_id === currentUser?.id ? (message.receiver?.full_name || 'مستخدم غير معروف') : (message.sender?.full_name || 'مستخدم غير معروف')}
-                            {message.count > 1 && <span className="text-xs text-slate-400 mr-2">(رسالة جماعية إلى {message.count} طلاب)</span>}
+                            {message.sender_id === currentUser?.id ? (
+                              message.section_id ? (
+                                `رسالة جماعية: ${message.section?.classes?.name || ''} - ${message.section?.name || ''}`
+                              ) : (
+                                message.receiver?.full_name || 'مستخدم غير معروف'
+                              )
+                            ) : (
+                              message.sender?.full_name || 'مستخدم غير معروف'
+                            )}
+                            {message.count > 1 && !message.section_id && <span className="text-xs text-slate-400 mr-2">(رسالة جماعية إلى {message.count} طلاب)</span>}
                           </p>
                           <span className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">
                             {message.sender?.role === 'admin' ? 'إدارة' : message.sender?.role === 'teacher' ? 'معلم' : 'طالب'}

@@ -38,6 +38,7 @@ export async function POST(req: Request) {
     const messagesToInsert = students.map(student => ({
       sender_id: senderId,
       receiver_id: student.id,
+      section_id: sectionId,
       subject,
       content,
       is_read: false

@@ -338,7 +338,9 @@ export default function AssignmentDetailsPage({ params }: { params: Promise<{ id
       if (error) throw error;
 
       // Update Questions
-      await supabase.from('assignment_questions').delete().eq('assignment_id', assignmentId);
+      const { error: deleteError } = await supabase.from('assignment_questions').delete().eq('assignment_id', assignmentId);
+      if (deleteError) throw deleteError;
+
       if (questions.length > 0) {
         const questionsPayload = questions.map((q, index) => ({
           assignment_id: assignmentId,
@@ -349,7 +351,8 @@ export default function AssignmentDetailsPage({ params }: { params: Promise<{ id
           is_required: q.isRequired,
           order: index
         }));
-        await supabase.from('assignment_questions').insert(questionsPayload);
+        const { error: insertError } = await supabase.from('assignment_questions').insert(questionsPayload);
+        if (insertError) throw insertError;
       }
 
       showNotification('success', 'تم تحديث الواجب بنجاح');

@@ -253,7 +253,7 @@ export default function AssignmentsPage() {
             order: index
           }));
           const { error: qError } = await supabase.from('assignment_questions').insert(questionsPayload);
-          if (qError) console.error('Error saving questions:', qError);
+          if (qError) throw qError;
         }
       } else {
         // Insert
@@ -276,7 +276,7 @@ export default function AssignmentsPage() {
             order: index
           }));
           const { error: qError } = await supabase.from('assignment_questions').insert(questionsPayload);
-          if (qError) console.error('Error saving questions:', qError);
+          if (qError) throw qError;
         }
 
         // Send Notifications to students in the section

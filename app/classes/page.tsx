@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Users, BookOpen, ChevronDown, ChevronUp, Search, User, GraduationCap, Edit, Trash2, Plus, X, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import Link from 'next/link';
 
 type Student = {
   id: string;
@@ -477,9 +478,9 @@ export default function ClassesPage() {
                                                 </span>
                                               </td>
                                               <td className="py-4 px-8 whitespace-nowrap text-sm">
-                                                <button className="text-indigo-600 hover:text-indigo-800 font-bold bg-indigo-50 px-4 py-2 rounded-xl transition-all hover:bg-indigo-100 opacity-0 group-hover:opacity-100 scale-90 group-hover:scale-100">
+                                                <Link href={`/students/${student.id}`} className="text-indigo-600 hover:text-indigo-800 font-bold bg-indigo-50 px-4 py-2 rounded-xl transition-all hover:bg-indigo-100 opacity-0 group-hover:opacity-100 scale-90 group-hover:scale-100">
                                                   عرض الملف
-                                                </button>
+                                                </Link>
                                               </td>
                                             </tr>
                                           ))}

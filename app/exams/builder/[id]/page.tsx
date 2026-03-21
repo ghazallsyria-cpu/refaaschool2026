@@ -64,6 +64,8 @@ export default function QuizBuilder() {
     title: '',
     description: '',
     subject_id: '',
+    section_ids: [], // Changed from section_id to section_ids
+    teacher_id: '',
     duration: 30,
     max_attempts: 1,
     max_score: 100, // Default to 100
@@ -385,8 +387,8 @@ export default function QuizBuilder() {
       if (exam.status === 'published') {
         try {
           let studentsQuery = supabase.from('students').select('id');
-          if (exam.section_id) {
-            studentsQuery = studentsQuery.eq('section_id', exam.section_id);
+          if (exam.section_ids && exam.section_ids.length > 0) {
+            studentsQuery = studentsQuery.in('section_id', exam.section_ids);
           }
           const { data: students } = await studentsQuery;
 
@@ -672,15 +674,34 @@ export default function QuizBuilder() {
               </select>
             </div>
             <div className="space-y-3">
-              <label className="text-xs font-black text-slate-400 uppercase tracking-widest block">الشعبة المستهدفة</label>
-              <select 
-                value={exam.section_id}
-                onChange={(e) => setExam({...exam, section_id: e.target.value})}
-                className="w-full px-5 py-4 rounded-2xl bg-slate-50 border-0 ring-1 ring-inset ring-slate-100 focus:ring-2 focus:ring-indigo-600 outline-none font-bold text-slate-700 transition-all appearance-none cursor-pointer"
-              >
-                <option value="">جميع الشعب</option>
-                {sections.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
+              <label className="text-xs font-black text-slate-400 uppercase tracking-widest block">الشعب المستهدفة</label>
+              <div className="grid grid-cols-2 gap-2">
+                <label className="flex items-center gap-2 p-3 rounded-xl bg-slate-50 border border-slate-100 cursor-pointer">
+                  <input 
+                    type="checkbox"
+                    checked={exam.section_ids?.length === 0}
+                    onChange={(e) => e.target.checked ? setExam({...exam, section_ids: []}) : null}
+                    className="rounded text-indigo-600 focus:ring-indigo-500"
+                  />
+                  <span className="text-sm font-bold text-slate-700">الجميع</span>
+                </label>
+                {sections.map(s => (
+                  <label key={s.id} className="flex items-center gap-2 p-3 rounded-xl bg-slate-50 border border-slate-100 cursor-pointer">
+                    <input 
+                      type="checkbox"
+                      checked={exam.section_ids?.includes(s.id)}
+                      onChange={(e) => {
+                        const newSections = e.target.checked 
+                          ? [...(exam.section_ids || []), s.id]
+                          : (exam.section_ids || []).filter(id => id !== s.id);
+                        setExam({...exam, section_ids: newSections});
+                      }}
+                      className="rounded text-indigo-600 focus:ring-indigo-500"
+                    />
+                    <span className="text-sm font-bold text-slate-700">{s.name}</span>
+                  </label>
+                ))}
+              </div>
             </div>
           </div>
         </div>

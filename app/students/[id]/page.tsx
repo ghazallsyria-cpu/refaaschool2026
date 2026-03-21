@@ -14,9 +14,11 @@ import { arSA } from 'date-fns/locale';
 
 export default function StudentProfilePage() {
   const params = useParams();
+  const router = useRouter();
   const studentId = params.id as string;
   const [studentData, setStudentData] = useState<any>(null);
   const [attendanceStats, setAttendanceStats] = useState<any>(null);
+  const [absentDates, setAbsentDates] = useState<string[]>([]);
   const [recentGrades, setRecentGrades] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -37,22 +39,23 @@ export default function StudentProfilePage() {
         // Fetch attendance stats
         const { data: attendance } = await supabase
           .from('attendance')
-          .select('status')
+          .select('status, date')
           .eq('student_id', student.id);
         
         if (attendance) {
           const total = attendance.length;
           const present = attendance.filter(a => a.status === 'present').length;
           const late = attendance.filter(a => a.status === 'late').length;
-          const absent = attendance.filter(a => a.status === 'absent').length;
+          const absent = attendance.filter(a => a.status === 'absent');
           
           setAttendanceStats({
             total,
             present,
             late,
-            absent,
+            absent: absent.length,
             rate: total > 0 ? Math.round((present / total) * 100) : 100
           });
+          setAbsentDates(absent.map(a => a.date));
         }
 
         // Fetch recent grades
@@ -81,17 +84,25 @@ export default function StudentProfilePage() {
 
   return (
     <div className="p-8 space-y-8">
-      <div className="flex items-center gap-4">
-        <div className="h-20 w-20 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 text-3xl font-bold">
-          {studentData.users?.full_name?.charAt(0)}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <div className="h-20 w-20 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 text-3xl font-bold">
+            {studentData.users?.full_name?.charAt(0)}
+          </div>
+          <div>
+            <h1 className="text-3xl font-bold text-slate-900">{studentData.users?.full_name}</h1>
+            <p className="text-slate-500">{studentData.sections?.classes?.name} - {studentData.sections?.name}</p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900">{studentData.users?.full_name}</h1>
-          <p className="text-slate-500">{studentData.sections?.classes?.name} - {studentData.sections?.name}</p>
-        </div>
+        <button 
+          onClick={() => router.back()} 
+          className="px-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-2xl transition-all"
+        >
+          رجوع
+        </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="glass-card p-6 rounded-3xl border border-slate-100">
           <h3 className="text-lg font-bold mb-4">إحصائيات الحضور</h3>
           {attendanceStats && (
@@ -109,6 +120,21 @@ export default function StudentProfilePage() {
                 <span className="font-bold text-red-600">{attendanceStats.absent}</span>
               </div>
             </div>
+          )}
+        </div>
+
+        <div className="glass-card p-6 rounded-3xl border border-slate-100">
+          <h3 className="text-lg font-bold mb-4">تواريخ الغياب</h3>
+          {absentDates.length > 0 ? (
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              {absentDates.map((date, index) => (
+                <span key={index} className="bg-red-50 text-red-700 px-3 py-1.5 rounded-xl text-sm font-bold text-center border border-red-100">
+                  {format(new Date(date), 'yyyy-MM-dd')}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <p className="text-slate-500 font-bold">لا يوجد أيام غياب مسجلة.</p>
           )}
         </div>
       </div>

@@ -104,6 +104,49 @@ export default function AttendancePage() {
     }
   }, [selectedSection, date]);
 
+  const fetchSections = useCallback(async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // جلب دور المستخدم
+      const { data: userData } = await supabase
+        .from('users')
+        .select('role')
+        .eq('id', user.id)
+        .single();
+
+      let sectionsData: any[] = [];
+
+      if (userData?.role === 'admin') {
+        // المدير يرى كل الفصول
+        const { data: allSections } = await supabase
+          .from('sections')
+          .select('id, name, classes(name)');
+        sectionsData = allSections || [];
+      } else {
+        // المعلم يرى فصوله فقط
+        const { data: teacherSections } = await supabase
+          .from('teacher_sections')
+          .select('section_id, section:sections(id, name, classes(name))')
+          .eq('teacher_id', user.id);
+        
+        sectionsData = (teacherSections?.map(ts => ts.section) || []) as any[];
+      }
+      
+      setSections(sectionsData);
+      if (sectionsData.length > 0) {
+        setSelectedSection(sectionsData[0].id);
+      }
+    } catch (error) {
+      console.error('Error fetching sections:', error);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchSections();
+  }, [fetchSections]);
+
   useEffect(() => {
     if (selectedSection && date) {
       fetchStudentsAndAttendance();

@@ -335,7 +335,10 @@ export default function ExamsDashboard() {
                                 </Link>
                               </DropdownMenu.Item>
                               <DropdownMenu.Separator className="h-px bg-slate-100 my-3 mx-3" />
-                              <DropdownMenu.Item className="flex items-center gap-4 px-5 py-4 text-sm font-black text-red-600 hover:bg-red-50 rounded-2xl outline-none cursor-pointer transition-colors">
+                              <DropdownMenu.Item 
+                                className="flex items-center gap-4 px-5 py-4 text-sm font-black text-red-600 hover:bg-red-50 rounded-2xl outline-none cursor-pointer transition-colors"
+                                onClick={() => handleDelete(exam.id)}
+                              >
                                 <Trash2 className="h-5 w-5" />
                                 <span>حذف الاختبار</span>
                               </DropdownMenu.Item>

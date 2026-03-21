@@ -12,6 +12,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const [isChecking, setIsChecking] = useState(true);
+  const [isAuthorized, setIsAuthorized] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [platformClosed, setPlatformClosed] = useState(false);
   const [closeMessage, setCloseMessage] = useState('');
@@ -76,6 +77,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         }
 
         // Role-based routing
+        let authorized = true;
         if (session && !isPublicPage) {
           const isRoot = pathname === '/';
           const isStudentDashboard = pathname.startsWith('/dashboard/student');
@@ -88,21 +90,26 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           if (role === 'student') {
             if (isRoot || (isDashboardRoute && !isStudentDashboard)) {
               router.push('/dashboard/student');
+              authorized = false;
             }
           } else if (role === 'teacher') {
             if (isRoot || (isDashboardRoute && !isTeacherDashboard)) {
               router.push('/dashboard/teacher');
+              authorized = false;
             }
           } else if (role === 'parent') {
             if (isRoot || (isDashboardRoute && !isParentDashboard)) {
               router.push('/dashboard/parent');
+              authorized = false;
             }
           } else if (role === 'admin' || role === 'management' || isAdminByEmail) {
             if (isAdminDashboard) {
               router.push('/');
+              authorized = false;
             }
           }
         }
+        setIsAuthorized(authorized);
 
         // Check platform settings
         try {
@@ -152,7 +159,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe();
   }, [pathname, router, isPublicPage, isLoginPage, isAdminByEmail]);
 
-  if (isChecking) {
+  if (isChecking || (!isAuthorized && !isPublicPage)) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-slate-50">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent"></div>

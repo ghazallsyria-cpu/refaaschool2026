@@ -219,7 +219,22 @@ export default function ExamsDashboard() {
               { label: 'إجمالي الاختبارات', value: exams.length, icon: FileText, color: 'text-blue-600', bg: 'bg-blue-50', shadow: 'shadow-blue-100' },
               { label: 'اختبارات منشورة', value: exams.filter(e => e.status === 'published').length, icon: CheckCircle, color: 'text-emerald-600', bg: 'bg-emerald-50', shadow: 'shadow-emerald-100' },
               { label: 'إجمالي المحاولات', value: exams.reduce((acc, e) => acc + (e._count?.attempts || 0), 0), icon: Users, color: 'text-amber-600', bg: 'bg-amber-50', shadow: 'shadow-amber-100' },
-              { label: 'متوسط النجاح', value: '84%', icon: TrendingUp, color: 'text-indigo-600', bg: 'bg-indigo-50', shadow: 'shadow-indigo-100' },
+              { 
+                label: 'متوسط النجاح', 
+                value: (() => {
+                  const totalAttempts = exams.reduce((acc, e) => acc + (e._count?.attempts || 0), 0);
+                  if (totalAttempts === 0) return '0%';
+                  const totalScore = exams.reduce((acc, e) => {
+                    // Assuming score is out of 100 for simplicity in average calculation
+                    return acc + (e.stats?.avg_score || 0) * (e._count?.attempts || 0);
+                  }, 0);
+                  return `${Math.round(totalScore / totalAttempts)}%`;
+                })(), 
+                icon: TrendingUp, 
+                color: 'text-indigo-600', 
+                bg: 'bg-indigo-50', 
+                shadow: 'shadow-indigo-100' 
+              },
             ].map((stat, i) => (
               <motion.div
                 key={i}

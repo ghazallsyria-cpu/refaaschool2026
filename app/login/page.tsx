@@ -224,23 +224,6 @@ export default function LoginPage() {
               </span>
             </button>
           </form>
-
-          {/* Footer inside glass card */}
-          <div className="mt-10 pt-8 border-t border-white/10 text-center space-y-4">
-            <div className="flex flex-col items-center gap-2">
-              <div className="flex items-center gap-2 text-white font-black text-sm">
-                <Code className="h-4 w-4 text-indigo-400" />
-                <span>برمجة وتطوير : ايهاب جمال غزال</span>
-              </div>
-              <div className="flex items-center gap-2 text-slate-400 font-bold text-xs">
-                <ShieldCheck className="h-4 w-4 text-emerald-500" />
-                <span>جميع الحقوق محفوظة © {new Date().getFullYear()}</span>
-              </div>
-              <p className="text-slate-500 text-[10px] flex items-center gap-1 font-medium">
-                صنع بكل <Heart className="h-2 w-2 text-red-500 fill-red-500" /> لخدمة التعليم الرقمي
-              </p>
-            </div>
-          </div>
         </div>
       </motion.div>
     </div>

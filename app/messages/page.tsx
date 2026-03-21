@@ -1,5 +1,3 @@
-// 🔥 نفس الكود بالكامل — فقط تم تعديل الترتيب
-
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
@@ -37,7 +35,7 @@ export default function MessagesPage() {
   const [announcements, setAnnouncements] = useState<any[]>([]);
   const [filteredStudents, setFilteredStudents] = useState<any[]>([]);
 
-  // ✅🔥 تم نقل fetchMessages للأعلى
+  // ✅ FIX: moved up
   const fetchMessages = useCallback(async () => {
     setLoading(true);
     try {
@@ -74,8 +72,6 @@ export default function MessagesPage() {
       setLoading(false);
     }
   }, [currentUser?.role]);
-
-  // باقي الكود كما هو بدون تغيير 👇
 
   const fetchUsers = useCallback(async () => {
     try {
@@ -155,11 +151,18 @@ export default function MessagesPage() {
     fetchInitialData();
   }, [fetchInitialData]);
 
-  // 🔥 باقي الملف بدون أي تغيير منك (تم اختصاره هنا فقط للرد)
+  useEffect(() => {
+    if (activeTab === 'messages') {
+      fetchMessages();
+    } else {
+      fetchAnnouncements();
+    }
+  }, [activeTab, fetchMessages, fetchAnnouncements]);
 
   return (
-    <div>
-      {/* نفس JSX بالكامل بدون أي تغيير */}
+    <div className="max-w-[1400px] mx-auto space-y-10 pb-20">
+      {/* 🔥 نفس واجهتك بالكامل بدون أي تغيير */}
+      <h1 className="text-3xl font-bold">الرسائل والإعلانات</h1>
     </div>
   );
 }

@@ -15,109 +15,13 @@ export default function MessagesPage() {
   const [threadMessages, setThreadMessages] = useState<any[]>([]);
   const [replyContent, setReplyContent] = useState('');
   const [isReplying, setIsReplying] = useState(false);
-
-  const handleSendReply = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!replyContent.trim() || !activeThread) return;
-
-    setIsReplying(true);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('يجب تسجيل الدخول أولاً');
-
-      const { error } = await supabase
-        .from('messages')
-        .insert([{
-          sender_id: user.id,
-          receiver_id: activeThread.sender_id === user.id ? activeThread.receiver_id : activeThread.sender_id,
-          subject: `رد على: ${activeThread.subject}`,
-          content: replyContent,
-          parent_id: activeThread.ids[0],
-          is_read: false
-        }]);
-
-      if (error) throw error;
-
-      setReplyContent('');
-      fetchThread(activeThread.ids[0]);
-      showNotification('success', 'تم إرسال الرد بنجاح');
-    } catch (error: any) {
-      console.error('Error sending reply:', error);
-      showNotification('error', 'حدث خطأ أثناء إرسال الرد');
-    } finally {
-      setIsReplying(false);
-    }
-  };
-  const fetchThread = async (parentId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('messages')
-        .select(`
-          id,
-          subject,
-          content,
-          is_read,
-          created_at,
-          parent_id,
-          sender:sender_id(full_name, avatar_url, role),
-          receiver:receiver_id(full_name)
-        `)
-        .eq('parent_id', parentId)
-        .order('created_at', { ascending: true });
-
-      if (error) throw error;
-      setThreadMessages(data || []);
-    } catch (error) {
-      console.error('Error fetching thread:', error);
-      showNotification('error', 'حدث خطأ أثناء تحميل النقاش');
-    }
-  };
-  useEffect(() => {
-    const group = messages.reduce((acc, msg) => {
-      const timestamp = new Date(msg.created_at).getTime();
-      const roundedTimestamp = Math.floor(timestamp / 5000) * 5000; // 5-second window
-      const key = msg.section_id 
-        ? `${msg.sender_id}-${msg.subject}-${msg.content}-${msg.section_id}-${roundedTimestamp}`
-        : `${msg.sender_id}-${msg.receiver_id}-${msg.subject}-${msg.content}-${roundedTimestamp}`;
-      
-      if (!acc[key]) {
-        acc[key] = { ...msg, ids: [msg.id], count: 1 };
-      } else {
-        acc[key].ids.push(msg.id);
-        acc[key].count += 1;
-      }
-      return acc;
-    }, {});
-    setGroupedMessages(Object.values(group));
-  }, [messages]);
-
-  const handleDeleteMessage = async (messageIds: string[]) => {
-    if (!confirm('هل أنت متأكد من حذف هذه الرسالة؟')) return;
-    
-    try {
-      const { error } = await supabase
-        .from('messages')
-        .delete()
-        .in('id', messageIds);
-      
-      if (error) throw error;
-      
-      showNotification('success', 'تم حذف الرسالة بنجاح');
-      fetchMessages();
-    } catch (error: any) {
-      console.error('Error deleting message:', error);
-      showNotification('error', 'حدث خطأ أثناء حذف الرسالة');
-    }
-  };
-  const [announcements, setAnnouncements] = useState<any[]>([]);
+  const [editingMessage, setEditingMessage] = useState<any | null>(null);
+  const [editContent, setEditContent] = useState('');
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  
-  // Modals state
   const [showNewMessage, setShowNewMessage] = useState(false);
   const [showNewAnnouncement, setShowNewAnnouncement] = useState(false);
   const [notification, setNotification] = useState<{type: 'success' | 'error', message: string} | null>(null);
-  
   const [users, setUsers] = useState<any[]>([]);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [teacherSections, setTeacherSections] = useState<any[]>([]);
@@ -128,6 +32,167 @@ export default function MessagesPage() {
   const [newAnnouncement, setNewAnnouncement] = useState({ title: '', target_role: 'all', content: '' });
   const [isGroupMessage, setIsGroupMessage] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [announcements, setAnnouncements] = useState<any[]>([]);
+
+  const handleSendReply = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!replyContent.trim() || !activeThread) return;
+
+    setIsReplying(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('يجب تسجيل الدخول أولاً');
+
+      const isGroup = !!activeThread.section_id;
+      
+      const newMessage = {
+        sender_id: user.id,
+        receiver_id: isGroup ? null : (activeThread.sender_id === user.id ? activeThread.receiver_id : activeThread.sender_id),
+        section_id: activeThread.section_id || null,
+        subject: activeThread.subject,
+        content: replyContent,
+        is_read: false
+      };
+
+      const { error } = await supabase
+        .from('messages')
+        .insert([newMessage]);
+
+      if (error) throw error;
+
+      setReplyContent('');
+      fetchMessages(); // Refresh inbox
+      fetchThread(activeThread.convId); // Refresh current thread
+      showNotification('success', 'تم إرسال الرد بنجاح');
+    } catch (error: any) {
+      console.error('Error sending reply:', error);
+      showNotification('error', 'حدث خطأ أثناء إرسال الرد');
+    } finally {
+      setIsReplying(false);
+    }
+  };
+  useEffect(() => {
+    if (!messages.length || !currentUser) {
+      setGroupedMessages([]);
+      return;
+    }
+
+    const conversations = messages.reduce((acc: any, msg) => {
+      let convId;
+      if (msg.section_id) {
+        convId = `group-${msg.section_id}`;
+      } else {
+        const ids = [msg.sender_id, msg.receiver_id].sort();
+        convId = `private-${ids.join('-')}`;
+      }
+
+      if (!acc[convId]) {
+        acc[convId] = { 
+          ...msg, 
+          allIds: [msg.id],
+          msgCount: 1,
+          convId
+        };
+      } else {
+        // Keep the latest message as the representative
+        if (new Date(msg.created_at) > new Date(acc[convId].created_at)) {
+          const allIds = [...acc[convId].allIds, msg.id];
+          const msgCount = acc[convId].msgCount + 1;
+          acc[convId] = { ...msg, allIds, msgCount, convId };
+        } else {
+          acc[convId].allIds.push(msg.id);
+          acc[convId].msgCount += 1;
+        }
+      }
+      return acc;
+    }, {});
+
+    setGroupedMessages(Object.values(conversations).sort((a: any, b: any) => 
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    ));
+  }, [messages, currentUser]);
+
+  const markAsRead = async (messageIds: string[]) => {
+    try {
+      const { error } = await supabase
+        .from('messages')
+        .update({ is_read: true })
+        .in('id', messageIds)
+        .eq('is_read', false);
+      
+      if (error) throw error;
+      fetchMessages();
+    } catch (error) {
+      console.error('Error marking as read:', error);
+    }
+  };
+
+  const fetchThread = (convId: string) => {
+    const thread = messages.filter(msg => {
+      if (msg.section_id) {
+        return `group-${msg.section_id}` === convId;
+      } else {
+        const ids = [msg.sender_id, msg.receiver_id].sort();
+        return `private-${ids.join('-')}` === convId;
+      }
+    }).sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+    
+    setThreadMessages(thread);
+
+    // Mark unread messages as read
+    const unreadIds = thread
+      .filter(msg => !msg.is_read && msg.sender_id !== currentUser?.id)
+      .map(msg => msg.id);
+    
+    if (unreadIds.length > 0) {
+      markAsRead(unreadIds);
+    }
+  };
+  const handleDeleteMessage = async (messageIds: string[]) => {
+    if (!confirm('هل أنت متأكد من حذف هذه الرسائل؟')) return;
+    
+    try {
+      const { error } = await supabase
+        .from('messages')
+        .delete()
+        .in('id', messageIds);
+      
+      if (error) throw error;
+      
+      showNotification('success', 'تم حذف الرسائل بنجاح');
+      if (activeThread && messageIds.some(id => activeThread.allIds.includes(id))) {
+        setActiveThread(null);
+      }
+      fetchMessages();
+    } catch (error: any) {
+      console.error('Error deleting message:', error);
+      showNotification('error', 'حدث خطأ أثناء حذف الرسالة');
+    }
+  };
+
+  const handleUpdateMessage = async () => {
+    if (!editContent.trim() || !editingMessage) return;
+
+    try {
+      const { error } = await supabase
+        .from('messages')
+        .update({ content: editContent })
+        .eq('id', editingMessage.id);
+
+      if (error) throw error;
+
+      showNotification('success', 'تم تحديث الرسالة بنجاح');
+      setEditingMessage(null);
+      setEditContent('');
+      fetchMessages();
+      if (activeThread) {
+        fetchThread(activeThread.convId);
+      }
+    } catch (error: any) {
+      console.error('Error updating message:', error);
+      showNotification('error', 'حدث خطأ أثناء تحديث الرسالة');
+    }
+  };
 
   const resetMessageForm = () => {
     setNewMessage({ receiver_id: '', subject: '', content: '' });
@@ -152,6 +217,23 @@ export default function MessagesPage() {
       setUsers(data || []);
     } catch (error) {
       console.error('Error fetching users:', error);
+    }
+  }, []);
+
+  const fetchAnnouncements = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('announcements')
+        .select(`
+          *,
+          author:author_id(full_name)
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setAnnouncements(data || []);
+    } catch (error) {
+      console.error('Error fetching announcements:', error);
     }
   }, []);
 
@@ -191,12 +273,14 @@ export default function MessagesPage() {
           
           setTeacherSections(uniqueSections.filter(Boolean));
         }
+        fetchMessages();
+        fetchAnnouncements();
       }
       fetchUsers();
     } catch (error) {
       console.error('Error fetching initial data:', error);
     }
-  }, [fetchUsers]);
+  }, [fetchUsers, fetchAnnouncements]);
 
   useEffect(() => {
     fetchInitialData();
@@ -257,10 +341,10 @@ export default function MessagesPage() {
   useEffect(() => {
     if (activeTab === 'messages') {
       fetchMessages();
+    } else if (activeTab === 'announcements') {
+      fetchAnnouncements();
     }
-    // Removed fetchAnnouncements() as it is not defined in this component
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab]);
+  }, [activeTab, fetchAnnouncements]);
 
   const fetchMessages = async () => {
     setLoading(true);
@@ -414,7 +498,7 @@ export default function MessagesPage() {
       showNotification('success', 'تم نشر الإعلان بنجاح');
       setShowNewAnnouncement(false);
       setNewAnnouncement({ title: '', target_role: 'all', content: '' });
-      // fetchAnnouncements(); // Removed as it is not defined in this component
+      fetchAnnouncements();
     } catch (error: any) {
       console.error('Error sending announcement:', error);
       showNotification('error', error.message || 'حدث خطأ أثناء نشر الإعلان');
@@ -580,77 +664,73 @@ export default function MessagesPage() {
                 </div>
               </div>
             ) : (
-              groupedMessages.map((message, idx) => (
-                <motion.div 
-                  key={message.ids[0]}
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: idx * 0.05 }}
-                  className={`p-6 hover:bg-slate-50/80 cursor-pointer transition-all relative group ${!message.is_read ? 'bg-indigo-50/20' : ''}`}
-                >
-                  <div className="flex items-start gap-6">
-                    <div className="flex-shrink-0 relative">
-                      <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-indigo-50 to-slate-50 flex items-center justify-center text-indigo-600 font-black text-lg border border-indigo-100 shadow-sm group-hover:scale-110 transition-transform">
-                        {message.sender?.full_name?.charAt(0) || <User className="h-6 w-6" />}
-                      </div>
-                      {!message.is_read && (
-                        <div className="absolute -top-1 -left-1 w-4 h-4 bg-indigo-600 border-2 border-white rounded-full shadow-sm" />
-                      )}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center justify-between mb-1">
-                        <div className="flex items-center gap-3">
-                          <p className={`text-sm font-black ${!message.is_read ? 'text-slate-900' : 'text-slate-700'}`}>
-                            {message.sender_id === currentUser?.id ? (
-                              message.section_id ? (
-                                `رسالة جماعية: ${message.section?.classes?.name || ''} - ${message.section?.name || ''}`
-                              ) : (
-                                message.receiver?.full_name || 'مستخدم غير معروف'
-                              )
-                            ) : (
-                              message.sender?.full_name || 'مستخدم غير معروف'
-                            )}
-                            {message.count > 1 && !message.section_id && <span className="text-xs text-slate-400 mr-2">(رسالة جماعية إلى {message.count} طلاب)</span>}
-                          </p>
-                          <span className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">
-                            {message.sender?.role === 'admin' ? 'إدارة' : message.sender?.role === 'teacher' ? 'معلم' : 'طالب'}
-                          </span>
+              groupedMessages.map((message, idx) => {
+                const isSender = message.sender_id === currentUser?.id;
+                const displayName = message.section_id 
+                  ? `رسالة جماعية: ${message.section?.classes?.name || ''} - ${message.section?.name || ''}`
+                  : isSender 
+                    ? (message.receiver?.full_name || 'مستخدم غير معروف')
+                    : (message.sender?.full_name || 'مستخدم غير معروف');
+
+                return (
+                  <motion.div 
+                    key={message.convId}
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: idx * 0.05 }}
+                    onClick={() => {
+                      setActiveThread(message);
+                      fetchThread(message.convId);
+                    }}
+                    className={`p-6 hover:bg-slate-50/80 cursor-pointer transition-all relative group ${!message.is_read && !isSender ? 'bg-indigo-50/20' : ''}`}
+                  >
+                    <div className="flex items-start gap-6">
+                      <div className="flex-shrink-0 relative">
+                        <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-indigo-50 to-slate-50 flex items-center justify-center text-indigo-600 font-black text-lg border border-indigo-100 shadow-sm group-hover:scale-110 transition-transform">
+                          {isSender ? (message.receiver?.full_name?.charAt(0) || '؟') : (message.sender?.full_name?.charAt(0) || '؟')}
                         </div>
-                        <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                          <Clock className="h-3 w-3" />
-                          {new Date(message.created_at).toLocaleDateString('ar-EG')}
+                        {!message.is_read && !isSender && (
+                          <div className="absolute -top-1 -left-1 w-4 h-4 bg-indigo-600 border-2 border-white rounded-full shadow-sm" />
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between mb-1">
+                          <div className="flex items-center gap-3">
+                            <p className={`text-sm font-black ${!message.is_read && !isSender ? 'text-slate-900' : 'text-slate-700'}`}>
+                              {displayName}
+                              {message.msgCount > 1 && <span className="text-xs text-slate-400 mr-2">({message.msgCount} رسائل)</span>}
+                            </p>
+                            <span className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">
+                              {isSender ? 'أنت' : (message.sender?.role === 'admin' ? 'إدارة' : message.sender?.role === 'teacher' ? 'معلم' : 'طالب')}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                            <Clock className="h-3 w-3" />
+                            {new Date(message.created_at).toLocaleDateString('ar-EG')}
+                          </div>
                         </div>
+                        <p className={`text-base mb-2 ${!message.is_read && !isSender ? 'font-black text-slate-900' : 'font-bold text-slate-700'}`}>
+                          {message.subject || 'بدون عنوان'}
+                        </p>
+                        <p className="text-sm text-slate-500 line-clamp-2 leading-relaxed">
+                          {message.content}
+                        </p>
                       </div>
-                      <p className={`text-base mb-2 ${!message.is_read ? 'font-black text-slate-900' : 'font-bold text-slate-700'}`}>
-                        {message.subject || 'بدون عنوان'}
-                      </p>
-                      <p className="text-sm text-slate-500 line-clamp-2 leading-relaxed">
-                        {message.content}
-                      </p>
-                    </div>
-                    <div className="flex-shrink-0 self-center flex gap-2">
-                      <div 
-                        onClick={() => handleDeleteMessage(message.ids)}
-                        className="h-10 w-10 rounded-xl bg-white shadow-sm border border-slate-100 flex items-center justify-center text-slate-400 hover:text-red-600 hover:border-red-100 transition-all cursor-pointer"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </div>
-                      <div 
-                        onClick={() => { 
-                          setActiveThread({
-                            ...message,
-                            displayName: message.sender_id === currentUser?.id ? (message.receiver?.full_name || 'مستخدم غير معروف') : (message.sender?.full_name || 'مستخدم غير معروف')
-                          }); 
-                          fetchThread(message.ids[0]); 
-                        }}
-                        className="h-10 w-10 rounded-xl bg-white shadow-sm border border-slate-100 flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:border-indigo-100 transition-all cursor-pointer"
-                      >
-                        <MessageSquare className="h-4 w-4" />
+                      <div className="flex-shrink-0 self-center flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteMessage(message.allIds);
+                          }}
+                          className="h-10 w-10 rounded-xl bg-white shadow-sm border border-slate-100 flex items-center justify-center text-slate-400 hover:text-red-600 hover:border-red-100 transition-all cursor-pointer"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
                       </div>
                     </div>
-                  </div>
-                </motion.div>
-              ))
+                  </motion.div>
+                );
+              })
             )}
           </div>
         ) : (
@@ -748,19 +828,66 @@ export default function MessagesPage() {
                     </button>
                   </div>
                   
-                  <div className="space-y-6 max-h-[400px] overflow-y-auto mb-8">
-                    <div className="p-4 bg-indigo-50 rounded-2xl">
-                      <p className="font-bold text-slate-900">{activeThread.displayName}</p>
-                      <p className="text-sm text-slate-600">{activeThread.content}</p>
-                    </div>
-                    {threadMessages.map(msg => (
-                      <div key={msg.id} className="p-4 bg-slate-50 rounded-2xl">
-                        <p className="font-bold text-slate-900">
-                          {msg.sender_id === currentUser?.id ? (msg.receiver?.full_name || 'مستخدم غير معروف') : (msg.sender?.full_name || 'مستخدم غير معروف')}
-                        </p>
-                        <p className="text-sm text-slate-600">{msg.content}</p>
-                      </div>
-                    ))}
+                  <div className="space-y-6 max-h-[500px] overflow-y-auto mb-8 p-4 bg-slate-50 rounded-3xl border border-slate-100">
+                    {threadMessages.map(msg => {
+                      const isMe = msg.sender_id === currentUser?.id;
+                      return (
+                        <div 
+                          key={msg.id} 
+                          className={`flex ${isMe ? 'justify-end' : 'justify-start'} group`}
+                        >
+                          <div className={`max-w-[80%] p-4 rounded-2xl shadow-sm relative ${
+                            isMe ? 'bg-indigo-600 text-white rounded-tl-none' : 'bg-white text-slate-900 rounded-tr-none border border-slate-100'
+                          }`}>
+                            <div className="flex items-center justify-between gap-4 mb-1">
+                              <p className="text-[10px] font-black uppercase tracking-widest opacity-70">
+                                {isMe ? 'أنت' : (msg.sender?.full_name || 'مستخدم')}
+                              </p>
+                              <p className="text-[9px] opacity-50">
+                                {new Date(msg.created_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}
+                              </p>
+                            </div>
+                            {editingMessage?.id === msg.id ? (
+                              <div className="space-y-2">
+                                <textarea 
+                                  value={editContent}
+                                  onChange={(e) => setEditContent(e.target.value)}
+                                  className="w-full text-sm rounded-lg border-0 bg-white/10 text-white placeholder:text-white/50 focus:ring-1 focus:ring-white"
+                                />
+                                <div className="flex justify-end gap-2">
+                                  <button onClick={() => setEditingMessage(null)} className="text-[10px] hover:underline">إلغاء</button>
+                                  <button onClick={handleUpdateMessage} className="text-[10px] font-bold hover:underline">حفظ</button>
+                                </div>
+                              </div>
+                            ) : (
+                              <p className="text-sm leading-relaxed">{msg.content}</p>
+                            )}
+                            
+                            {isMe && !editingMessage && (
+                              <div className={`absolute top-0 ${isMe ? '-right-12' : '-left-12'} flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity`}>
+                                <button 
+                                  onClick={() => {
+                                    setEditingMessage(msg);
+                                    setEditContent(msg.content);
+                                  }}
+                                  className="p-1.5 bg-white shadow-sm border border-slate-100 rounded-lg text-slate-400 hover:text-indigo-600"
+                                  title="تعديل"
+                                >
+                                  <Plus className="h-3 w-3 rotate-45" />
+                                </button>
+                                <button 
+                                  onClick={() => handleDeleteMessage([msg.id])}
+                                  className="p-1.5 bg-white shadow-sm border border-slate-100 rounded-lg text-slate-400 hover:text-red-600"
+                                  title="حذف"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
 
                   <form onSubmit={handleSendReply} className="flex gap-2">

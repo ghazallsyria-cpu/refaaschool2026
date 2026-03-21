@@ -2,13 +2,18 @@
 
 import { useState, useEffect, useCallback, use } from 'react';
 import { supabase } from '@/lib/supabase';
-import { FileText, Clock, Link as LinkIcon, Users, User, CheckCircle, AlertCircle, ArrowRight, Upload, Edit2, Trash2, Settings, Share2, BarChart3, MoreVertical, Eye, X, Calendar } from 'lucide-react';
+import { FileText, Clock, Link as LinkIcon, Users, User, CheckCircle, AlertCircle, ArrowRight, Upload, Edit2, Trash2, Settings, Share2, BarChart3, MoreVertical, Eye, X, Calendar, Download, FileSpreadsheet, Edit, ArrowLeft, GraduationCap, LayoutDashboard, Send } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import * as Dialog from '@radix-ui/react-dialog';
 import AssignmentForm from '@/components/assignment-form';
 import AssignmentBuilder from '@/components/assignment-builder';
 import { Question } from '@/components/assignment-builder';
+import { format } from 'date-fns';
+import { arSA } from 'date-fns/locale';
+import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 
 type Assignment = {
   id: string;
@@ -70,6 +75,50 @@ export default function AssignmentDetailsPage({ params }: { params: Promise<{ id
     setTimeout(() => setNotification(null), 5000);
   };
 
+  const exportToExcel = () => {
+    if (submissions.length === 0) return;
+    
+    const data = submissions.map(sub => ({
+      'اسم الطالب': sub.students?.users?.full_name || 'غير معروف',
+      'تاريخ التسليم': sub.submitted_at ? format(new Date(sub.submitted_at), 'yyyy-MM-dd HH:mm') : '-',
+      'الحالة': sub.status === 'graded' ? 'تم التصحيح' : 'قيد الانتظار',
+      'الدرجة': sub.grade || '-'
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Submissions');
+    XLSX.writeFile(wb, `submissions_${assignmentId}.xlsx`);
+  };
+
+  const exportToPDF = () => {
+    if (submissions.length === 0) return;
+
+    const doc = new jsPDF();
+    doc.addFont('https://fonts.gstatic.com/s/amiri/v26/J7afpDI9z6hc06m3.ttf', 'Amiri', 'normal');
+    doc.setFont('Amiri');
+    
+    doc.text('قائمة تسليمات الواجب', 105, 10, { align: 'center' });
+    doc.text(`الواجب: ${assignment?.title}`, 105, 20, { align: 'center' });
+
+    const tableData = submissions.map(sub => [
+      sub.grade || '-',
+      sub.status === 'graded' ? 'تم التصحيح' : 'قيد الانتظار',
+      sub.submitted_at ? format(new Date(sub.submitted_at), 'yyyy-MM-dd HH:mm') : '-',
+      sub.students?.users?.full_name || 'غير معروف'
+    ]);
+
+    (doc as any).autoTable({
+      head: [['الدرجة', 'الحالة', 'تاريخ التسليم', 'اسم الطالب']],
+      body: tableData,
+      startY: 30,
+      styles: { font: 'Amiri', halign: 'right' },
+      headStyles: { fillColor: [79, 70, 229] }
+    });
+
+    doc.save(`submissions_${assignmentId}.pdf`);
+  };
+
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
@@ -96,7 +145,7 @@ export default function AssignmentDetailsPage({ params }: { params: Promise<{ id
           .select('id')
           .eq('id', user.id)
           .single();
-        setStudentId(studentData?.id || null);
+        setStudentId(studentData?.id || user.id);
       }
 
       // Fetch assignment details
@@ -574,7 +623,21 @@ export default function AssignmentDetailsPage({ params }: { params: Promise<{ id
                   </div>
                   تسليمات الطلاب
                 </h2>
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3">
+                  <button 
+                    onClick={exportToExcel}
+                    className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-700 rounded-xl font-bold border border-emerald-100 hover:bg-emerald-100 transition-all"
+                  >
+                    <FileSpreadsheet className="h-4 w-4" />
+                    Excel
+                  </button>
+                  <button 
+                    onClick={exportToPDF}
+                    className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-700 rounded-xl font-bold border border-red-100 hover:bg-red-100 transition-all"
+                  >
+                    <Download className="h-4 w-4" />
+                    PDF
+                  </button>
                   <div className="px-4 py-2 bg-white rounded-xl shadow-sm border border-slate-100 text-sm font-bold text-slate-600">
                     الإجمالي: {submissions.length}
                   </div>
@@ -641,11 +704,21 @@ export default function AssignmentDetailsPage({ params }: { params: Promise<{ id
                 <AlertCircle className="h-5 w-5" />
                 هذه معاينة لما يراه الطالب. لن يتم حفظ أي إجابات تقوم بإدخالها هنا.
               </div>
-              <AssignmentForm 
-                questions={questions} 
-                onSubmit={() => showNotification('success', 'هذه معاينة فقط، لم يتم حفظ الإجابة')} 
-                readOnly={false}
-              />
+              {questions.length > 0 ? (
+                <AssignmentForm 
+                  questions={questions} 
+                  onSubmit={() => showNotification('success', 'هذه معاينة فقط، لم يتم حفظ الإجابة')} 
+                  readOnly={false}
+                />
+              ) : (
+                <div className="glass-card p-12 rounded-4xl border border-white/60 text-center">
+                  <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-6 border border-slate-100">
+                    <FileText className="h-10 w-10 text-slate-300" />
+                  </div>
+                  <h3 className="text-2xl font-black text-slate-900 mb-2">لا توجد أسئلة</h3>
+                  <p className="text-slate-500 font-bold">هذا الواجب لا يحتوي على أسئلة بعد. يمكنك إضافة أسئلة من خلال تعديل الواجب.</p>
+                </div>
+              )}
             </div>
           )}
         </div>

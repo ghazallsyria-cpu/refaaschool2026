@@ -37,6 +37,20 @@ export default function SettingsPage() {
     email: 'info@alrifaa.edu'
   });
 
+  const [profileSettings, setProfileSettings] = useState({
+    full_name: '',
+    email: '',
+    phone: '',
+    role: '',
+    zoom_link: ''
+  });
+
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
+
   useEffect(() => {
     const fetchSettings = async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -48,11 +62,24 @@ export default function SettingsPage() {
           .single();
         
         if (userData) {
+          let zoomLink = '';
+          if (userData.role === 'teacher') {
+            const { data: teacherData } = await supabase
+              .from('teachers')
+              .select('zoom_link')
+              .eq('id', user.id)
+              .single();
+            if (teacherData) {
+              zoomLink = teacherData.zoom_link || '';
+            }
+          }
+
           setProfileSettings({
             full_name: userData.full_name || '',
             email: userData.email || '',
             phone: userData.phone || '',
-            role: userData.role || ''
+            role: userData.role || '',
+            zoom_link: zoomLink
           });
         }
         
@@ -90,21 +117,29 @@ export default function SettingsPage() {
     fetchSettings();
   }, []);
 
-  const [profileSettings, setProfileSettings] = useState({
-    full_name: 'أحمد محمد',
-    email: 'admin@alrifaa.edu',
-    phone: '0501234567',
-    role: 'مدير النظام'
-  });
-
   const handleSave = async () => {
     setSaving(true);
     setMessage({ text: '', type: '' });
     
     try {
-      if (isAdmin) {
-        const { data: { user } } = await supabase.auth.getUser();
-        
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('يجب تسجيل الدخول أولاً');
+
+      if (activeTab === 'security') {
+        if (passwordData.newPassword !== passwordData.confirmPassword) {
+          throw new Error('كلمات المرور الجديدة غير متطابقة');
+        }
+        if (passwordData.newPassword.length < 6) {
+          throw new Error('يجب أن تكون كلمة المرور 6 أحرف على الأقل');
+        }
+
+        const { error } = await supabase.auth.updateUser({
+          password: passwordData.newPassword
+        });
+        if (error) throw error;
+
+        setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      } else if (isAdmin && (activeTab === 'platform' || activeTab === 'school')) {
         let updateData: any = {
           updated_by: user?.id,
           updated_at: new Date().toISOString()
@@ -128,13 +163,6 @@ export default function SettingsPage() {
             phone: schoolSettings.phone,
             email: schoolSettings.email,
           };
-        } else {
-          // Simulate save for other tabs
-          await new Promise(resolve => setTimeout(resolve, 800));
-          setMessage({ text: 'تم حفظ الإعدادات بنجاح', type: 'success' });
-          setTimeout(() => setMessage({ text: '', type: '' }), 3000);
-          setSaving(false);
-          return;
         }
 
         if (platformSettings.id) {
@@ -150,17 +178,25 @@ export default function SettingsPage() {
           if (error) throw error;
         }
       } else if (activeTab === 'profile') {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          const { error } = await supabase
-            .from('users')
+        // Update user profile
+        const { error: userError } = await supabase
+          .from('users')
+          .update({
+            full_name: profileSettings.full_name,
+            phone: profileSettings.phone
+          })
+          .eq('id', user.id);
+        if (userError) throw userError;
+
+        // Update teacher specific data if applicable
+        if (profileSettings.role === 'teacher') {
+          const { error: teacherError } = await supabase
+            .from('teachers')
             .update({
-              full_name: profileSettings.full_name,
-              email: profileSettings.email,
-              phone: profileSettings.phone
+              zoom_link: profileSettings.zoom_link
             })
             .eq('id', user.id);
-          if (error) throw error;
+          if (teacherError) throw teacherError;
         }
       } else {
         // For other tabs, simulate save
@@ -169,9 +205,9 @@ export default function SettingsPage() {
       
       setMessage({ text: 'تم حفظ الإعدادات بنجاح', type: 'success' });
       setTimeout(() => setMessage({ text: '', type: '' }), 3000);
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      setMessage({ text: 'حدث خطأ أثناء حفظ الإعدادات', type: 'error' });
+      setMessage({ text: error.message || 'حدث خطأ أثناء حفظ الإعدادات', type: 'error' });
     } finally {
       setSaving(false);
     }
@@ -409,6 +445,20 @@ export default function SettingsPage() {
                       className="mt-2 block w-full rounded-md border-0 py-1.5 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6" 
                     />
                   </div>
+
+                  {profileSettings.role === 'teacher' && (
+                    <div className="sm:col-span-2">
+                      <label className="block text-sm font-medium leading-6 text-slate-900">رابط برنامج زوم (Zoom)</label>
+                      <input 
+                        type="url" 
+                        value={profileSettings.zoom_link}
+                        onChange={(e) => setProfileSettings({...profileSettings, zoom_link: e.target.value})}
+                        className="mt-2 block w-full rounded-md border-0 py-1.5 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6" 
+                        placeholder="https://zoom.us/j/..."
+                      />
+                      <p className="mt-1 text-xs text-slate-500">سيظهر هذا الرابط للطلاب في جدول الحصص الخاص بهم.</p>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -468,25 +518,30 @@ export default function SettingsPage() {
 
                 <div className="grid grid-cols-1 gap-y-6 sm:grid-cols-2 sm:gap-x-6">
                   <div className="sm:col-span-2">
-                    <label className="block text-sm font-medium leading-6 text-slate-900">كلمة المرور الحالية</label>
-                    <input type="password" placeholder="••••••••" className="mt-2 block w-full rounded-md border-0 py-1.5 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6" />
-                  </div>
-
-                  <div className="sm:col-span-2">
                     <label className="block text-sm font-medium leading-6 text-slate-900">كلمة المرور الجديدة</label>
-                    <input type="password" placeholder="••••••••" className="mt-2 block w-full rounded-md border-0 py-1.5 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6" />
+                    <input 
+                      type="password" 
+                      value={passwordData.newPassword}
+                      onChange={(e) => setPasswordData({...passwordData, newPassword: e.target.value})}
+                      placeholder="••••••••" 
+                      className="mt-2 block w-full rounded-md border-0 py-1.5 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6" 
+                    />
                   </div>
 
                   <div className="sm:col-span-2">
                     <label className="block text-sm font-medium leading-6 text-slate-900">تأكيد كلمة المرور الجديدة</label>
-                    <input type="password" placeholder="••••••••" className="mt-2 block w-full rounded-md border-0 py-1.5 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6" />
+                    <input 
+                      type="password" 
+                      value={passwordData.confirmPassword}
+                      onChange={(e) => setPasswordData({...passwordData, confirmPassword: e.target.value})}
+                      placeholder="••••••••" 
+                      className="mt-2 block w-full rounded-md border-0 py-1.5 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6" 
+                    />
                   </div>
                 </div>
                 
                 <div className="pt-4 border-t border-slate-200">
-                  <button type="button" className="rounded-md bg-white px-3 py-2 text-sm font-semibold text-slate-900 shadow-sm ring-1 ring-inset ring-slate-300 hover:bg-slate-50">
-                    تسجيل الخروج من جميع الأجهزة الأخرى
-                  </button>
+                  <p className="text-xs text-slate-500 mb-4">ملاحظة: عند تغيير كلمة المرور، ستحتاج إلى تسجيل الدخول مرة أخرى باستخدام كلمة المرور الجديدة.</p>
                 </div>
               </div>
             )}

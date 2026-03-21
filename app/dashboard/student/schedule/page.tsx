@@ -43,7 +43,7 @@ export default function StudentSchedulePage() {
       if (student?.section_id) {
         const { data, error } = await supabase
           .from('schedules')
-          .select('*, subjects(name), teachers(users(full_name))')
+          .select('*, subjects(name), teachers(zoom_link, users:teacher_id(full_name))')
           .eq('section_id', student.section_id)
           .order('day_of_week')
           .order('period');
@@ -126,11 +126,21 @@ export default function StudentSchedulePage() {
                               </div>
                               <div className="font-black text-slate-900 text-sm leading-tight">{cellData.subjects?.name}</div>
                             </div>
-                            <div className="mt-3 pt-2 border-t border-indigo-100/50">
+                            <div className="mt-3 pt-2 border-t border-indigo-100/50 flex flex-col gap-2">
                               <div className="flex items-center gap-1.5 text-slate-400">
                                 <User className="h-3 w-3" />
                                 <div className="text-[11px] font-bold text-slate-600 truncate">{cellData.teachers?.users?.full_name}</div>
                               </div>
+                              {cellData.teachers?.zoom_link && (
+                                <a 
+                                  href={cellData.teachers.zoom_link}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex items-center justify-center gap-1.5 py-1 px-2 bg-indigo-600 text-white rounded-lg text-[10px] font-bold hover:bg-indigo-700 transition-colors"
+                                >
+                                  <span>دخول الحصة (Zoom)</span>
+                                </a>
+                              )}
                             </div>
                           </motion.div>
                         ) : (

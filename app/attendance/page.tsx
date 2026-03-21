@@ -115,16 +115,12 @@ export default function AttendancePage() {
         .select('role')
         .eq('id', user.id)
         .single();
+      
+      console.log('User Role:', userData?.role);
 
       let sectionsData: any[] = [];
 
-      if (userData?.role === 'admin') {
-        // المدير يرى كل الفصول
-        const { data: allSections } = await supabase
-          .from('sections')
-          .select('id, name, classes(name)');
-        sectionsData = allSections || [];
-      } else {
+      if (userData?.role === 'teacher') {
         // المعلم يرى فصوله فقط
         const { data: teacherSections } = await supabase
           .from('teacher_sections')
@@ -132,6 +128,18 @@ export default function AttendancePage() {
           .eq('teacher_id', user.id);
         
         sectionsData = (teacherSections?.map(ts => ts.section) || []) as any[];
+        console.log('Teacher sections:', sectionsData);
+      } else if (userData?.role === 'admin') {
+        // المدير يرى كل الفصول
+        const { data: allSections } = await supabase
+          .from('sections')
+          .select('id, name, classes(name)');
+        sectionsData = allSections || [];
+        console.log('Admin sections:', sectionsData);
+      } else {
+        // المستخدم ليس مديراً ولا معلماً
+        sectionsData = [];
+        console.log('No sections for this user role:', userData?.role);
       }
       
       setSections(sectionsData);

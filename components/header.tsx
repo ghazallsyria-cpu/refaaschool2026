@@ -11,6 +11,7 @@ import Link from 'next/link';
 export function Header({ onMenuClick, showMenuButton = true }: { onMenuClick?: () => void, showMenuButton?: boolean }) {
   const [user, setUser] = useState<any>(null);
   const [userRole, setUserRole] = useState<string>('');
+  const [rawUserRole, setRawUserRole] = useState<string>('');
   const [userName, setUserName] = useState<string>('');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const router = useRouter();
@@ -30,6 +31,7 @@ export function Header({ onMenuClick, showMenuButton = true }: { onMenuClick?: (
           
         if (userData) {
           setUserName(userData.full_name || session.user.email?.split('@')[0] || '');
+          setRawUserRole(userData.role);
           
           // Map role to Arabic display name
           const roleMap: Record<string, string> = {
@@ -45,6 +47,7 @@ export function Header({ onMenuClick, showMenuButton = true }: { onMenuClick?: (
       } else {
         setUser(null);
         setUserRole('');
+        setRawUserRole('');
         setUserName('');
       }
     };
@@ -114,9 +117,11 @@ export function Header({ onMenuClick, showMenuButton = true }: { onMenuClick?: (
         </div>
       </div>
       <div className="flex items-center gap-4 sm:gap-8">
-        <div className="hidden sm:block">
-          <NotificationsBell />
-        </div>
+        {rawUserRole !== 'teacher' && (
+          <div className="hidden sm:block">
+            <NotificationsBell />
+          </div>
+        )}
 
         {/* Profile dropdown */}
         <div className="relative">

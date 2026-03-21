@@ -45,20 +45,41 @@ export default function MessagesPage() {
 
       const isGroup = !!activeThread.section_id;
       
-      const newMessage = {
-        sender_id: user.id,
-        receiver_id: isGroup ? null : (activeThread.sender_id === user.id ? activeThread.receiver_id : activeThread.sender_id),
-        section_id: activeThread.section_id || null,
-        subject: activeThread.subject,
-        content: replyContent,
-        is_read: false
-      };
+      if (isGroup && currentUser?.role === 'teacher') {
+        // Teacher replying to a group thread -> send to all students in section
+        const response = await fetch('/api/messages/send-group', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sectionId: activeThread.section_id,
+            subject: activeThread.subject,
+            content: replyContent,
+            senderId: user.id,
+          }),
+        });
 
-      const { error } = await supabase
-        .from('messages')
-        .insert([newMessage]);
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'حدث خطأ أثناء إرسال الرد الجماعي');
+      } else {
+        // Private reply or student replying to group thread
+        // If it's a group thread and a student is replying, they reply to the original sender (teacher)
+        const receiverId = isGroup 
+          ? activeThread.sender_id 
+          : (activeThread.sender_id === user.id ? activeThread.receiver_id : activeThread.sender_id);
 
-      if (error) throw error;
+        const { error } = await supabase
+          .from('messages')
+          .insert([{
+            sender_id: user.id,
+            receiver_id: receiverId,
+            section_id: activeThread.section_id || null,
+            subject: activeThread.subject,
+            content: replyContent,
+            is_read: false
+          }]);
+
+        if (error) throw error;
+      }
 
       setReplyContent('');
       fetchMessages(); // Refresh inbox
@@ -66,7 +87,7 @@ export default function MessagesPage() {
       showNotification('success', 'تم إرسال الرد بنجاح');
     } catch (error: any) {
       console.error('Error sending reply:', error);
-      showNotification('error', 'حدث خطأ أثناء إرسال الرد');
+      showNotification('error', error.message || 'حدث خطأ أثناء إرسال الرد');
     } finally {
       setIsReplying(false);
     }
@@ -280,7 +301,7 @@ export default function MessagesPage() {
     } catch (error) {
       console.error('Error fetching initial data:', error);
     }
-  }, [fetchUsers, fetchAnnouncements]);
+  }, [fetchUsers, fetchAnnouncements, fetchMessages]);
 
   useEffect(() => {
     fetchInitialData();
@@ -344,9 +365,9 @@ export default function MessagesPage() {
     } else if (activeTab === 'announcements') {
       fetchAnnouncements();
     }
-  }, [activeTab, fetchAnnouncements]);
+  }, [activeTab, fetchMessages, fetchAnnouncements]);
 
-  const fetchMessages = async () => {
+  const fetchMessages = useCallback(async () => {
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -388,7 +409,7 @@ export default function MessagesPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentUser?.role]);
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -666,11 +687,10 @@ export default function MessagesPage() {
             ) : (
               groupedMessages.map((message, idx) => {
                 const isSender = message.sender_id === currentUser?.id;
+                const otherUser = isSender ? message.receiver : message.sender;
                 const displayName = message.section_id 
                   ? `رسالة جماعية: ${message.section?.classes?.name || ''} - ${message.section?.name || ''}`
-                  : isSender 
-                    ? (message.receiver?.full_name || 'مستخدم غير معروف')
-                    : (message.sender?.full_name || 'مستخدم غير معروف');
+                  : (otherUser?.full_name || 'مستخدم غير معروف');
 
                 return (
                   <motion.div 
@@ -820,9 +840,16 @@ export default function MessagesPage() {
               >
                 <div className="bg-white px-8 pb-8 pt-10 sm:p-10">
                   <div className="flex items-center justify-between mb-10">
-                    <h3 className="text-2xl font-black text-slate-900 tracking-tight">
-                      {activeThread.subject}
-                    </h3>
+                    <div>
+                      <h3 className="text-2xl font-black text-slate-900 tracking-tight">
+                        {activeThread.subject}
+                      </h3>
+                      <p className="text-sm text-slate-500 font-bold mt-1">
+                        {activeThread.section_id 
+                          ? `رسالة جماعية: ${activeThread.section?.classes?.name || ''} - ${activeThread.section?.name || ''}`
+                          : `مع: ${activeThread.sender_id === currentUser?.id ? activeThread.receiver?.full_name : activeThread.sender?.full_name}`}
+                      </p>
+                    </div>
                     <button onClick={() => setActiveThread(null)} className="p-2 text-slate-400 hover:text-slate-600 rounded-xl hover:bg-slate-50 transition-all">
                       <X className="h-6 w-6" />
                     </button>

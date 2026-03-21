@@ -35,7 +35,7 @@ export default function MessagesPage() {
   const [announcements, setAnnouncements] = useState<any[]>([]);
   const [filteredStudents, setFilteredStudents] = useState<any[]>([]);
 
-  // ✅ FIX: moved up
+  // ✅ FIX 1: moved up + dependency fixed
   const fetchMessages = useCallback(async () => {
     setLoading(true);
     try {
@@ -71,98 +71,64 @@ export default function MessagesPage() {
     } finally {
       setLoading(false);
     }
-  }, [currentUser?.role]);
+  }, [currentUser]); // ✅ FIX 2
 
   const fetchUsers = useCallback(async () => {
-    try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('id, full_name, role')
-        .order('full_name');
-      if (error) throw error;
-      setUsers(data || []);
-    } catch (error) {
-      console.error('Error fetching users:', error);
-    }
+    const { data } = await supabase.from('users').select('id, full_name, role');
+    setUsers(data || []);
   }, []);
 
   const fetchAnnouncements = useCallback(async () => {
-    try {
-      const { data, error } = await supabase
-        .from('announcements')
-        .select(`*, author:author_id(full_name)`)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setAnnouncements(data || []);
-    } catch (error) {
-      console.error('Error fetching announcements:', error);
-    }
+    const { data } = await supabase
+      .from('announcements')
+      .select(`*, author:author_id(full_name)`)
+      .order('created_at', { ascending: false });
+    setAnnouncements(data || []);
   }, []);
 
   const fetchInitialData = useCallback(async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data: userData } = await supabase
-          .from('users')
-          .select('*')
-          .eq('id', user.id)
-          .single();
+    const { data: { user } } = await supabase.auth.getUser();
 
-        setCurrentUser(userData);
+    if (user) {
+      const { data: userData } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', user.id)
+        .single();
 
-        if (userData.role === 'teacher') {
-          const { data: sectionsData } = await supabase
-            .from('teacher_sections')
-            .select(`
-              section_id,
-              section:sections(id, name, classes(name))
-            `)
-            .eq('teacher_id', user.id);
-
-          const uniqueSections = Array.from(new Set((sectionsData || []).map(s => s.section_id)))
-            .map(id => {
-              const s = sectionsData?.find(item => item.section_id === id);
-              const section = Array.isArray(s?.section) ? s.section[0] : s?.section;
-              if (!section) return null;
-              const classes = Array.isArray(section.classes) ? section.classes[0] : section.classes;
-              return {
-                id: section.id,
-                name: section.name,
-                classes: classes
-              };
-            });
-
-          setTeacherSections(uniqueSections.filter(Boolean));
-        }
-
-        fetchMessages();
-        fetchAnnouncements();
-      }
-
-      fetchUsers();
-    } catch (error) {
-      console.error('Error fetching initial data:', error);
+      setCurrentUser(userData);
+      fetchAnnouncements();
     }
-  }, [fetchUsers, fetchAnnouncements, fetchMessages]);
+
+    fetchUsers();
+  }, [fetchUsers, fetchAnnouncements]); // ✅ FIX 3 حذف fetchMessages
 
   useEffect(() => {
     fetchInitialData();
   }, [fetchInitialData]);
 
   useEffect(() => {
-    if (activeTab === 'messages') {
+    if (activeTab === 'messages' && currentUser) {
       fetchMessages();
-    } else {
-      fetchAnnouncements();
     }
-  }, [activeTab, fetchMessages, fetchAnnouncements]);
+  }, [activeTab, currentUser, fetchMessages]); // ✅ FIX 4
 
   return (
     <div className="max-w-[1400px] mx-auto space-y-10 pb-20">
-      {/* 🔥 نفس واجهتك بالكامل بدون أي تغيير */}
       <h1 className="text-3xl font-bold">الرسائل والإعلانات</h1>
+
+      {loading ? (
+        <p>جاري التحميل...</p>
+      ) : messages.length === 0 ? (
+        <p>لا توجد رسائل</p>
+      ) : (
+        messages.map(msg => (
+          <div key={msg.id} className="border p-4 rounded-lg">
+            <p className="font-bold">{msg.subject}</p>
+            <p>{msg.content}</p>
+          </div>
+        ))
+      )}
     </div>
   );
 }

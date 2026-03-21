@@ -41,6 +41,7 @@ type ExamData = {
   description: string;
   subject_id: string;
   section_id?: string;
+  section_ids?: string[];
   teacher_id?: string;
   duration: number;
   max_attempts: number;

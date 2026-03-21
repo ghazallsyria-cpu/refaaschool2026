@@ -34,6 +34,7 @@ export default function MessagesPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [announcements, setAnnouncements] = useState<any[]>([]);
 
+
   const handleSendReply = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!replyContent.trim() || !activeThread) return;
@@ -269,38 +270,23 @@ export default function MessagesPage() {
       let query = supabase
         .from('messages')
         .select(`
-          id,
-          subject,
-          content,
-          is_read,
-          created_at,
-          parent_id,
-          section_id,
-          sender:sender_id(full_name, avatar_url, role),
-          receiver:receiver_id(full_name),
-          section:section_id(name, classes(name))
+          *,
+          sender:sender_id(full_name),
+          receiver:receiver_id(full_name)
         `)
+        .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
         .order('created_at', { ascending: false });
 
-      // Admin can see all messages, others only their own
-      if (currentUser?.role !== 'admin') {
-        query = query.or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`);
-      }
-
       const { data, error } = await query;
-
-      if (error) {
-        console.error('Supabase error fetching messages:', error);
-        throw error;
-      }
-      console.log('Fetched messages:', data);
+      if (error) throw error;
       setMessages(data || []);
     } catch (error) {
       console.error('Error fetching messages:', error);
+      showNotification('error', 'حدث خطأ أثناء جلب الرسائل');
     } finally {
       setLoading(false);
     }
-  }, [currentUser?.role]);
+  }, []);
 
   const fetchInitialData = useCallback(async () => {
     try {

@@ -332,20 +332,29 @@ export default function QuizBuilder() {
         finalTeacherId = teacher.id;
       }
 
+      const { section_ids, ...examPayload } = exam;
+      
+      // تعيين section_id لأول قسم تم اختياره (للتوافق مع قاعدة البيانات الحالية)
+      if (section_ids && section_ids.length > 0) {
+        examPayload.section_id = section_ids[0];
+      } else {
+        examPayload.section_id = undefined;
+      }
+
       if (isNew) {
-        console.log('Inserting exam:', { ...exam, max_score: exam.max_score || 100, teacher_id: finalTeacherId, status: exam.status });
+        console.log('Inserting exam:', { ...examPayload, max_score: exam.max_score || 100, teacher_id: finalTeacherId, status: exam.status });
         const { data: newExam, error } = await supabase
           .from('exams')
-          .insert([{ ...exam, max_score: exam.max_score || 100, teacher_id: finalTeacherId, status: exam.status }])
+          .insert([{ ...examPayload, max_score: exam.max_score || 100, teacher_id: finalTeacherId, status: exam.status }])
           .select()
           .single();
         if (error) throw error;
         examId = newExam.id;
       } else {
-        console.log('Updating exam:', { ...exam, max_score: exam.max_score || 100, teacher_id: finalTeacherId, status: exam.status });
+        console.log('Updating exam:', { ...examPayload, max_score: exam.max_score || 100, teacher_id: finalTeacherId, status: exam.status });
         const { error } = await supabase
           .from('exams')
-          .update({ ...exam, max_score: exam.max_score || 100, teacher_id: finalTeacherId, status: exam.status })
+          .update({ ...examPayload, max_score: exam.max_score || 100, teacher_id: finalTeacherId, status: exam.status })
           .eq('id', examId);
         if (error) throw error;
       }

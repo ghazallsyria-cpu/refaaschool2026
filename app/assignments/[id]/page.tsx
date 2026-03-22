@@ -8,7 +8,8 @@ import { useRouter } from 'next/navigation';
 import * as Dialog from '@radix-ui/react-dialog';
 import AssignmentForm from '@/components/assignment-form';
 import AssignmentBuilder from '@/components/assignment-builder';
-import AssignmentUpload from '@/components/AssignmentUpload';
+import ImageUpload from '@/components/ImageUpload';
+import Image from 'next/image';
 import { Question } from '@/components/assignment-builder';
 import { format } from 'date-fns';
 import { arSA } from 'date-fns/locale';
@@ -566,16 +567,15 @@ export default function AssignmentDetailsPage({ params }: { params: Promise<{ id
                 <div className="glass-card p-8 rounded-4xl border border-white/60 shadow-xl shadow-slate-200/50">
                   <label className="block text-sm font-bold text-slate-700 mb-4">صورة الواجب (اختياري)</label>
                   {studentId && assignmentId && (!mySubmission || (mySubmission.grade === undefined || mySubmission.grade === null)) ? (
-                    <AssignmentUpload
-                      studentId={studentId}
-                      assignmentId={assignmentId}
+                    <ImageUpload
                       initialImageUrl={fileUrl}
                       onUploadSuccess={(url) => setFileUrl(url || '')}
+                      label="اختر صورة الواجب"
                     />
                   ) : (
                     fileUrl && (
                       <div className="relative w-full h-48 mt-2">
-                        <img src={fileUrl} alt="Assignment" className="w-full h-full object-cover rounded-lg" />
+                        <Image src={fileUrl} alt="Assignment" fill className="object-cover rounded-lg" referrerPolicy="no-referrer" />
                       </div>
                     )
                   )}
@@ -598,16 +598,15 @@ export default function AssignmentDetailsPage({ params }: { params: Promise<{ id
                 <div>
                   <label className="block text-sm font-bold text-slate-700 mb-2">صورة الواجب (اختياري)</label>
                   {studentId && assignmentId && (!mySubmission || (mySubmission.grade === undefined || mySubmission.grade === null)) ? (
-                    <AssignmentUpload
-                      studentId={studentId}
-                      assignmentId={assignmentId}
+                    <ImageUpload
                       initialImageUrl={fileUrl}
                       onUploadSuccess={(url) => setFileUrl(url || '')}
+                      label="اختر صورة الواجب"
                     />
                   ) : (
                     fileUrl && (
                       <div className="relative w-full h-48 mt-2">
-                        <img src={fileUrl} alt="Assignment" className="w-full h-full object-cover rounded-lg" />
+                        <Image src={fileUrl} alt="Assignment" fill className="object-cover rounded-lg" referrerPolicy="no-referrer" />
                       </div>
                     )
                   )}

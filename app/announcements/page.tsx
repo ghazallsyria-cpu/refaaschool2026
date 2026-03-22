@@ -5,6 +5,9 @@ import { supabase } from '@/lib/supabase';
 import { Plus, Search, Edit2, Trash2, Megaphone, Bell, X, Users, Calendar, Filter, AlertCircle, ArrowRight } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { motion, AnimatePresence } from 'motion/react';
+import Image from 'next/image';
+
+import ImageUpload from '@/components/ImageUpload';
 
 type Announcement = {
   id: string;
@@ -13,6 +16,7 @@ type Announcement = {
   target_role: string;
   created_at: string;
   author_id?: string;
+  image_url?: string;
   users?: { full_name: string };
 };
 
@@ -68,6 +72,7 @@ export default function AnnouncementsPage() {
           title,
           content,
           target_role,
+          image_url,
           created_at
         `)
         .order('created_at', { ascending: false });
@@ -110,6 +115,7 @@ export default function AnnouncementsPage() {
         title: currentAnnouncement.title,
         content: currentAnnouncement.content,
         target_role: currentAnnouncement.target_role === 'all' ? null : currentAnnouncement.target_role,
+        image_url: currentAnnouncement.image_url || null,
       };
 
       if (currentAnnouncement.id) {
@@ -390,6 +396,18 @@ export default function AnnouncementsPage() {
                         {announcement.content}
                       </div>
 
+                      {announcement.image_url && (
+                        <div className="mt-6 relative w-full aspect-video rounded-3xl overflow-hidden border border-slate-100 shadow-sm">
+                          <Image 
+                            src={announcement.image_url} 
+                            alt={announcement.title} 
+                            fill
+                            className="object-cover"
+                            referrerPolicy="no-referrer"
+                          />
+                        </div>
+                      )}
+
                       <div className="mt-8 flex items-center justify-between">
                         <div className="flex -space-x-2 rtl:space-x-reverse">
                           {[1,2,3].map(i => (
@@ -514,6 +532,15 @@ export default function AnnouncementsPage() {
                     className="block w-full rounded-[2rem] border-0 py-6 px-8 text-slate-900 bg-slate-50/50 ring-1 ring-inset ring-slate-100 focus:ring-2 focus:ring-indigo-600 sm:text-base transition-all font-bold resize-none leading-relaxed"
                     value={currentAnnouncement.content || ''}
                     onChange={(e) => setCurrentAnnouncement({...currentAnnouncement, content: e.target.value})}
+                  />
+                </div>
+
+                <div className="space-y-4">
+                  <label className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] px-2">صورة الإعلان (اختياري)</label>
+                  <ImageUpload 
+                    initialImageUrl={currentAnnouncement.image_url}
+                    onUploadSuccess={(url) => setCurrentAnnouncement({...currentAnnouncement, image_url: url || undefined})}
+                    label="إرفاق صورة مع الإعلان"
                   />
                 </div>
 

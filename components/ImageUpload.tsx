@@ -3,21 +3,21 @@
 import { useState, useEffect } from 'react';
 import { Upload, X, Loader2 } from 'lucide-react';
 import imageCompression from 'browser-image-compression';
+import Image from 'next/image';
 
 interface Props {
-  studentId: string;
-  assignmentId: string;
   initialImageUrl?: string;
   onUploadSuccess: (url: string | null) => void;
+  label?: string;
 }
 
-export default function AssignmentUpload({ studentId, assignmentId, initialImageUrl, onUploadSuccess }: Props) {
+export default function ImageUpload({ initialImageUrl, onUploadSuccess, label = "اختر صورة" }: Props) {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(initialImageUrl || null);
 
   useEffect(() => {
-    if (initialImageUrl) {
+    if (initialImageUrl !== undefined) {
       setImageUrl(initialImageUrl);
     }
   }, [initialImageUrl]);
@@ -72,15 +72,15 @@ export default function AssignmentUpload({ studentId, assignmentId, initialImage
           ) : (
             <>
               <Upload className="text-slate-400" />
-              <span className="text-sm text-slate-500 mt-2">اختر صورة الواجب</span>
+              <span className="text-sm text-slate-500 mt-2">{label}</span>
             </>
           )}
           <input type="file" className="hidden" accept="image/*" onChange={handleUpload} disabled={uploading} />
         </label>
       ) : (
         <div className="relative w-full h-48">
-          <img src={imageUrl} alt="Assignment" className="w-full h-full object-cover rounded-lg" />
-          <button onClick={() => { setImageUrl(null); onUploadSuccess(null); }} className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full">
+          <Image src={imageUrl} alt="Uploaded" fill className="object-cover rounded-lg" referrerPolicy="no-referrer" />
+          <button onClick={() => { setImageUrl(null); onUploadSuccess(null); }} className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full z-10">
             <X size={16} />
           </button>
         </div>

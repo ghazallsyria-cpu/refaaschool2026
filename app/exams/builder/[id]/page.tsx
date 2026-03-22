@@ -56,6 +56,8 @@ type ExamData = {
   };
 };
 
+import ImageUpload from '@/components/ImageUpload';
+
 export default function QuizBuilder() {
   const params = useParams();
   const router = useRouter();
@@ -749,6 +751,13 @@ export default function QuizBuilder() {
                         onChange={(e) => updateQuestion(q.id, { content: e.target.value })}
                         className="w-full bg-slate-50/50 px-6 py-5 rounded-3xl border-0 ring-1 ring-inset ring-slate-100 focus:ring-2 focus:ring-indigo-600 text-xl font-black text-slate-900 placeholder:text-slate-200 transition-all outline-none"
                       />
+                      <div className="pt-2">
+                        <ImageUpload
+                          initialImageUrl={q.media_url}
+                          onUploadSuccess={(url) => updateQuestion(q.id, { media_url: url || undefined, media_type: url ? 'image' : undefined })}
+                          label="إرفاق صورة للسؤال (اختياري)"
+                        />
+                      </div>
                     </div>
                     <div className="w-full md:w-64 space-y-3">
                       <label className="text-xs font-black text-slate-400 uppercase tracking-widest block">نوع السؤال</label>

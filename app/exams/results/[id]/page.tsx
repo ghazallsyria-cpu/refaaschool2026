@@ -211,34 +211,52 @@ export default function ExamResults() {
       'الطالب': a.student.full_name,
       'البريد الإلكتروني': a.student.email,
       'الفصل': a.student.section_name,
-      'تاريخ التقديم': new Date(a.completed_at).toLocaleDateString(),
+      'تاريخ التقديم': new Date(a.completed_at).toLocaleDateString('ar-SA'),
       'الدرجة (%)': a.score,
       'الحالة': a.score >= 50 ? 'ناجح' : 'راسب'
     }));
 
     const ws = XLSX.utils.json_to_sheet(data);
+    
+    // Add RTL support to the worksheet
+    if (!ws['!cols']) ws['!cols'] = [];
+    ws['!dir'] = 'rtl';
+
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'النتائج');
     XLSX.writeFile(wb, `${exam?.title || 'نتائج_الاختبار'}.xlsx`);
   };
 
-  const exportToPDF = () => {
-    const doc = new jsPDF();
-    doc.text(`نتائج الاختبار: ${exam?.title || ''}`, 14, 15);
-    
-    autoTable(doc, {
-      head: [['الطالب', 'الفصل', 'تاريخ التقديم', 'الدرجة (%)', 'الحالة']],
-      body: filteredAttempts.map(a => [
-        a.student.full_name,
-        a.student.section_name,
-        new Date(a.completed_at).toLocaleDateString(),
-        a.score.toString(),
-        a.score >= 50 ? 'ناجح' : 'راسب'
-      ]),
-      startY: 20,
-    });
-    
-    doc.save(`${exam?.title || 'نتائج_الاختبار'}.pdf`);
+  const exportToPDF = async () => {
+    try {
+      // Use html2canvas to capture the hidden printable area
+      const html2canvas = (await import('html2canvas')).default;
+      const element = document.getElementById('printable-area');
+      if (!element) return;
+
+      // Make it temporarily visible for capture
+      element.style.display = 'block';
+
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#ffffff'
+      });
+
+      element.style.display = 'none';
+
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+      
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      pdf.save(`${exam?.title || 'نتائج_الاختبار'}.pdf`);
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      alert('حدث خطأ أثناء إنشاء ملف PDF');
+    }
   };
 
   if (loading) {
@@ -251,6 +269,66 @@ export default function ExamResults() {
 
   return (
     <div className="max-w-7xl mx-auto p-4 sm:p-8 space-y-10 pb-24">
+      {/* Hidden Printable Area for PDF Export */}
+      <div style={{ position: 'absolute', top: '-9999px', left: '-9999px', width: '800px' }}>
+        <div id="printable-area" style={{ display: 'none' }} className="p-8 bg-white w-full" dir="rtl">
+          <div className="text-center mb-8 border-b-2 border-slate-200 pb-6">
+            <h1 className="text-3xl font-black text-slate-900 mb-2">{exam?.title}</h1>
+            <p className="text-lg text-slate-600 font-bold">{exam?.subject?.name}</p>
+            <p className="text-sm text-slate-500 mt-2">تاريخ التقرير: {new Date().toLocaleDateString('ar-SA')}</p>
+          </div>
+          
+          <div className="grid grid-cols-4 gap-4 mb-8">
+            <div className="bg-slate-50 p-4 rounded-xl text-center border border-slate-100">
+              <p className="text-xs text-slate-500 font-bold mb-1">متوسط الدرجات</p>
+              <p className="text-xl font-black text-indigo-600">{stats?.avg_score}%</p>
+            </div>
+            <div className="bg-slate-50 p-4 rounded-xl text-center border border-slate-100">
+              <p className="text-xs text-slate-500 font-bold mb-1">نسبة النجاح</p>
+              <p className="text-xl font-black text-emerald-600">{stats?.pass_rate}%</p>
+            </div>
+            <div className="bg-slate-50 p-4 rounded-xl text-center border border-slate-100">
+              <p className="text-xs text-slate-500 font-bold mb-1">أعلى درجة</p>
+              <p className="text-xl font-black text-blue-600">{stats?.max_score}%</p>
+            </div>
+            <div className="bg-slate-50 p-4 rounded-xl text-center border border-slate-100">
+              <p className="text-xs text-slate-500 font-bold mb-1">المحاولات</p>
+              <p className="text-xl font-black text-amber-600">{stats?.total_attempts}</p>
+            </div>
+          </div>
+
+          <h2 className="text-xl font-black text-slate-900 mb-4">نتائج الطلاب التفصيلية</h2>
+          <table className="w-full text-right border-collapse">
+            <thead>
+              <tr className="bg-slate-100 text-slate-700 text-sm font-black">
+                <th className="p-3 border border-slate-200">الطالب</th>
+                <th className="p-3 border border-slate-200">الفصل</th>
+                <th className="p-3 border border-slate-200">تاريخ التقديم</th>
+                <th className="p-3 border border-slate-200">الدرجة</th>
+                <th className="p-3 border border-slate-200">الحالة</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredAttempts.map((attempt) => (
+                <tr key={attempt.id} className="border-b border-slate-100">
+                  <td className="p-3 text-sm font-bold text-slate-900 border border-slate-200">{attempt.student.full_name}</td>
+                  <td className="p-3 text-sm text-slate-600 border border-slate-200">{attempt.student.section_name}</td>
+                  <td className="p-3 text-sm text-slate-600 border border-slate-200">
+                    {new Date(attempt.completed_at).toLocaleDateString('ar-SA')}
+                  </td>
+                  <td className="p-3 text-sm font-black text-indigo-600 border border-slate-200" dir="ltr">{attempt.score}%</td>
+                  <td className="p-3 text-sm font-bold border border-slate-200">
+                    <span className={attempt.score >= 50 ? 'text-emerald-600' : 'text-red-600'}>
+                      {attempt.score >= 50 ? 'ناجح' : 'راسب'}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-8">
         <div className="flex items-center gap-6">

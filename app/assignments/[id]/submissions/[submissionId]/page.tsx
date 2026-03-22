@@ -22,8 +22,10 @@ type Submission = {
   submitted_at: string;
   grade?: number;
   feedback?: string;
-  student?: {
-    full_name: string;
+  students?: {
+    users?: {
+      full_name: string;
+    };
   };
 };
 
@@ -108,15 +110,27 @@ export default function GradingPage({ params }: { params: Promise<{ id: string, 
   }, [fetchData]);
 
   const handleSaveGrade = async () => {
+    if (grade === '') {
+      setNotification({ type: 'error', message: 'يرجى إدخال الدرجة' });
+      return;
+    }
+
     setIsSaving(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       
+      const numericGrade = parseFloat(grade);
+      if (isNaN(numericGrade)) {
+        setNotification({ type: 'error', message: 'يرجى إدخال درجة صحيحة' });
+        return;
+      }
+
       const { error } = await supabase
         .from('assignment_submissions')
         .update({
-          grade: parseFloat(grade) || 0,
+          grade: numericGrade,
           feedback,
+          status: 'graded',
           graded_at: new Date().toISOString(),
           graded_by: user?.id
         })
@@ -130,7 +144,8 @@ export default function GradingPage({ params }: { params: Promise<{ id: string, 
         setNotification(null);
       }, 3000);
       
-      router.refresh();
+      // Refresh data to show updated state
+      fetchData();
     } catch (error: any) {
       setNotification({ type: 'error', message: 'خطأ في الحفظ: ' + error.message });
     } finally {

@@ -77,7 +77,7 @@ export default function AnnouncementsPage() {
         `)
         .order('created_at', { ascending: false });
 
-      if (role === 'student' || role === 'parent') {
+      if (role && role !== 'admin' && role !== 'management') {
         query = query.or(`target_role.eq.${role},target_role.is.null`);
       }
 

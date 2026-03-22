@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Plus, Search, Edit2, Trash2, FileText, Calendar, Clock, Link as LinkIcon, X, BookOpen, Users, User, AlertCircle, Share2, Eye, CheckCircle2 } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, FileText, Calendar, Clock, Link as LinkIcon, X, BookOpen, Users, User, AlertCircle, Share2, Eye, CheckCircle2, Sparkles } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
 import Link from 'next/link';
 import AssignmentBuilder, { Question } from '@/components/assignment-builder';
@@ -15,7 +15,10 @@ type Assignment = {
   section_id: string;
   teacher_id: string;
   due_date: string;
+  created_at: string;
   file_url: string;
+  submission_count?: number;
+  graded_count?: number;
   subjects?: { name: string };
   sections?: { name: string; classes?: { name: string } };
   teachers?: { users?: { full_name: string } };
@@ -73,6 +76,7 @@ export default function AssignmentsPage() {
           section_id,
           teacher_id,
           due_date,
+          created_at,
           file_url,
           subjects (name),
           sections (name, classes (name)),
@@ -115,9 +119,25 @@ export default function AssignmentsPage() {
       // admins and management see all
 
       const { data, error } = await query;
-
       if (error) throw error;
-      setAssignments((data as unknown) as Assignment[] || []);
+
+      // Fetch submission counts for each assignment
+      const assignmentIds = (data || []).map(a => a.id);
+      const { data: submissionsData } = await supabase
+        .from('assignment_submissions')
+        .select('assignment_id, status')
+        .in('assignment_id', assignmentIds);
+
+      const assignmentsWithStats = (data || []).map(a => {
+        const assignmentSubmissions = (submissionsData || []).filter(s => s.assignment_id === a.id);
+        return {
+          ...a,
+          submission_count: assignmentSubmissions.length,
+          graded_count: assignmentSubmissions.filter(s => s.status === 'graded').length
+        };
+      });
+
+      setAssignments((assignmentsWithStats as unknown) as Assignment[] || []);
 
       // Fetch student submissions if role is student
       if (role === 'student') {
@@ -267,8 +287,8 @@ export default function AssignmentsPage() {
             question_text: q.text,
             question_type: q.type,
             options: q.options || null,
-            points: q.points,
-            is_required: q.isRequired,
+            points: q.points || 0,
+            is_required: q.isRequired || false,
             order: index
           }));
           const { error: qError } = await supabase.from('assignment_questions').insert(questionsPayload);
@@ -282,6 +302,7 @@ export default function AssignmentsPage() {
           .select()
           .single();
         if (error) throw error;
+        if (!newAssignment) throw new Error('فشل في إنشاء الواجب');
 
         // Save Questions
         if (questions.length > 0) {
@@ -290,8 +311,8 @@ export default function AssignmentsPage() {
             question_text: q.text,
             question_type: q.type,
             options: q.options || null,
-            points: q.points,
-            is_required: q.isRequired,
+            points: q.points || 0,
+            is_required: q.isRequired || false,
             order: index
           }));
           const { error: qError } = await supabase.from('assignment_questions').insert(questionsPayload);
@@ -484,12 +505,19 @@ export default function AssignmentsPage() {
           {filteredAssignments.map((assignment) => {
             const overdue = isOverdue(assignment.due_date);
             const dueDateObj = new Date(assignment.due_date);
+            const isNew = new Date().getTime() - new Date(assignment.created_at).getTime() < 24 * 60 * 60 * 1000;
             
             return (
               <div key={assignment.id} className="group glass-card rounded-4xl shadow-xl shadow-slate-200/50 border border-white/60 overflow-hidden flex flex-col transition-all hover:shadow-2xl hover:-translate-y-2">
                 <div className="p-8 flex-1">
                   <div className="flex justify-between items-start mb-6">
                     <div className="flex flex-wrap gap-2">
+                      {isNew && (
+                        <span className="inline-flex items-center gap-1.5 rounded-2xl bg-amber-50 px-4 py-1.5 text-xs font-black text-amber-700 uppercase tracking-widest border border-amber-100 shadow-sm">
+                          <Sparkles className="h-3.5 w-3.5" />
+                          جديد
+                        </span>
+                      )}
                       <span className="inline-flex items-center rounded-2xl bg-indigo-50 px-4 py-1.5 text-xs font-black text-indigo-700 uppercase tracking-widest border border-indigo-100 shadow-sm">
                         {assignment.subjects?.name}
                       </span>
@@ -497,6 +525,26 @@ export default function AssignmentsPage() {
                         <span className="inline-flex items-center gap-1.5 rounded-2xl bg-emerald-50 px-4 py-1.5 text-xs font-black text-emerald-700 uppercase tracking-widest border border-emerald-100 shadow-sm">
                           <CheckCircle2 className="h-3.5 w-3.5" />
                           تم التسليم
+                        </span>
+                      )}
+                      {overdue && (
+                        <span className="inline-flex items-center gap-1.5 rounded-2xl bg-red-50 px-4 py-1.5 text-xs font-black text-red-700 uppercase tracking-widest border border-red-100 shadow-sm">
+                          <AlertCircle className="h-3.5 w-3.5" />
+                          انتهى الوقت
+                        </span>
+                      )}
+                      {(userRole === 'teacher' || userRole === 'admin' || userRole === 'management') && assignment.submission_count !== undefined && assignment.submission_count > 0 && (
+                        <span className={`inline-flex items-center gap-1.5 rounded-2xl px-4 py-1.5 text-xs font-black uppercase tracking-widest border shadow-sm ${
+                          assignment.graded_count === assignment.submission_count
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                            : 'bg-amber-50 text-amber-700 border-amber-100'
+                        }`}>
+                          {assignment.graded_count === assignment.submission_count ? (
+                            <CheckCircle2 className="h-3.5 w-3.5" />
+                          ) : (
+                            <Clock className="h-3.5 w-3.5" />
+                          )}
+                          {assignment.graded_count === assignment.submission_count ? 'مكتمل التقييم' : `تم تقييم ${assignment.graded_count}/${assignment.submission_count}`}
                         </span>
                       )}
                     </div>

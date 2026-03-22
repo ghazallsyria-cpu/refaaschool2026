@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { CheckCircle2, Circle, Square, Type, AlignLeft, AlertCircle, Send } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Question, QuestionType } from './assignment-builder';
@@ -17,6 +17,19 @@ interface AssignmentFormProps {
 export default function AssignmentForm({ questions, onSubmit, isSubmitting, initialAnswers = {}, readOnly = false, children }: AssignmentFormProps) {
   const [answers, setAnswers] = useState<Record<string, any>>(initialAnswers);
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Sync answers when initialAnswers changes (e.g. after async fetch)
+  useEffect(() => {
+    if (initialAnswers && Object.keys(initialAnswers).length > 0) {
+      const timer = setTimeout(() => {
+        setAnswers(prev => {
+          if (JSON.stringify(prev) === JSON.stringify(initialAnswers)) return prev;
+          return initialAnswers;
+        });
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+  }, [initialAnswers]);
 
   const handleAnswerChange = (questionId: string, value: any) => {
     if (readOnly) return;

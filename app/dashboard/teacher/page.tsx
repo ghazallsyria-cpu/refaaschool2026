@@ -26,6 +26,7 @@ export default function TeacherDashboard() {
     totalAssignments: 0,
     avgAttendance: 0
   });
+  const [assignmentStats, setAssignmentStats] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchData = useCallback(async () => {
@@ -56,7 +57,7 @@ export default function TeacherDashboard() {
         // Fetch exams for the teacher's sections
         const sectionIds = sectionsData.map((s: any) => s.id);
         
-        const [examsRes, assignmentsRes, scheduleRes, messagesRes, attendanceRes, examsCountRes, assignmentsCountRes] = await Promise.all([
+        const [examsRes, assignmentsRes, scheduleRes, messagesRes, attendanceRes, examsCountRes, assignmentsCountRes, submissionsRes] = await Promise.all([
           supabase
             .from('exams')
             .select('*, subject:subjects(name), section:sections(name)')
@@ -92,13 +93,39 @@ export default function TeacherDashboard() {
           supabase
             .from('assignments')
             .select('id', { count: 'exact', head: true })
-            .in('section_id', sectionIds)
+            .in('section_id', sectionIds),
+          supabase
+            .from('assignment_submissions')
+            .select('assignment_id')
+            .in('assignment_id', (await supabase.from('assignments').select('id').in('section_id', sectionIds)).data?.map(a => a.id) || [])
         ]);
         
         setRecentExams(examsRes.data || []);
         setRecentAssignments(assignmentsRes.data || []);
         setSchedule(scheduleRes.data || []);
         setMessages(messagesRes.data || []);
+
+        // Calculate assignment stats by class
+        const allAssignments = await supabase
+          .from('assignments')
+          .select('id, title, section_id, sections(name, classes(name))')
+          .in('section_id', sectionIds);
+        
+        if (allAssignments.data) {
+          const statsByAssignment = allAssignments.data.map(assignment => {
+            const submissionCount = submissionsRes.data?.filter(s => s.assignment_id === assignment.id).length || 0;
+            const totalStudents = sectionsData.find(s => s.id === assignment.section_id)?.students?.[0]?.count || 0;
+            return {
+              id: assignment.id,
+              title: assignment.title,
+              className: `${(assignment.sections as any)?.classes?.name || (assignment.sections as any)?.[0]?.classes?.name || ''} - ${(assignment.sections as any)?.name || (assignment.sections as any)?.[0]?.name || ''}`,
+              submissionCount,
+              totalStudents,
+              percentage: totalStudents > 0 ? Math.round((submissionCount / totalStudents) * 100) : 0
+            };
+          });
+          setAssignmentStats(statsByAssignment);
+        }
 
         // Calculate real attendance stats
         const attendanceData = attendanceRes.data || [];
@@ -302,6 +329,54 @@ export default function TeacherDashboard() {
                   لا توجد فصول مسجلة حالياً
                 </div>
               )}
+            </div>
+          </div>
+
+          {/* Assignment Statistics by Class */}
+          <div className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-sm ring-1 ring-slate-200/50 overflow-hidden hover:shadow-md transition-all">
+            <div className="p-6 border-b border-slate-100/50 flex items-center justify-between bg-white/50">
+              <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                <div className="p-2 bg-amber-50 rounded-xl">
+                  <BarChart2 className="h-5 w-5 text-amber-600" />
+                </div>
+                إحصائيات الواجبات حسب الفصل
+              </h2>
+            </div>
+            <div className="p-6">
+              <div className="space-y-6">
+                {assignmentStats.length > 0 ? (
+                  assignmentStats.map((stat, i) => (
+                    <div key={i} className="space-y-2">
+                      <div className="flex justify-between items-end">
+                        <div>
+                          <p className="text-sm font-black text-slate-900">{stat.title}</p>
+                          <p className="text-xs font-medium text-slate-500">{stat.className}</p>
+                        </div>
+                        <div className="text-left">
+                          <span className="text-sm font-black text-indigo-600">{stat.percentage}%</span>
+                          <p className="text-[10px] font-medium text-slate-400">{stat.submissionCount} من {stat.totalStudents} طالب</p>
+                        </div>
+                      </div>
+                      <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                        <motion.div 
+                          initial={{ width: 0 }}
+                          animate={{ width: `${stat.percentage}%` }}
+                          transition={{ duration: 1, delay: i * 0.1 }}
+                          className={`h-full rounded-full ${
+                            stat.percentage > 80 ? 'bg-emerald-500' : 
+                            stat.percentage > 50 ? 'bg-indigo-500' : 
+                            'bg-amber-500'
+                          }`}
+                        />
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-8 text-slate-500">
+                    لا توجد بيانات إحصائية متاحة حالياً
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 

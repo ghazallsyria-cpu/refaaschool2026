@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Plus, Search, MoreHorizontal, Edit, Trash2, X, Key, Filter, Download, UserPlus, Users, ArrowRight, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Plus, Search, MoreHorizontal, Edit, Trash2, X, Key, Filter, Download, UserPlus, Users, ArrowRight, AlertCircle, CheckCircle2, FileSpreadsheet } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import * as Dialog from '@radix-ui/react-dialog';
+import * as XLSX from 'xlsx';
 
 export default function StudentsPage() {
   const [students, setStudents] = useState<any[]>([]);
@@ -244,6 +245,23 @@ export default function StudentsPage() {
     }
   };
 
+  const exportToExcel = () => {
+    const data = filteredStudents.map(student => ({
+      'الاسم الرباعي': student.users?.full_name,
+      'الرقم المدني': student.national_id,
+      'البريد الإلكتروني': student.users?.email,
+      'رقم الهاتف': student.users?.phone,
+      'الصف': student.sections?.classes?.name,
+      'الشعبة': student.sections?.name,
+      'ولي الأمر': student.parents?.users?.full_name || 'غير مسجل'
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "الطلاب");
+    XLSX.writeFile(workbook, "قائمة_الطلاب.xlsx");
+  };
+
   const filteredStudents = students.filter(s => 
     s.users?.full_name?.includes(searchTerm) || 
     s.national_id?.includes(searchTerm)
@@ -301,6 +319,7 @@ export default function StudentsPage() {
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.2 }}
+            onClick={exportToExcel}
             className="inline-flex items-center justify-center rounded-2xl bg-white/70 backdrop-blur-md px-6 py-3.5 text-sm font-bold text-slate-700 shadow-sm border border-white/20 hover:bg-white transition-all active:scale-95"
           >
             <Download className="ml-2 h-5 w-5 text-slate-400" />

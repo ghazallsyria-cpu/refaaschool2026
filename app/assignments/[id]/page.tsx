@@ -80,12 +80,20 @@ export default function AssignmentDetailsPage({ params }: { params: Promise<{ id
   const exportToExcel = () => {
     if (submissions.length === 0) return;
     
-    const data = submissions.map(sub => ({
-      'اسم الطالب': sub.students?.users?.full_name || 'غير معروف',
-      'تاريخ التسليم': sub.submitted_at ? format(new Date(sub.submitted_at), 'yyyy-MM-dd HH:mm') : '-',
-      'الحالة': sub.status === 'graded' ? 'تم التصحيح' : 'قيد الانتظار',
-      'الدرجة': sub.grade || '-'
-    }));
+    const data = submissions.map(sub => {
+      const student = sub.students as any;
+      const section = student?.sections;
+      const className = section?.classes?.name || '';
+      const sectionName = section?.name || '';
+      
+      return {
+        'اسم الطالب': student?.users?.full_name || 'غير معروف',
+        'الصف': `${className} - ${sectionName}`,
+        'تاريخ التسليم': sub.submitted_at ? format(new Date(sub.submitted_at), 'yyyy-MM-dd HH:mm') : '-',
+        'الحالة': sub.status === 'graded' ? 'تم التصحيح' : 'قيد الانتظار',
+        'الدرجة': sub.grade || '-'
+      };
+    });
 
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
@@ -103,15 +111,23 @@ export default function AssignmentDetailsPage({ params }: { params: Promise<{ id
     doc.text('قائمة تسليمات الواجب', 105, 10, { align: 'center' });
     doc.text(`الواجب: ${assignment?.title}`, 105, 20, { align: 'center' });
 
-    const tableData = submissions.map(sub => [
-      sub.grade || '-',
-      sub.status === 'graded' ? 'تم التصحيح' : 'قيد الانتظار',
-      sub.submitted_at ? format(new Date(sub.submitted_at), 'yyyy-MM-dd HH:mm') : '-',
-      sub.students?.users?.full_name || 'غير معروف'
-    ]);
+    const tableData = submissions.map(sub => {
+      const student = sub.students as any;
+      const section = student?.sections;
+      const className = section?.classes?.name || '';
+      const sectionName = section?.name || '';
+
+      return [
+        sub.grade || '-',
+        sub.status === 'graded' ? 'تم التصحيح' : 'قيد الانتظار',
+        sub.submitted_at ? format(new Date(sub.submitted_at), 'yyyy-MM-dd HH:mm') : '-',
+        `${className} - ${sectionName}`,
+        student?.users?.full_name || 'غير معروف'
+      ];
+    });
 
     (doc as any).autoTable({
-      head: [['الدرجة', 'الحالة', 'تاريخ التسليم', 'اسم الطالب']],
+      head: [['الدرجة', 'الحالة', 'تاريخ التسليم', 'الصف', 'اسم الطالب']],
       body: tableData,
       startY: 30,
       styles: { font: 'Amiri', halign: 'right' },
@@ -223,7 +239,13 @@ export default function AssignmentDetailsPage({ params }: { params: Promise<{ id
           .from('assignment_submissions')
           .select(`
             *,
-            students (users (full_name))
+            students (
+              users (full_name),
+              sections (
+                name,
+                classes (name)
+              )
+            )
           `)
           .eq('assignment_id', assignmentId)
           .order('submitted_at', { ascending: false });

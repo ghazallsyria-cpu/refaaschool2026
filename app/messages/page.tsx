@@ -177,7 +177,11 @@ export default function MessagesPage() {
       const seenContents = new Set();
       for (const msg of thread) {
         if (msg.sender_id === currentUser?.id) {
-          const key = `${msg.content}-${msg.subject}`;
+          // Use a combination of content, subject, and timestamp (rounded to minute) to deduplicate
+          // This ensures that if a teacher sends multiple group messages with same content at different times, they show up
+          const date = new Date(msg.created_at);
+          const timeKey = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}-${date.getHours()}-${date.getMinutes()}`;
+          const key = `${msg.content}-${msg.subject}-${timeKey}`;
           if (!seenContents.has(key)) {
             seenContents.add(key);
             uniqueMessages.push(msg);
@@ -774,8 +778,13 @@ export default function MessagesPage() {
               groupedMessages.map((message, idx) => {
                 const isSender = message.sender_id === currentUser?.id;
                 const otherUser = isSender ? message.receiver : message.sender;
+                
+                // Handle potential array responses from Supabase for relations
+                const section = Array.isArray(message.section) ? message.section[0] : message.section;
+                const classes = section ? (Array.isArray(section.classes) ? section.classes[0] : section.classes) : null;
+                
                 const displayName = message.section_id 
-                  ? `رسالة جماعية: ${message.section?.classes?.name || ''} - ${message.section?.name || ''}`
+                  ? `رسالة جماعية: ${classes?.name || ''} - ${section?.name || ''}`
                   : (otherUser?.full_name || 'مستخدم غير معروف');
 
                 return (

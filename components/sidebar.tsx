@@ -20,6 +20,7 @@ import {
   FolderOpen,
   Settings,
   Database,
+  Award,
   X
 } from 'lucide-react';
 
@@ -36,6 +37,7 @@ const navigation = [
   { name: 'الجدول الدراسي', href: '/schedule', icon: CalendarDays },
   { name: 'الواجبات', href: '/assignments', icon: PenTool },
   { name: 'التقارير', href: '/reports', icon: BarChart3 },
+  { name: 'سجل الأداء', href: '/student/performance', icon: Award },
   { name: 'الرسائل', href: '/messages', icon: MessageSquare },
   { name: 'الإعلانات', href: '/announcements', icon: Bell },
   { name: 'المستندات', href: '/documents', icon: FolderOpen },
@@ -56,7 +58,7 @@ export function Sidebar({ onClose, userRole = 'admin' }: { onClose?: () => void,
     }
     
     if (userRole === 'student') {
-      return ['لوحة التحكم', 'الحضور والغياب', 'الاختبارات والدرجات', 'الجدول الدراسي', 'الواجبات', 'الرسائل'].includes(item.name);
+      return ['لوحة التحكم', 'الحضور والغياب', 'الاختبارات والدرجات', 'الجدول الدراسي', 'الواجبات', 'سجل الأداء', 'الرسائل'].includes(item.name);
     }
     
     if (userRole === 'parent') {

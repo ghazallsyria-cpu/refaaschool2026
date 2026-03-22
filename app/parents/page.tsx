@@ -2,17 +2,20 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Plus, Search, Edit, Trash2, X, Key, UserPlus, Download, Filter, MapPin, Briefcase, Phone, Mail } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, X, Key, UserPlus, Download, Filter, MapPin, Briefcase, Phone, Mail, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 export default function ParentsPage() {
   const [parents, setParents] = useState<any[]>([]);
+  const [students, setStudents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingParent, setEditingParent] = useState<any>(null);
   const [resettingPassword, setResettingPassword] = useState(false);
+  const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
+  const [studentSearchTerm, setStudentSearchTerm] = useState('');
   const [addForm, setAddForm] = useState({
     full_name: '',
     national_id: '',
@@ -76,7 +79,8 @@ export default function ParentsPage() {
           national_id,
           address,
           job_title,
-          users (full_name, email, phone)
+          users (full_name, email, phone),
+          students (id, users (full_name))
         `);
 
       if (error) throw error;
@@ -89,9 +93,25 @@ export default function ParentsPage() {
     }
   }, []);
 
+  const fetchStudents = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('students')
+        .select(`
+          id,
+          users (full_name)
+        `);
+      if (error) throw error;
+      setStudents(data || []);
+    } catch (error) {
+      console.error('Error fetching students:', error);
+    }
+  }, []);
+
   useEffect(() => {
     fetchParents();
-  }, [fetchParents]);
+    fetchStudents();
+  }, [fetchParents, fetchStudents]);
 
   const handleAddSubmit = async () => {
     try {
@@ -126,9 +146,23 @@ export default function ParentsPage() {
         throw new Error(data.error || 'فشل إنشاء حساب ولي الأمر');
       }
 
+      // Link students if any selected
+      if (selectedStudents.length > 0) {
+        const { error: linkError } = await supabase
+          .from('students')
+          .update({ parent_id: data.userId })
+          .in('id', selectedStudents);
+        
+        if (linkError) {
+          console.error('Error linking students:', linkError);
+          showNotification('error', 'تم إنشاء الحساب ولكن فشل ربط بعض الطلاب');
+        }
+      }
+
       showNotification('success', `تم إضافة ولي الأمر بنجاح (كلمة المرور: ${data.password})`);
       setShowAddModal(false);
       setAddForm({ full_name: '', national_id: '', email: '', phone: '', address: '', job_title: '' });
+      setSelectedStudents([]);
       fetchParents();
     } catch (error: any) {
       console.error('Error adding parent:', error);
@@ -146,6 +180,7 @@ export default function ParentsPage() {
       address: parent.address || '',
       job_title: parent.job_title || ''
     });
+    setSelectedStudents(parent.students?.map((s: any) => s.id) || []);
     setShowEditModal(true);
   };
 
@@ -175,8 +210,28 @@ export default function ParentsPage() {
 
       if (parentError) throw parentError;
 
+      // Update student links
+      // 1. Remove old links
+      const { error: unlinkError } = await supabase
+        .from('students')
+        .update({ parent_id: null })
+        .eq('parent_id', editingParent.id);
+      
+      if (unlinkError) throw unlinkError;
+
+      // 2. Add new links
+      if (selectedStudents.length > 0) {
+        const { error: linkError } = await supabase
+          .from('students')
+          .update({ parent_id: editingParent.id })
+          .in('id', selectedStudents);
+        
+        if (linkError) throw linkError;
+      }
+
       showNotification('success', 'تم تحديث بيانات ولي الأمر بنجاح');
       setShowEditModal(false);
+      setSelectedStudents([]);
       fetchParents();
     } catch (error: any) {
       console.error('Error updating parent:', error);
@@ -334,6 +389,7 @@ export default function ParentsPage() {
               <tr>
                 <th scope="col" className="py-6 pr-10 pl-4 text-right text-xs font-black text-slate-400 uppercase tracking-[0.2em]">ولي الأمر</th>
                 <th scope="col" className="px-4 py-6 text-right text-xs font-black text-slate-400 uppercase tracking-[0.2em]">الرقم المدني</th>
+                <th scope="col" className="px-4 py-6 text-right text-xs font-black text-slate-400 uppercase tracking-[0.2em]">الأبناء المرتبطون</th>
                 <th scope="col" className="px-4 py-6 text-right text-xs font-black text-slate-400 uppercase tracking-[0.2em]">معلومات التواصل</th>
                 <th scope="col" className="px-4 py-6 text-right text-xs font-black text-slate-400 uppercase tracking-[0.2em]">الوظيفة</th>
                 <th scope="col" className="px-4 py-6 text-right text-xs font-black text-slate-400 uppercase tracking-[0.2em]">الحالة</th>
@@ -394,6 +450,19 @@ export default function ParentsPage() {
                     </td>
                     <td className="whitespace-nowrap px-4 py-6">
                       <span className="text-sm font-bold text-slate-600 font-mono">{parent.national_id}</span>
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-6">
+                      <div className="flex flex-wrap gap-1 max-w-[200px]">
+                        {parent.students && parent.students.length > 0 ? (
+                          parent.students.map((student: any) => (
+                            <span key={student.id} className="inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-bold bg-indigo-50 text-indigo-600 border border-indigo-100">
+                              {student.users?.full_name}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-[10px] font-bold text-slate-400 italic">لا يوجد أبناء مرتبطون</span>
+                        )}
+                      </div>
                     </td>
                     <td className="whitespace-nowrap px-4 py-6">
                       <div className="flex flex-col gap-1">
@@ -513,6 +582,20 @@ export default function ParentsPage() {
                   <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] block mb-2">رقم الهاتف</span>
                     <span className="text-sm font-bold text-slate-900">{parent.users?.phone || '-'}</span>
+                  </div>
+                  <div className="col-span-2 bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] block mb-2">الأبناء المرتبطون</span>
+                    <div className="flex flex-wrap gap-2">
+                      {parent.students && parent.students.length > 0 ? (
+                        parent.students.map((student: any) => (
+                          <span key={student.id} className="inline-flex items-center px-3 py-1 rounded-xl text-xs font-bold bg-indigo-50 text-indigo-600 border border-indigo-100">
+                            {student.users?.full_name}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-xs font-bold text-slate-400 italic">لا يوجد أبناء مرتبطون</span>
+                      )}
+                    </div>
                   </div>
                   <div className="col-span-2 bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] block mb-2">العنوان</span>
@@ -649,6 +732,63 @@ export default function ParentsPage() {
                         </div>
                       </div>
                     </div>
+
+                    <div className="space-y-4 pt-6 border-t border-slate-100">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest mr-1">ربط الأبناء (الطلاب)</label>
+                        <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded-lg">
+                          {selectedStudents.length} طلاب مختارين
+                        </span>
+                      </div>
+                      
+                      <div className="relative group">
+                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-4">
+                          <Search className="h-4 w-4 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
+                        </div>
+                        <input
+                          type="text"
+                          className="block w-full rounded-2xl border-0 py-3 pr-10 pl-4 text-slate-900 bg-slate-50 ring-1 ring-inset ring-slate-100 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-indigo-500 sm:text-sm transition-all"
+                          placeholder="البحث عن طالب بالاسم..."
+                          value={studentSearchTerm}
+                          onChange={(e) => setStudentSearchTerm(e.target.value)}
+                        />
+                      </div>
+
+                      <div className="max-h-48 overflow-y-auto rounded-2xl border border-slate-100 bg-slate-50/30 p-2 space-y-1">
+                        {students
+                          .filter(s => s.users?.full_name?.toLowerCase().includes(studentSearchTerm.toLowerCase()))
+                          .map(student => (
+                            <label 
+                              key={student.id} 
+                              className={`flex items-center justify-between p-3 rounded-xl cursor-pointer transition-all ${
+                                selectedStudents.includes(student.id) 
+                                  ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' 
+                                  : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-100'
+                              }`}
+                            >
+                              <span className="text-sm font-bold">{student.users?.full_name}</span>
+                              <input 
+                                type="checkbox"
+                                className="hidden"
+                                checked={selectedStudents.includes(student.id)}
+                                onChange={() => {
+                                  if (selectedStudents.includes(student.id)) {
+                                    setSelectedStudents(selectedStudents.filter(id => id !== student.id));
+                                  } else {
+                                    setSelectedStudents([...selectedStudents, student.id]);
+                                  }
+                                }}
+                              />
+                              {selectedStudents.includes(student.id) && <Check className="h-4 w-4" />}
+                            </label>
+                          ))}
+                        {students.filter(s => s.users?.full_name?.toLowerCase().includes(studentSearchTerm.toLowerCase())).length === 0 && (
+                          <div className="py-8 text-center text-xs font-bold text-slate-400 italic">
+                            لا يوجد طلاب بهذا الاسم
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </form>
                 </div>
                 <div className="bg-slate-50/50 px-8 py-6 sm:flex sm:flex-row-reverse sm:px-10 gap-3">
@@ -662,7 +802,7 @@ export default function ParentsPage() {
                   <button
                     type="button"
                     className="mt-3 inline-flex w-full justify-center rounded-2xl bg-white px-8 py-4 text-sm font-black text-slate-700 shadow-sm ring-1 ring-inset ring-slate-200 hover:bg-slate-50 sm:mt-0 sm:w-auto transition-all"
-                    onClick={() => { setShowAddModal(false); setShowEditModal(false); }}
+                    onClick={() => { setShowAddModal(false); setShowEditModal(false); setSelectedStudents([]); setStudentSearchTerm(''); }}
                   >
                     إلغاء
                   </button>

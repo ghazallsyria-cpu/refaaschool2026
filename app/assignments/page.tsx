@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Plus, Search, Edit2, Trash2, FileText, Calendar, Clock, Link as LinkIcon, X, BookOpen, Users, User, AlertCircle, Share2, Eye } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, FileText, Calendar, Clock, Link as LinkIcon, X, BookOpen, Users, User, AlertCircle, Share2, Eye, CheckCircle2 } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
 import Link from 'next/link';
 import AssignmentBuilder, { Question } from '@/components/assignment-builder';
@@ -37,6 +37,7 @@ export default function AssignmentsPage() {
   const [currentAssignment, setCurrentAssignment] = useState<Partial<Assignment>>({});
   const [questions, setQuestions] = useState<Question[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [studentSubmissions, setStudentSubmissions] = useState<Record<string, boolean>>({});
 
   const [notification, setNotification] = useState<{type: 'success' | 'error', message: string} | null>(null);
   const [assignmentToDelete, setAssignmentToDelete] = useState<string | null>(null);
@@ -117,6 +118,23 @@ export default function AssignmentsPage() {
 
       if (error) throw error;
       setAssignments((data as unknown) as Assignment[] || []);
+
+      // Fetch student submissions if role is student
+      if (role === 'student') {
+        const { data: submissionsData } = await supabase
+          .from('assignment_submissions')
+          .select('assignment_id')
+          .eq('student_id', user.id);
+        
+        if (submissionsData) {
+          const subsMap: Record<string, boolean> = {};
+          submissionsData.forEach(sub => {
+            subsMap[sub.assignment_id] = true;
+          });
+          setStudentSubmissions(subsMap);
+        }
+      }
+
     } catch (error: any) {
       console.error('Error fetching assignments:', error);
       showNotification('error', 'حدث خطأ أثناء جلب الواجبات: ' + error.message);
@@ -471,9 +489,17 @@ export default function AssignmentsPage() {
               <div key={assignment.id} className="group glass-card rounded-4xl shadow-xl shadow-slate-200/50 border border-white/60 overflow-hidden flex flex-col transition-all hover:shadow-2xl hover:-translate-y-2">
                 <div className="p-8 flex-1">
                   <div className="flex justify-between items-start mb-6">
-                    <span className="inline-flex items-center rounded-2xl bg-indigo-50 px-4 py-1.5 text-xs font-black text-indigo-700 uppercase tracking-widest border border-indigo-100 shadow-sm">
-                      {assignment.subjects?.name}
-                    </span>
+                    <div className="flex flex-wrap gap-2">
+                      <span className="inline-flex items-center rounded-2xl bg-indigo-50 px-4 py-1.5 text-xs font-black text-indigo-700 uppercase tracking-widest border border-indigo-100 shadow-sm">
+                        {assignment.subjects?.name}
+                      </span>
+                      {userRole === 'student' && studentSubmissions[assignment.id] && (
+                        <span className="inline-flex items-center gap-1.5 rounded-2xl bg-emerald-50 px-4 py-1.5 text-xs font-black text-emerald-700 uppercase tracking-widest border border-emerald-100 shadow-sm">
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                          تم التسليم
+                        </span>
+                      )}
+                    </div>
                     {(userRole === 'teacher' || userRole === 'admin' || userRole === 'management') && (
                       <div className="flex gap-2">
                         <Link 
@@ -553,9 +579,17 @@ export default function AssignmentsPage() {
                   )}
                   <Link 
                     href={`/assignments/${assignment.id}`}
-                    className="h-10 px-4 rounded-xl bg-indigo-600 text-xs font-black text-white shadow-sm hover:bg-indigo-700 transition-all flex items-center gap-2 active:scale-95 mr-auto"
+                    className={`h-10 px-4 rounded-xl text-xs font-black shadow-sm transition-all flex items-center gap-2 active:scale-95 mr-auto ${
+                      userRole === 'student' && studentSubmissions[assignment.id]
+                        ? 'bg-indigo-50 text-indigo-600 border border-indigo-100 hover:bg-indigo-100'
+                        : 'bg-indigo-600 text-white hover:bg-indigo-700'
+                    }`}
                   >
-                    <span>{userRole === 'student' ? 'عرض وتسليم' : 'التفاصيل'}</span>
+                    <span>
+                      {userRole === 'student' 
+                        ? (studentSubmissions[assignment.id] ? 'عرض الإجابة' : 'عرض وتسليم') 
+                        : 'التفاصيل'}
+                    </span>
                   </Link>
                 </div>
               </div>

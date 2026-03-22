@@ -73,7 +73,7 @@ export default function GradingPage({ params }: { params: Promise<{ id: string, 
       // Fetch submission
       const { data: subData } = await supabase
         .from('assignment_submissions')
-        .select('*, student:users(full_name)')
+        .select('*, students(users(full_name))')
         .eq('id', submissionId)
         .single();
       
@@ -110,17 +110,26 @@ export default function GradingPage({ params }: { params: Promise<{ id: string, 
   const handleSaveGrade = async () => {
     setIsSaving(true);
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
       const { error } = await supabase
         .from('assignment_submissions')
         .update({
           grade: parseFloat(grade) || 0,
           feedback,
-          status: 'graded'
+          graded_at: new Date().toISOString(),
+          graded_by: user?.id
         })
         .eq('id', submissionId);
 
       if (error) throw error;
       setNotification({ type: 'success', message: 'تم حفظ التقييم بنجاح' });
+      
+      // Clear notification after 3 seconds
+      setTimeout(() => {
+        setNotification(null);
+      }, 3000);
+      
       router.refresh();
     } catch (error: any) {
       setNotification({ type: 'error', message: 'خطأ في الحفظ: ' + error.message });
@@ -180,7 +189,7 @@ export default function GradingPage({ params }: { params: Promise<{ id: string, 
                 <User className="h-8 w-8" />
               </div>
               <div>
-                <h2 className="text-lg font-black text-slate-900">{submission?.student?.full_name}</h2>
+                <h2 className="text-lg font-black text-slate-900">{submission?.students?.users?.full_name || 'طالب غير معروف'}</h2>
                 <div className="flex items-center gap-4 mt-1">
                   <span className="flex items-center gap-1 text-xs font-bold text-slate-400">
                     <Calendar className="h-3 w-3" />

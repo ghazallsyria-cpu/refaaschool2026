@@ -562,11 +562,11 @@ export default function AssignmentDetailsPage({ params }: { params: Promise<{ id
                 onSubmit={handleSubmitAnswers} 
                 isSubmitting={isSubmitting}
                 initialAnswers={myAnswers}
-                readOnly={mySubmission?.grade !== undefined && mySubmission?.grade !== null}
+                readOnly={!!mySubmission}
               >
                 <div className="glass-card p-8 rounded-4xl border border-white/60 shadow-xl shadow-slate-200/50">
                   <label className="block text-sm font-bold text-slate-700 mb-4">صورة الواجب (اختياري)</label>
-                  {studentId && assignmentId && (!mySubmission || (mySubmission.grade === undefined || mySubmission.grade === null)) ? (
+                  {!mySubmission ? (
                     <ImageUpload
                       initialImageUrl={fileUrl}
                       onUploadSuccess={(url) => setFileUrl(url || '')}
@@ -591,13 +591,13 @@ export default function AssignmentDetailsPage({ params }: { params: Promise<{ id
                     placeholder="اكتب إجابتك هنا..."
                     value={content}
                     onChange={(e) => setContent(e.target.value)}
-                    disabled={mySubmission?.grade !== undefined && mySubmission?.grade !== null}
+                    disabled={!!mySubmission}
                   />
                 </div>
                 
                 <div>
                   <label className="block text-sm font-bold text-slate-700 mb-2">صورة الواجب (اختياري)</label>
-                  {studentId && assignmentId && (!mySubmission || (mySubmission.grade === undefined || mySubmission.grade === null)) ? (
+                  {!mySubmission ? (
                     <ImageUpload
                       initialImageUrl={fileUrl}
                       onUploadSuccess={(url) => setFileUrl(url || '')}
@@ -612,7 +612,7 @@ export default function AssignmentDetailsPage({ params }: { params: Promise<{ id
                   )}
                 </div>
 
-                {(!mySubmission || (mySubmission.grade === undefined || mySubmission.grade === null)) && (
+                {!mySubmission && (
                   <div className="pt-4">
                     <button
                       type="submit"
@@ -624,7 +624,7 @@ export default function AssignmentDetailsPage({ params }: { params: Promise<{ id
                       ) : (
                         <CheckCircle className="h-5 w-5" />
                       )}
-                      {mySubmission ? 'تحديث التسليم' : 'تسليم الواجب'}
+                      تسليم الواجب
                     </button>
                   </div>
                 )}

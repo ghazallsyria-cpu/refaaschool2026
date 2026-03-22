@@ -162,7 +162,7 @@ export default function MessagesPage() {
   };
 
   const fetchThread = (convId: string) => {
-    const thread = messages.filter(msg => {
+    let thread = messages.filter(msg => {
       if (msg.section_id) {
         return `group-${msg.section_id}` === convId;
       } else {
@@ -171,6 +171,24 @@ export default function MessagesPage() {
       }
     }).sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
     
+    // Deduplicate group messages sent by the current user (teacher)
+    if (convId.startsWith('group-')) {
+      const uniqueMessages = [];
+      const seenContents = new Set();
+      for (const msg of thread) {
+        if (msg.sender_id === currentUser?.id) {
+          const key = `${msg.content}-${msg.subject}`;
+          if (!seenContents.has(key)) {
+            seenContents.add(key);
+            uniqueMessages.push(msg);
+          }
+        } else {
+          uniqueMessages.push(msg);
+        }
+      }
+      thread = uniqueMessages;
+    }
+
     setThreadMessages(thread);
 
     // Mark unread messages as read
@@ -335,7 +353,8 @@ export default function MessagesPage() {
         .select(`
           *,
           sender:sender_id(full_name),
-          receiver:receiver_id(full_name)
+          receiver:receiver_id(full_name),
+          section:section_id(name, classes(name))
         `)
         .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
         .order('created_at', { ascending: false });

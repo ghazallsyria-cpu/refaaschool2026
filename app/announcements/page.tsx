@@ -6,6 +6,7 @@ import { Plus, Search, Edit2, Trash2, Megaphone, Bell, X, Users, Calendar, Filte
 import * as Dialog from '@radix-ui/react-dialog';
 import { motion, AnimatePresence } from 'motion/react';
 import Image from 'next/image';
+import { deleteFromCloudinary } from '@/lib/cloudinary';
 
 import ImageUpload from '@/components/ImageUpload';
 
@@ -126,6 +127,11 @@ export default function AnnouncementsPage() {
 
       if (currentAnnouncement.id) {
         // Update
+        // Delete old image if it's being replaced
+        if (currentAnnouncement.image_url && currentAnnouncement.image_url !== payload.image_url) {
+          await deleteFromCloudinary(currentAnnouncement.image_url);
+        }
+
         const { error } = await supabase
           .from('announcements')
           .update(payload)
@@ -181,8 +187,17 @@ export default function AnnouncementsPage() {
     if (!announcementToDelete) return;
     
     try {
+      // Get the announcement to find its image_url
+      const annToDelete = announcements.find(a => a.id === announcementToDelete);
+
       const { error } = await supabase.from('announcements').delete().eq('id', announcementToDelete);
       if (error) throw error;
+
+      // Delete from Cloudinary if it's a Cloudinary URL
+      if (annToDelete?.image_url) {
+        await deleteFromCloudinary(annToDelete.image_url);
+      }
+
       await fetchAnnouncements();
       showNotification('success', 'تم حذف الإعلان بنجاح');
     } catch (error) {

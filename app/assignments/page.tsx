@@ -6,6 +6,7 @@ import { Plus, Search, Edit2, Trash2, FileText, Calendar, Clock, Link as LinkIco
 import * as Dialog from '@radix-ui/react-dialog';
 import Link from 'next/link';
 import AssignmentBuilder, { Question } from '@/components/assignment-builder';
+import { deleteFromCloudinary } from '@/lib/cloudinary';
 
 type Assignment = {
   id: string;
@@ -270,6 +271,11 @@ export default function AssignmentsPage() {
       };
 
       if (currentAssignment.id) {
+        // Check if file_url changed to delete old one from Cloudinary
+        if (currentAssignment.file_url && currentAssignment.file_url !== payload.file_url) {
+          await deleteFromCloudinary(currentAssignment.file_url, 'raw');
+        }
+
         // Update
         const { error } = await supabase
           .from('assignments')
@@ -358,6 +364,31 @@ export default function AssignmentsPage() {
     if (!assignmentToDelete) return;
     
     try {
+      // Get the assignment to find its file_url
+      const { data: assignment } = await supabase
+        .from('assignments')
+        .select('file_url')
+        .eq('id', assignmentToDelete)
+        .single();
+
+      if (assignment?.file_url) {
+        await deleteFromCloudinary(assignment.file_url, 'raw');
+      }
+
+      // Also delete student submissions files if any
+      const { data: submissions } = await supabase
+        .from('assignment_submissions')
+        .select('file_url')
+        .eq('assignment_id', assignmentToDelete);
+      
+      if (submissions && submissions.length > 0) {
+        for (const sub of submissions) {
+          if (sub.file_url) {
+            await deleteFromCloudinary(sub.file_url);
+          }
+        }
+      }
+
       const { error } = await supabase.from('assignments').delete().eq('id', assignmentToDelete);
       if (error) throw error;
       await fetchAssignments();

@@ -15,6 +15,7 @@ import { motion, Reorder, AnimatePresence } from 'motion/react';
 import * as Dialog from '@radix-ui/react-dialog';
 import * as Tabs from '@radix-ui/react-tabs';
 import * as Switch from '@radix-ui/react-switch';
+import { deleteFromCloudinary } from '@/lib/cloudinary';
 
 type QuestionType = 'multiple_choice' | 'true_false' | 'multi_select' | 'essay' | 'fill_in_blank' | 'matching' | 'ordering';
 
@@ -246,7 +247,11 @@ export default function QuizBuilder() {
     setQuestions(questions.map(q => q.id === id ? { ...q, ...updates } : q));
   };
 
-  const deleteQuestion = (id: string) => {
+  const deleteQuestion = async (id: string) => {
+    const question = questions.find(q => q.id === id);
+    if (question?.media_url) {
+      await deleteFromCloudinary(question.media_url);
+    }
     setQuestions(questions.filter(q => q.id !== id));
   };
 

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Plus, Search, Edit2, Trash2, FileText, X, Filter, Link as LinkIcon, ExternalLink, Calendar, Folder, FileArchive, UploadCloud } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
+import { deleteFromCloudinary } from '@/lib/cloudinary';
 
 type Document = {
   id: string;
@@ -125,6 +126,11 @@ export default function DocumentsPage() {
 
       if (currentDocument.id) {
         // Update
+        // Delete old file if it's being replaced
+        if (uploadType === 'file' && selectedFile && currentDocument.file_url) {
+          await deleteFromCloudinary(currentDocument.file_url, 'raw');
+        }
+
         const { data, error } = await supabase
           .from('documents')
           .update(payload)
@@ -168,8 +174,17 @@ export default function DocumentsPage() {
     if (!documentToDelete) return;
     
     try {
+      // Get the document to find its file_url
+      const docToDelete = documents.find(d => d.id === documentToDelete);
+      
       const { error } = await supabase.from('documents').delete().eq('id', documentToDelete);
       if (error) throw error;
+
+      // Delete from Cloudinary if it's a Cloudinary URL
+      if (docToDelete?.file_url) {
+        await deleteFromCloudinary(docToDelete.file_url, 'raw');
+      }
+
       await fetchDocuments();
       showNotification('success', 'تم حذف المستند بنجاح');
     } catch (error) {

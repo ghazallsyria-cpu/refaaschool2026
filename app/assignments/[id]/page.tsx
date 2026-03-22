@@ -16,6 +16,7 @@ import { arSA } from 'date-fns/locale';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
+import { deleteFromCloudinary } from '@/lib/cloudinary';
 
 type Assignment = {
   id: string;
@@ -405,6 +406,20 @@ export default function AssignmentDetailsPage({ params }: { params: Promise<{ id
 
   const handleDeleteAssignment = async () => {
     try {
+      // 1. Delete assignment file from Cloudinary
+      if (assignment?.file_url) {
+        await deleteFromCloudinary(assignment.file_url);
+      }
+
+      // 2. Delete all submission files from Cloudinary
+      if (submissions && submissions.length > 0) {
+        for (const sub of submissions) {
+          if (sub.file_url) {
+            await deleteFromCloudinary(sub.file_url);
+          }
+        }
+      }
+
       const { error } = await supabase.from('assignments').delete().eq('id', assignmentId);
       if (error) throw error;
       router.push('/assignments');

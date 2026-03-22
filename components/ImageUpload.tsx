@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Upload, X, Loader2 } from 'lucide-react';
 import imageCompression from 'browser-image-compression';
 import Image from 'next/image';
+import { deleteFromCloudinary } from '@/lib/cloudinary';
 
 interface Props {
   initialImageUrl?: string;
@@ -73,6 +74,11 @@ export default function ImageUpload({ initialImageUrl, onUploadSuccess, label = 
 
       setImageUrl(data.secure_url);
       onUploadSuccess(data.secure_url);
+      
+      // Delete old image if it exists and is different
+      if (imageUrl && imageUrl !== data.secure_url) {
+        await deleteFromCloudinary(imageUrl);
+      }
     } catch (err: any) {
       setError(err.message || 'حدث خطأ أثناء الرفع');
     } finally {
@@ -97,7 +103,15 @@ export default function ImageUpload({ initialImageUrl, onUploadSuccess, label = 
       ) : (
         <div className="relative w-full h-48">
           <Image src={imageUrl} alt="Uploaded" fill className="object-contain rounded-lg" referrerPolicy="no-referrer" />
-          <button onClick={() => { setImageUrl(null); onUploadSuccess(null); }} className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full z-10">
+          <button 
+            onClick={async () => { 
+              const oldUrl = imageUrl;
+              setImageUrl(null); 
+              onUploadSuccess(null); 
+              if (oldUrl) await deleteFromCloudinary(oldUrl);
+            }} 
+            className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full z-10"
+          >
             <X size={16} />
           </button>
         </div>

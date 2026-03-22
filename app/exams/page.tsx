@@ -11,6 +11,7 @@ import {
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'motion/react';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
+import { deleteFromCloudinary } from '@/lib/cloudinary';
 
 type Exam = {
   id: string;
@@ -166,6 +167,23 @@ export default function ExamsDashboard() {
 
   const handleDelete = async (examId: string) => {
     try {
+      // 1. Fetch all questions for this exam to get their media_urls
+      const { data: questions, error: qError } = await supabase
+        .from('questions')
+        .select('media_url')
+        .eq('exam_id', examId);
+      
+      if (qError) throw qError;
+
+      // 2. Delete all question images from Cloudinary
+      if (questions && questions.length > 0) {
+        for (const q of questions) {
+          if (q.media_url) {
+            await deleteFromCloudinary(q.media_url);
+          }
+        }
+      }
+
       const { error } = await supabase.from('exams').delete().eq('id', examId);
       if (error) throw error;
       setExams(exams.filter(e => e.id !== examId));

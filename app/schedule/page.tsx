@@ -4,8 +4,15 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Printer, User, Users, Info, X, Plus, Calendar, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import Link from 'next/link';
 
-const DAYS = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
+const DAYS = [
+  { id: 1, name: 'الأحد' },
+  { id: 2, name: 'الإثنين' },
+  { id: 3, name: 'الثلاثاء' },
+  { id: 4, name: 'الأربعاء' },
+  { id: 5, name: 'الخميس' },
+];
 
 export default function SchedulePage() {
   const [viewType, setViewType] = useState<'teacher' | 'section'>('teacher');
@@ -187,7 +194,7 @@ export default function SchedulePage() {
 
       // Send notifications
       const notifyUsers = async (lesson: any, newDay: number, newPeriod: number) => {
-        const dayName = DAYS[newDay];
+        const dayName = DAYS.find(d => d.id === newDay)?.name || '';
         const msg = `تم تغيير موعد حصة ${lesson.subjects?.name} إلى يوم ${dayName} الحصة ${newPeriod}`;
         
         // Notify teacher
@@ -671,6 +678,24 @@ export default function SchedulePage() {
               : 'يرجى اختيار معلم أو فصل لعرض الجدول الدراسي.'}
           </p>
         </div>
+      ) : periods.length === 0 ? (
+        <div className="bg-white rounded-xl shadow-sm ring-1 ring-slate-200 p-12 text-center">
+          <div className="mx-auto h-24 w-24 bg-amber-50 rounded-full flex items-center justify-center mb-4">
+            <AlertCircle className="h-10 w-10 text-amber-500" />
+          </div>
+          <h3 className="text-xl font-bold text-slate-900 mb-2">لم يتم إعداد توقيت الحصص</h3>
+          <p className="text-slate-500 mb-6">
+            يجب على المدير إعداد توقيت الحصص (Lesson Timings) أولاً ليظهر الجدول.
+          </p>
+          {isAdmin && (
+            <Link 
+              href="/admin/periods"
+              className="inline-flex items-center justify-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700"
+            >
+              انتقل إلى إعداد توقيت الحصص
+            </Link>
+          )}
+        </div>
       ) : (
         <>
           <div className="bg-white rounded-xl shadow-sm ring-1 ring-slate-200 overflow-hidden print:shadow-none print:ring-0 print:border-0">
@@ -694,21 +719,21 @@ export default function SchedulePage() {
                   جاري تحميل الجدول...
                 </div>
               ) : (
-                DAYS.map((day, dayIndex) => (
-                  <React.Fragment key={day}>
+                DAYS.map((day) => (
+                  <React.Fragment key={day.id}>
                     <div className="font-bold text-center p-4 bg-slate-50 rounded-lg flex items-center justify-center">
-                      {day}
+                      {day.name}
                     </div>
                     {periods.map(p => {
                       const period = p.period_number;
                       const slot = scheduleData.find(s => 
-                        s.day_of_week === dayIndex && 
+                        s.day_of_week === day.id && 
                         s.period === period && 
                         (viewType === 'teacher' ? s.teachers?.id === selectedId : s.sections?.id === selectedId)
                       );
 
                       const others = (isAdmin && showAllSchedules) ? scheduleData.filter(s => 
-                        s.day_of_week === dayIndex && 
+                        s.day_of_week === day.id && 
                         s.period === period && 
                         (viewType === 'teacher' ? s.teachers?.id !== selectedId : s.sections?.id !== selectedId)
                       ) : [];
@@ -719,7 +744,7 @@ export default function SchedulePage() {
                       const displaySlot = slot || (isSwappingFromThisSlot ? swappingFrom : (isCopiedFromThisSlot ? copiedLesson : others[0]));
 
                       return (
-                        <div key={`${day}-${period}`} className={`group p-3 border rounded-xl min-h-[110px] flex flex-col items-center justify-center text-center transition-all relative overflow-hidden
+                        <div key={`${day.id}-${period}`} className={`group p-3 border rounded-xl min-h-[110px] flex flex-col items-center justify-center text-center transition-all relative overflow-hidden
                           ${slot 
                             ? 'bg-gradient-to-br from-indigo-600 to-violet-700 text-white shadow-lg shadow-indigo-200 border-transparent scale-[1.02] z-10' 
                             : displaySlot 
@@ -736,7 +761,7 @@ export default function SchedulePage() {
                                 if (swappingFrom.id === displaySlot?.id) {
                                   setSwappingFrom(null); // Cancel swap
                                 } else {
-                                  handleSwap(dayIndex, period, displaySlot);
+                                  handleSwap(day.id, period, displaySlot);
                                 }
                               } else if (displaySlot) {
                                 // If admin clicks an occupied slot and not swapping, maybe they want to start swapping?
@@ -748,7 +773,7 @@ export default function SchedulePage() {
                                   section_id: viewType === 'section' ? selectedId : (copiedLesson?.sections?.id || ''), 
                                   subject_id: copiedLesson?.subjects?.id || '' 
                                 });
-                                setSelectedSlot({day: dayIndex, period: period});
+                                setSelectedSlot({day: day.id, period: period});
                                 setIsModalOpen(true);
                               }
                             } else if (slot?.teachers?.zoom_link) {
@@ -805,7 +830,7 @@ export default function SchedulePage() {
                                         section_id: displaySlot.sections?.id || '', 
                                         subject_id: displaySlot.subjects?.id || '' 
                                       });
-                                      setSelectedSlot({day: dayIndex, period: period});
+                                      setSelectedSlot({day: day.id, period: period});
                                       setIsModalOpen(true);
                                     }}
                                   >
@@ -857,19 +882,19 @@ export default function SchedulePage() {
               </tr>
             </thead>
             <tbody>
-              {DAYS.map((day, dayIndex) => (
-                <tr key={day}>
-                  <td className="font-bold bg-slate-50">{day}</td>
+              {DAYS.map((day) => (
+                <tr key={day.id}>
+                  <td className="font-bold bg-slate-50">{day.name}</td>
                   {periods.map(p => {
                     const period = p.period_number;
                     const slot = scheduleData.find(s => 
-                      s.day_of_week === dayIndex && 
+                      s.day_of_week === day.id && 
                       s.period === period && 
                       (viewType === 'teacher' ? s.teachers?.id === selectedId : s.sections?.id === selectedId)
                     );
 
                     const others = (isAdmin && showAllSchedules) ? scheduleData.filter(s => 
-                      s.day_of_week === dayIndex && 
+                      s.day_of_week === day.id && 
                       s.period === period && 
                       (viewType === 'teacher' ? s.teachers?.id !== selectedId : s.sections?.id !== selectedId)
                     ) : [];

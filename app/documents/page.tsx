@@ -93,29 +93,27 @@ export default function DocumentsPage() {
     try {
       let finalFileUrl = currentDocument.file_url;
 
-      // Handle File Upload to Supabase Storage bucket 'refaa'
+      // Handle File Upload to Cloudinary
       if (uploadType === 'file' && selectedFile) {
-        const fileExt = selectedFile.name.split('.').pop();
-        const fileName = `${crypto.randomUUID()}_${Date.now()}.${fileExt}`;
-        const filePath = `${currentDocument.category}/${fileName}`;
-
-        const { error: uploadError } = await supabase.storage
-          .from('refaa')
-          .upload(filePath, selectedFile, {
-            cacheControl: '3600',
-            upsert: false
-          });
-
-        if (uploadError) {
-          console.error('Upload error:', uploadError);
-          throw new Error('فشل رفع الملف: ' + uploadError.message);
+        if (!process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || !process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET) {
+          throw new Error('يرجى إعداد إعدادات Cloudinary في المتغيرات البيئية');
         }
 
-        const { data: { publicUrl } } = supabase.storage
-          .from('refaa')
-          .getPublicUrl(filePath);
+        const formData = new FormData();
+        formData.append('file', selectedFile);
+        formData.append('upload_preset', process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET);
 
-        finalFileUrl = publicUrl;
+        const res = await fetch(
+          `https://api.cloudinary.com/v1_1/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/auto/upload`,
+          { method: 'POST', body: formData }
+        );
+
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.error?.message || 'فشل رفع الملف إلى Cloudinary');
+        }
+
+        finalFileUrl = data.secure_url;
       }
 
       const payload = {

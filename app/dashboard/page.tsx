@@ -36,21 +36,30 @@ export default function AdminDashboard() {
     { name: 'حضور اليوم', value: '...', icon: CalendarDays, color: 'text-sky-600', bg: 'bg-sky-50', trend: '92%' },
   ]);
   const [loading, setLoading] = useState(true);
+  const [recentActivities, setRecentActivities] = useState<any[]>([]);
 
   useEffect(() => {
-    async function fetchStats() {
+    async function fetchDashboardData() {
       try {
         const today = new Date().toISOString().split('T')[0];
         const [
           { count: studentsCount },
           { count: teachersCount },
           { count: sectionsCount },
-          { data: attendanceToday }
+          { data: attendanceToday },
+          { data: recentStudents },
+          { data: recentDocs },
+          { data: recentExams },
+          { data: recentNotifs }
         ] = await Promise.all([
           supabase.from('students').select('*', { count: 'exact', head: true }),
           supabase.from('teachers').select('*', { count: 'exact', head: true }),
           supabase.from('sections').select('*', { count: 'exact', head: true }),
-          supabase.from('attendance').select('status').eq('date', today)
+          supabase.from('attendance').select('status').eq('date', today),
+          supabase.from('students').select('full_name, created_at').order('created_at', { ascending: false }).limit(2),
+          supabase.from('documents').select('title, created_at').order('created_at', { ascending: false }).limit(2),
+          supabase.from('exams').select('title, created_at').order('created_at', { ascending: false }).limit(2),
+          supabase.from('notifications').select('title, created_at').eq('type', 'announcement').order('created_at', { ascending: false }).limit(2)
         ]);
 
         const attendanceRate = attendanceToday && attendanceToday.length > 0
@@ -63,15 +72,38 @@ export default function AdminDashboard() {
           { name: 'إجمالي الفصول', value: (sectionsCount || 0).toString(), icon: BookOpen, color: 'text-amber-600', bg: 'bg-amber-50', trend: '0' },
           { name: 'حضور اليوم', value: `${attendanceRate}%`, icon: CalendarDays, color: 'text-sky-600', bg: 'bg-sky-50', trend: `${attendanceRate}%` },
         ]);
+
+        // Combine and sort activities
+        const activities: any[] = [
+          ...(recentStudents || []).map(s => ({ title: `إضافة الطالب ${s.full_name}`, time: s.created_at, type: 'students', color: 'bg-indigo-100 text-indigo-600' })),
+          ...(recentDocs || []).map(d => ({ title: `رفع مستند جديد: ${d.title}`, time: d.created_at, type: 'docs', color: 'bg-emerald-100 text-emerald-600' })),
+          ...(recentExams || []).map(e => ({ title: `إنشاء اختبار جديد: ${e.title}`, time: e.created_at, type: 'exams', color: 'bg-amber-100 text-amber-600' })),
+          ...(recentNotifs || []).map(n => ({ title: `إعلان جديد: ${n.title}`, time: n.created_at, type: 'announcement', color: 'bg-sky-100 text-sky-600' }))
+        ].sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime()).slice(0, 5);
+
+        setRecentActivities(activities);
       } catch (error) {
-        console.error('Error fetching admin stats:', error);
+        console.error('Error fetching admin dashboard data:', error);
       } finally {
         setLoading(false);
       }
     }
 
-    fetchStats();
+    fetchDashboardData();
   }, []);
+
+  const formatTime = (timeStr: string) => {
+    const date = new Date(timeStr);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffMins < 60) return `منذ ${diffMins} دقيقة`;
+    if (diffHours < 24) return `منذ ${diffHours} ساعة`;
+    return `منذ ${diffDays} يوم`;
+  };
 
   if (loading) {
     return (
@@ -192,32 +224,31 @@ export default function AdminDashboard() {
             <button className="text-sm font-bold text-indigo-600 hover:text-indigo-700 bg-indigo-50 px-4 py-2 rounded-xl transition-colors">عرض الكل</button>
           </div>
           <div className="space-y-4">
-            {[
-              { title: 'تحديث جدول الامتحانات النهائية', time: 'منذ 10 دقائق', type: 'exams', color: 'bg-amber-100 text-amber-600' },
-              { title: 'إضافة 5 طلاب جدد في الصف العاشر', time: 'منذ ساعة', type: 'students', color: 'bg-indigo-100 text-indigo-600' },
-              { title: 'تم رفع مستندات جديدة من قبل المعلم أحمد', time: 'منذ ساعتين', type: 'docs', color: 'bg-emerald-100 text-emerald-600' },
-              { title: 'إرسال إعلان عام لأولياء الأمور', time: 'منذ 5 ساعات', type: 'announcement', color: 'bg-sky-100 text-sky-600' },
-            ].map((activity, i) => (
-              <motion.div 
-                key={i} 
-                whileHover={{ x: -5 }}
-                className="flex items-center gap-5 p-4 rounded-3xl hover:bg-slate-50/50 transition-all border border-transparent hover:border-slate-100 group cursor-pointer"
-              >
-                <div className={`h-12 w-12 rounded-2xl flex items-center justify-center font-bold shrink-0 ${activity.color} group-hover:scale-105 transition-transform shadow-sm`}>
-                  {activity.title[0]}
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">{activity.title}</p>
-                  <p className="text-xs text-slate-500 mt-1 flex items-center gap-1">
-                    <CalendarDays className="h-3 w-3" />
-                    {activity.time}
-                  </p>
-                </div>
-                <div className="h-8 w-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 opacity-0 group-hover:opacity-100 transition-all">
-                  <ArrowUpRight className="h-4 w-4" />
-                </div>
-              </motion.div>
-            ))}
+            {recentActivities.length === 0 ? (
+              <div className="text-center py-10 text-slate-400">لا توجد نشاطات حديثة</div>
+            ) : (
+              recentActivities.map((activity, i) => (
+                <motion.div 
+                  key={i} 
+                  whileHover={{ x: -5 }}
+                  className="flex items-center gap-5 p-4 rounded-3xl hover:bg-slate-50/50 transition-all border border-transparent hover:border-slate-100 group cursor-pointer"
+                >
+                  <div className={`h-12 w-12 rounded-2xl flex items-center justify-center font-bold shrink-0 ${activity.color} group-hover:scale-105 transition-transform shadow-sm`}>
+                    {activity.title[0]}
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">{activity.title}</p>
+                    <p className="text-xs text-slate-500 mt-1 flex items-center gap-1">
+                      <CalendarDays className="h-3 w-3" />
+                      {formatTime(activity.time)}
+                    </p>
+                  </div>
+                  <div className="h-8 w-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 opacity-0 group-hover:opacity-100 transition-all">
+                    <ArrowUpRight className="h-4 w-4" />
+                  </div>
+                </motion.div>
+              ))
+            )}
           </div>
         </motion.div>
 

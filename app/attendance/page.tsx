@@ -23,41 +23,59 @@ export default function AttendancePage() {
 
     const calculateStats = (attendanceData: any[], studentsData: any[]) => {
       const now = new Date();
-      const thirtyDaysAgo = new Date(new Date().setDate(now.getDate() - 30));
-      const sevenDaysAgo = new Date(new Date().setDate(now.getDate() - 7));
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
       const stats = {
-        daily: { present: 0, absent: 0, late: 0, excused: 0 },
-        weekly: { present: 0, absent: 0, late: 0, excused: 0 },
-        monthly: { present: 0, absent: 0, late: 0, excused: 0 },
+        daily: { present: 0, absent: 0, late: 0, excused: 0, total: 0, rate: 0 },
+        weekly: { present: 0, absent: 0, late: 0, excused: 0, total: 0, rate: 0 },
+        monthly: { present: 0, absent: 0, late: 0, excused: 0, total: 0, rate: 0 },
         students: {} as Record<string, any>
       };
 
       attendanceData.forEach(a => {
         const aDate = new Date(a.date);
         const status = a.status as AttendanceStatus;
+        const isPresent = status === 'present' || status === 'late';
 
         // Daily (for selected date)
         if (a.date === date) {
           stats.daily[status]++;
+          stats.daily.total++;
         }
 
         // Weekly
         if (aDate >= sevenDaysAgo) {
           stats.weekly[status]++;
+          stats.weekly.total++;
         }
 
         // Monthly
         if (aDate >= thirtyDaysAgo) {
           stats.monthly[status]++;
+          stats.monthly.total++;
         }
 
         // Student stats
         if (!stats.students[a.student_id]) {
-          stats.students[a.student_id] = { present: 0, absent: 0, late: 0, excused: 0 };
+          stats.students[a.student_id] = { present: 0, absent: 0, late: 0, excused: 0, total: 0 };
         }
         stats.students[a.student_id][status]++;
+        stats.students[a.student_id].total++;
       });
+
+      // Calculate rates
+      if (stats.daily.total > 0) {
+        stats.daily.rate = Math.round(((stats.daily.present + stats.daily.late) / stats.daily.total) * 100);
+      }
+      if (stats.weekly.total > 0) {
+        stats.weekly.rate = Math.round(((stats.weekly.present + stats.weekly.late) / stats.weekly.total) * 100);
+      }
+      if (stats.monthly.total > 0) {
+        stats.monthly.rate = Math.round(((stats.monthly.present + stats.monthly.late) / stats.monthly.total) * 100);
+      }
 
       setStats(stats);
     };
@@ -273,40 +291,65 @@ export default function AttendancePage() {
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-          <div className="glass-card p-6 rounded-3xl border border-emerald-100 bg-emerald-50/30 flex flex-col items-center justify-center text-center gap-3 shadow-xl shadow-emerald-100/20">
-            <div className="h-14 w-14 rounded-2xl bg-emerald-100 flex items-center justify-center text-emerald-600">
-              <CheckCircle2 className="h-7 w-7" />
+          <div className="glass-card p-8 rounded-4xl border border-emerald-100 bg-emerald-50/30 flex flex-col items-center justify-center text-center gap-4 shadow-xl shadow-emerald-100/20 relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full -mr-12 -mt-12 transition-transform group-hover:scale-110" />
+            <div className="h-16 w-16 rounded-2xl bg-white flex items-center justify-center text-emerald-600 shadow-sm group-hover:scale-110 transition-transform">
+              <CheckCircle2 className="h-8 w-8" />
             </div>
-            <div>
-              <p className="text-sm font-black text-emerald-600/70 uppercase tracking-widest mb-1">حاضر</p>
-              <p className="text-4xl font-black text-emerald-600">{studentStats?.present || 0}</p>
+            <div className="relative">
+              <p className="text-[10px] font-black text-emerald-600/70 uppercase tracking-widest mb-1">حاضر</p>
+              <div className="flex items-baseline justify-center gap-1">
+                <p className="text-4xl font-black text-emerald-600">{studentStats?.present || 0}</p>
+                <span className="text-xs font-bold text-emerald-400">/ {studentAttendance.length}</span>
+              </div>
+              <div className="mt-4 h-1.5 w-24 bg-emerald-100 rounded-full overflow-hidden mx-auto">
+                <div 
+                  className="h-full bg-emerald-500 rounded-full transition-all duration-1000" 
+                  style={{ width: `${studentAttendance.length > 0 ? ((studentStats?.present || 0) / studentAttendance.length) * 100 : 0}%` }}
+                />
+              </div>
             </div>
           </div>
-          <div className="glass-card p-6 rounded-3xl border border-red-100 bg-red-50/30 flex flex-col items-center justify-center text-center gap-3 shadow-xl shadow-red-100/20">
-            <div className="h-14 w-14 rounded-2xl bg-red-100 flex items-center justify-center text-red-600">
-              <XCircle className="h-7 w-7" />
+
+          <div className="glass-card p-8 rounded-4xl border border-red-100 bg-red-50/30 flex flex-col items-center justify-center text-center gap-4 shadow-xl shadow-red-100/20 relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-red-500/5 rounded-full -mr-12 -mt-12 transition-transform group-hover:scale-110" />
+            <div className="h-16 w-16 rounded-2xl bg-white flex items-center justify-center text-red-600 shadow-sm group-hover:scale-110 transition-transform">
+              <XCircle className="h-8 w-8" />
             </div>
-            <div>
-              <p className="text-sm font-black text-red-600/70 uppercase tracking-widest mb-1">غائب</p>
+            <div className="relative">
+              <p className="text-[10px] font-black text-red-600/70 uppercase tracking-widest mb-1">غائب</p>
               <p className="text-4xl font-black text-red-600">{studentStats?.absent || 0}</p>
+              <span className="text-[10px] font-black text-red-400 bg-white px-2 py-0.5 rounded-lg mt-2 inline-block">
+                {studentAttendance.length > 0 ? Math.round(((studentStats?.absent || 0) / studentAttendance.length) * 100) : 0}% من الإجمالي
+              </span>
             </div>
           </div>
-          <div className="glass-card p-6 rounded-3xl border border-amber-100 bg-amber-50/30 flex flex-col items-center justify-center text-center gap-3 shadow-xl shadow-amber-100/20">
-            <div className="h-14 w-14 rounded-2xl bg-amber-100 flex items-center justify-center text-amber-600">
-              <Clock className="h-7 w-7" />
+
+          <div className="glass-card p-8 rounded-4xl border border-amber-100 bg-amber-50/30 flex flex-col items-center justify-center text-center gap-4 shadow-xl shadow-amber-100/20 relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/5 rounded-full -mr-12 -mt-12 transition-transform group-hover:scale-110" />
+            <div className="h-16 w-16 rounded-2xl bg-white flex items-center justify-center text-amber-600 shadow-sm group-hover:scale-110 transition-transform">
+              <Clock className="h-8 w-8" />
             </div>
-            <div>
-              <p className="text-sm font-black text-amber-600/70 uppercase tracking-widest mb-1">متأخر</p>
+            <div className="relative">
+              <p className="text-[10px] font-black text-amber-600/70 uppercase tracking-widest mb-1">متأخر</p>
               <p className="text-4xl font-black text-amber-600">{studentStats?.late || 0}</p>
+              <span className="text-[10px] font-black text-amber-400 bg-white px-2 py-0.5 rounded-lg mt-2 inline-block">
+                {studentAttendance.length > 0 ? Math.round(((studentStats?.late || 0) / studentAttendance.length) * 100) : 0}% من الإجمالي
+              </span>
             </div>
           </div>
-          <div className="glass-card p-6 rounded-3xl border border-blue-100 bg-blue-50/30 flex flex-col items-center justify-center text-center gap-3 shadow-xl shadow-blue-100/20">
-            <div className="h-14 w-14 rounded-2xl bg-blue-100 flex items-center justify-center text-blue-600">
-              <AlertCircle className="h-7 w-7" />
+
+          <div className="glass-card p-8 rounded-4xl border border-blue-100 bg-blue-50/30 flex flex-col items-center justify-center text-center gap-4 shadow-xl shadow-blue-100/20 relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/5 rounded-full -mr-12 -mt-12 transition-transform group-hover:scale-110" />
+            <div className="h-16 w-16 rounded-2xl bg-white flex items-center justify-center text-blue-600 shadow-sm group-hover:scale-110 transition-transform">
+              <AlertCircle className="h-8 w-8" />
             </div>
-            <div>
-              <p className="text-sm font-black text-blue-600/70 uppercase tracking-widest mb-1">بعذر</p>
+            <div className="relative">
+              <p className="text-[10px] font-black text-blue-600/70 uppercase tracking-widest mb-1">بعذر</p>
               <p className="text-4xl font-black text-blue-600">{studentStats?.excused || 0}</p>
+              <span className="text-[10px] font-black text-blue-400 bg-white px-2 py-0.5 rounded-lg mt-2 inline-block">
+                {studentAttendance.length > 0 ? Math.round(((studentStats?.excused || 0) / studentAttendance.length) * 100) : 0}% من الإجمالي
+              </span>
             </div>
           </div>
         </div>
@@ -413,36 +456,197 @@ export default function AttendancePage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         {stats && (
           <>
-            <div className="glass-card p-8 rounded-4xl shadow-2xl shadow-slate-200/50 border border-white/60">
-              <h3 className="text-xl font-black text-slate-900 mb-4">يومي</h3>
-              <div className="grid grid-cols-2 gap-4 text-sm font-bold">
-                <div className="text-emerald-600">حاضر: {stats.daily.present}</div>
-                <div className="text-red-600">غائب: {stats.daily.absent}</div>
-                <div className="text-amber-600">متأخر: {stats.daily.late}</div>
-                <div className="text-blue-600">مستأذن: {stats.daily.excused}</div>
+            <div className="glass-card p-8 rounded-4xl shadow-2xl shadow-slate-200/50 border border-white/60 relative overflow-hidden group">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full -mr-16 -mt-16 transition-transform group-hover:scale-110" />
+              <div className="relative">
+                <div className="flex justify-between items-start mb-6">
+                  <h3 className="text-xl font-black text-slate-900">يومي</h3>
+                  <span className="px-3 py-1 rounded-xl bg-emerald-100 text-emerald-700 text-xs font-black">{stats.daily.rate}%</span>
+                </div>
+                <div className="grid grid-cols-2 gap-y-4 gap-x-6">
+                  <div className="flex flex-col">
+                    <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest">حاضر</span>
+                    <span className="text-xl font-black text-emerald-600">{stats.daily.present}</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest">غائب</span>
+                    <span className="text-xl font-black text-red-600">{stats.daily.absent}</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest">متأخر</span>
+                    <span className="text-xl font-black text-amber-600">{stats.daily.late}</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest">مستأذن</span>
+                    <span className="text-xl font-black text-blue-600">{stats.daily.excused}</span>
+                  </div>
+                </div>
+                <div className="mt-6 pt-6 border-t border-slate-100 flex items-center justify-between text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                  <span>إجمالي السجلات</span>
+                  <span className="text-slate-900">{stats.daily.total}</span>
+                </div>
               </div>
             </div>
-            <div className="glass-card p-8 rounded-4xl shadow-2xl shadow-slate-200/50 border border-white/60">
-              <h3 className="text-xl font-black text-slate-900 mb-4">أسبوعي</h3>
-              <div className="grid grid-cols-2 gap-4 text-sm font-bold">
-                <div className="text-emerald-600">حاضر: {stats.weekly.present}</div>
-                <div className="text-red-600">غائب: {stats.weekly.absent}</div>
-                <div className="text-amber-600">متأخر: {stats.weekly.late}</div>
-                <div className="text-blue-600">مستأذن: {stats.weekly.excused}</div>
+
+            <div className="glass-card p-8 rounded-4xl shadow-2xl shadow-slate-200/50 border border-white/60 relative overflow-hidden group">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 rounded-full -mr-16 -mt-16 transition-transform group-hover:scale-110" />
+              <div className="relative">
+                <div className="flex justify-between items-start mb-6">
+                  <h3 className="text-xl font-black text-slate-900">أسبوعي</h3>
+                  <span className="px-3 py-1 rounded-xl bg-indigo-100 text-indigo-700 text-xs font-black">{stats.weekly.rate}%</span>
+                </div>
+                <div className="grid grid-cols-2 gap-y-4 gap-x-6">
+                  <div className="flex flex-col">
+                    <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest">حاضر</span>
+                    <span className="text-xl font-black text-emerald-600">{stats.weekly.present}</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest">غائب</span>
+                    <span className="text-xl font-black text-red-600">{stats.weekly.absent}</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest">متأخر</span>
+                    <span className="text-xl font-black text-amber-600">{stats.weekly.late}</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest">مستأذن</span>
+                    <span className="text-xl font-black text-blue-600">{stats.weekly.excused}</span>
+                  </div>
+                </div>
+                <div className="mt-6 pt-6 border-t border-slate-100 flex items-center justify-between text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                  <span>إجمالي السجلات</span>
+                  <span className="text-slate-900">{stats.weekly.total}</span>
+                </div>
               </div>
             </div>
-            <div className="glass-card p-8 rounded-4xl shadow-2xl shadow-slate-200/50 border border-white/60">
-              <h3 className="text-xl font-black text-slate-900 mb-4">شهري</h3>
-              <div className="grid grid-cols-2 gap-4 text-sm font-bold">
-                <div className="text-emerald-600">حاضر: {stats.monthly.present}</div>
-                <div className="text-red-600">غائب: {stats.monthly.absent}</div>
-                <div className="text-amber-600">متأخر: {stats.monthly.late}</div>
-                <div className="text-blue-600">مستأذن: {stats.monthly.excused}</div>
+
+            <div className="glass-card p-8 rounded-4xl shadow-2xl shadow-slate-200/50 border border-white/60 relative overflow-hidden group">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full -mr-16 -mt-16 transition-transform group-hover:scale-110" />
+              <div className="relative">
+                <div className="flex justify-between items-start mb-6">
+                  <h3 className="text-xl font-black text-slate-900">شهري</h3>
+                  <span className="px-3 py-1 rounded-xl bg-amber-100 text-amber-700 text-xs font-black">{stats.monthly.rate}%</span>
+                </div>
+                <div className="grid grid-cols-2 gap-y-4 gap-x-6">
+                  <div className="flex flex-col">
+                    <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest">حاضر</span>
+                    <span className="text-xl font-black text-emerald-600">{stats.monthly.present}</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest">غائب</span>
+                    <span className="text-xl font-black text-red-600">{stats.monthly.absent}</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest">متأخر</span>
+                    <span className="text-xl font-black text-amber-600">{stats.monthly.late}</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest">مستأذن</span>
+                    <span className="text-xl font-black text-blue-600">{stats.monthly.excused}</span>
+                  </div>
+                </div>
+                <div className="mt-6 pt-6 border-t border-slate-100 flex items-center justify-between text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                  <span>إجمالي السجلات</span>
+                  <span className="text-slate-900">{stats.monthly.total}</span>
+                </div>
               </div>
             </div>
           </>
         )}
       </div>
+
+      {/* Smart Insights */}
+      {stats && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+          <div className="glass-card p-8 rounded-4xl shadow-2xl shadow-slate-200/50 border border-white/60 relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-red-500/5 rounded-full -mr-16 -mt-16 transition-transform group-hover:scale-110" />
+            <div className="relative">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="p-2 bg-red-100 rounded-xl">
+                  <AlertCircle className="w-5 h-5 text-red-600" />
+                </div>
+                <h3 className="text-lg font-black text-slate-900 tracking-tight">تنبيهات الغياب (أقل من 80%)</h3>
+              </div>
+              <div className="space-y-4">
+                {students.filter(s => {
+                  const sStats = stats.students[s.id];
+                  if (!sStats || sStats.total === 0) return false;
+                  const rate = ((sStats.present + sStats.late) / sStats.total) * 100;
+                  return rate < 80;
+                }).slice(0, 5).map(s => {
+                  const sStats = stats.students[s.id];
+                  const rate = Math.round(((sStats.present + sStats.late) / sStats.total) * 100);
+                  return (
+                    <div key={s.id} className="flex items-center justify-between p-4 rounded-2xl bg-red-50/50 border border-red-100 group/item hover:bg-red-50 transition-colors">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-white border border-red-200 flex items-center justify-center text-red-600 font-black shadow-sm group-hover/item:scale-110 transition-transform">
+                          {s.users?.full_name?.[0] || '?'}
+                        </div>
+                        <span className="font-bold text-slate-700 tracking-tight">{s.users?.full_name}</span>
+                      </div>
+                      <div className="flex flex-col items-end">
+                        <span className="text-sm font-black text-red-600">{rate}%</span>
+                        <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest">معدل الحضور</span>
+                      </div>
+                    </div>
+                  );
+                })}
+                {students.filter(s => {
+                  const sStats = stats.students[s.id];
+                  if (!sStats || sStats.total === 0) return false;
+                  const rate = ((sStats.present + sStats.late) / sStats.total) * 100;
+                  return rate < 80;
+                }).length === 0 && (
+                  <div className="text-center py-8">
+                    <div className="w-16 h-16 bg-emerald-50 rounded-3xl flex items-center justify-center mx-auto mb-4">
+                      <CheckCircle2 className="w-8 h-8 text-emerald-500" />
+                    </div>
+                    <p className="text-slate-400 font-bold italic">جميع الطلاب لديهم معدل حضور ممتاز</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="glass-card p-8 rounded-4xl shadow-2xl shadow-slate-200/50 border border-white/60 relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full -mr-16 -mt-16 transition-transform group-hover:scale-110" />
+            <div className="relative">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="p-2 bg-amber-100 rounded-xl">
+                  <Clock className="w-5 h-5 text-amber-600" />
+                </div>
+                <h3 className="text-lg font-black text-slate-900 tracking-tight">الأكثر تأخراً (هذا الشهر)</h3>
+              </div>
+              <div className="space-y-4">
+                {students.filter(s => (stats.students[s.id]?.late || 0) > 0)
+                  .sort((a, b) => (stats.students[b.id]?.late || 0) - (stats.students[a.id]?.late || 0))
+                  .slice(0, 5).map(s => (
+                    <div key={s.id} className="flex items-center justify-between p-4 rounded-2xl bg-amber-50/50 border border-amber-100 group/item hover:bg-amber-50 transition-colors">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-white border border-amber-200 flex items-center justify-center text-amber-600 font-black shadow-sm group-hover/item:scale-110 transition-transform">
+                          {s.users?.full_name?.[0] || '?'}
+                        </div>
+                        <span className="font-bold text-slate-700 tracking-tight">{s.users?.full_name}</span>
+                      </div>
+                      <div className="flex flex-col items-end">
+                        <span className="text-sm font-black text-amber-600">{stats.students[s.id].late} مرات</span>
+                        <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest">إجمالي التأخير</span>
+                      </div>
+                    </div>
+                  ))}
+                {students.filter(s => (stats.students[s.id]?.late || 0) > 0).length === 0 && (
+                  <div className="text-center py-8">
+                    <div className="w-16 h-16 bg-slate-50 rounded-3xl flex items-center justify-center mx-auto mb-4">
+                      <Clock className="w-8 h-8 text-slate-200" />
+                    </div>
+                    <p className="text-slate-400 font-bold italic">لا يوجد سجلات تأخير لهذا الشهر</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="glass-card rounded-4xl shadow-2xl shadow-slate-200/50 border border-white/60 overflow-hidden">
         <div className="p-8 border-b border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row justify-between items-center gap-6">

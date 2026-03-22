@@ -251,7 +251,7 @@ export default function AssignmentsPage() {
             options: q.options || null,
             points: q.points,
             is_required: q.isRequired,
-            order_index: index
+            order: index
           }));
           const { error: qError } = await supabase.from('assignment_questions').insert(questionsPayload);
           if (qError) throw qError;
@@ -274,7 +274,7 @@ export default function AssignmentsPage() {
             options: q.options || null,
             points: q.points,
             is_required: q.isRequired,
-            order_index: index
+            order: index
           }));
           const { error: qError } = await supabase.from('assignment_questions').insert(questionsPayload);
           if (qError) throw qError;

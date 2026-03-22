@@ -34,6 +34,18 @@ export default function ImageUpload({ initialImageUrl, onUploadSuccess, label = 
     setError(null);
     setUploading(true);
 
+    if (!process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME === 'YOUR_CLOUDINARY_CLOUD_NAME') {
+      setError('يرجى إعداد Cloudinary Cloud Name في المتغيرات البيئية (Settings -> Secrets)');
+      setUploading(false);
+      return;
+    }
+
+    if (!process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET || process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET === 'YOUR_CLOUDINARY_UPLOAD_PRESET') {
+      setError('يرجى إعداد Cloudinary Upload Preset في المتغيرات البيئية (Settings -> Secrets)');
+      setUploading(false);
+      return;
+    }
+
     try {
       const compressedFile = await imageCompression(file, {
         maxSizeMB: 1,
@@ -52,7 +64,12 @@ export default function ImageUpload({ initialImageUrl, onUploadSuccess, label = 
       );
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error?.message || 'فشل الرفع');
+      if (!res.ok) {
+        if (data.error?.message?.includes('disabled')) {
+          throw new Error('حساب Cloudinary الخاص بك معطل أو اسم السحابة غير صحيح. يرجى التحقق من إعدادات Cloudinary.');
+        }
+        throw new Error(data.error?.message || 'فشل الرفع');
+      }
 
       setImageUrl(data.secure_url);
       onUploadSuccess(data.secure_url);

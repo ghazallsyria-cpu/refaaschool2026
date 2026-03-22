@@ -21,7 +21,7 @@ import autoTable from 'jspdf-autotable';
 
 type Attempt = {
   id: string;
-  student: { full_name: string, email: string };
+  student: { full_name: string, email: string, section_name: string };
   started_at: string;
   completed_at: string;
   score: number;
@@ -45,6 +45,11 @@ export default function ExamResults() {
   const [stats, setStats] = useState<ExamStats | null>(null);
   const [questionAnalytics, setQuestionAnalytics] = useState<any[]>([]);
   const [scoreDistribution, setScoreDistribution] = useState<any[]>([]);
+  const [selectedSection, setSelectedSection] = useState<string>('all');
+  const [availableSections, setAvailableSections] = useState<string[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [questionsData, setQuestionsData] = useState<any[]>([]);
+  const [answersData, setAnswersData] = useState<any[]>([]);
 
   const fetchData = useCallback(async () => {
     try {
@@ -60,86 +65,51 @@ export default function ExamResults() {
         .from('exam_attempts')
         .select(`
           *,
-          student:students(id, users(full_name, email))
+          student:students(
+            id, 
+            users(full_name, email),
+            section:sections(name, classes(name))
+          )
         `)
         .eq('exam_id', params.id)
         .order('completed_at', { ascending: false });
 
-      const formattedAttempts = (attemptsData || []).map(a => ({
-        ...a,
-        student: {
-          full_name: (a.student as any)?.users?.full_name || 'طالب غير معروف',
-          email: (a.student as any)?.users?.email || ''
-        }
-      }));
+      const formattedAttempts = (attemptsData || []).map(a => {
+        const studentData = a.student as any;
+        const sectionData = studentData?.section;
+        const className = Array.isArray(sectionData?.classes) ? sectionData?.classes[0]?.name : sectionData?.classes?.name;
+        const sectionName = sectionData?.name ? `${className ? className + ' - ' : ''}${sectionData.name}` : 'غير محدد';
+
+        return {
+          ...a,
+          student: {
+            full_name: studentData?.users?.full_name || 'طالب غير معروف',
+            email: studentData?.users?.email || '',
+            section_name: sectionName
+          }
+        };
+      });
       setAttempts(formattedAttempts);
 
+      // Extract unique sections for the filter
+      const sections = Array.from(new Set(formattedAttempts.map(a => a.student.section_name))).filter(Boolean);
+      setAvailableSections(sections);
+
       // Fetch Questions and Answers for real analytics
-      const { data: questionsData } = await supabase
+      const { data: qData } = await supabase
         .from('questions')
         .select('*')
         .eq('exam_id', params.id)
         .order('order_index');
+      
+      setQuestionsData(qData || []);
 
-      const { data: answersData } = await supabase
+      const { data: aData } = await supabase
         .from('student_answers')
         .select('*')
         .in('attempt_id', formattedAttempts.map(a => a.id));
-
-      // Calculate real stats
-      if (formattedAttempts.length > 0) {
-        const scores = formattedAttempts.map(a => a.score);
-        const maxPossibleScore = examData.max_score || 100;
-        const percentageScores = scores.map(s => (s / maxPossibleScore) * 100);
         
-        const avg = percentageScores.reduce((a, b) => a + b, 0) / percentageScores.length;
-        setStats({
-          avg_score: Math.round(avg),
-          max_score: Math.round(Math.max(...percentageScores)),
-          min_score: Math.round(Math.min(...percentageScores)),
-          pass_rate: Math.round((percentageScores.filter(s => s >= 50).length / percentageScores.length) * 100),
-          total_attempts: scores.length
-        });
-
-        // Calculate Question Analytics
-        if (questionsData && answersData) {
-          const analytics = questionsData.map((q, idx) => {
-            const qAnswers = answersData.filter(a => a.question_id === q.id);
-            const correctCount = qAnswers.filter(a => a.is_correct).length;
-            const accuracy = qAnswers.length > 0 ? Math.round((correctCount / qAnswers.length) * 100) : 0;
-            return {
-              name: `سؤال ${idx + 1}`,
-              correct: accuracy,
-              type: q.type,
-              id: q.id
-            };
-          });
-          setQuestionAnalytics(analytics);
-        }
-
-        // Calculate Score Distribution for Pie Chart
-        const distribution = [
-          { name: 'ممتاز', value: percentageScores.filter(s => s >= 90).length },
-          { name: 'جيد جداً', value: percentageScores.filter(s => s >= 80 && s < 90).length },
-          { name: 'جيد', value: percentageScores.filter(s => s >= 70 && s < 80).length },
-          { name: 'مقبول', value: percentageScores.filter(s => s >= 50 && s < 70).length },
-          { name: 'ضعيف', value: percentageScores.filter(s => s < 50).length },
-        ].filter(d => d.value > 0);
-        
-        // If all are 0 (shouldn't happen if length > 0), provide a default
-        setScoreDistribution(distribution.length > 0 ? distribution : [{ name: 'لا توجد بيانات', value: 1 }]);
-
-      } else {
-        setStats({
-          avg_score: 0,
-          max_score: 0,
-          min_score: 0,
-          pass_rate: 0,
-          total_attempts: 0
-        });
-        setQuestionAnalytics([]);
-        setScoreDistribution([]);
-      }
+      setAnswersData(aData || []);
 
     } catch (err) {
       console.error('Error fetching results:', err);
@@ -152,12 +122,95 @@ export default function ExamResults() {
     fetchData();
   }, [fetchData]);
 
+  // Calculate stats whenever attempts or selected section changes
+  useEffect(() => {
+    if (!exam) return;
+
+    let filteredAttempts = attempts;
+    if (selectedSection !== 'all') {
+      filteredAttempts = attempts.filter(a => a.student.section_name === selectedSection);
+    }
+
+    if (searchQuery) {
+      filteredAttempts = filteredAttempts.filter(a => 
+        a.student.full_name.includes(searchQuery) || 
+        a.student.email.includes(searchQuery)
+      );
+    }
+
+    if (filteredAttempts.length > 0) {
+      const scores = filteredAttempts.map(a => a.score);
+      const maxPossibleScore = exam.max_score || 100;
+      const percentageScores = scores.map(s => (s / maxPossibleScore) * 100);
+      
+      const avg = percentageScores.reduce((a, b) => a + b, 0) / percentageScores.length;
+      setStats({
+        avg_score: Math.round(avg),
+        max_score: Math.round(Math.max(...percentageScores)),
+        min_score: Math.round(Math.min(...percentageScores)),
+        pass_rate: Math.round((percentageScores.filter(s => s >= 50).length / percentageScores.length) * 100),
+        total_attempts: scores.length
+      });
+
+      // Calculate Question Analytics
+      if (questionsData.length > 0 && answersData.length > 0) {
+        // Filter answers to only include those from the filtered attempts
+        const validAttemptIds = new Set(filteredAttempts.map(a => a.id));
+        const filteredAnswers = answersData.filter(a => validAttemptIds.has(a.attempt_id));
+
+        const analytics = questionsData.map((q, idx) => {
+          const qAnswers = filteredAnswers.filter(a => a.question_id === q.id);
+          const correctCount = qAnswers.filter(a => a.is_correct).length;
+          const accuracy = qAnswers.length > 0 ? Math.round((correctCount / qAnswers.length) * 100) : 0;
+          return {
+            name: `سؤال ${idx + 1}`,
+            correct: accuracy,
+            type: q.type,
+            id: q.id
+          };
+        });
+        setQuestionAnalytics(analytics);
+      }
+
+      // Calculate Score Distribution for Pie Chart
+      const distribution = [
+        { name: 'ممتاز', value: percentageScores.filter(s => s >= 90).length },
+        { name: 'جيد جداً', value: percentageScores.filter(s => s >= 80 && s < 90).length },
+        { name: 'جيد', value: percentageScores.filter(s => s >= 70 && s < 80).length },
+        { name: 'مقبول', value: percentageScores.filter(s => s >= 50 && s < 70).length },
+        { name: 'ضعيف', value: percentageScores.filter(s => s < 50).length },
+      ].filter(d => d.value > 0);
+      
+      setScoreDistribution(distribution.length > 0 ? distribution : [{ name: 'لا توجد بيانات', value: 1 }]);
+
+    } else {
+      setStats({
+        avg_score: 0,
+        max_score: 0,
+        min_score: 0,
+        pass_rate: 0,
+        total_attempts: 0
+      });
+      setQuestionAnalytics([]);
+      setScoreDistribution([]);
+    }
+  }, [attempts, selectedSection, searchQuery, exam, questionsData, answersData]);
+
   const COLORS = ['#4f46e5', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 
+  const filteredAttempts = attempts.filter(a => {
+    const matchesSection = selectedSection === 'all' || a.student.section_name === selectedSection;
+    const matchesSearch = !searchQuery || 
+      a.student.full_name.includes(searchQuery) || 
+      a.student.email.includes(searchQuery);
+    return matchesSection && matchesSearch;
+  });
+
   const exportToExcel = () => {
-    const data = attempts.map(a => ({
+    const data = filteredAttempts.map(a => ({
       'الطالب': a.student.full_name,
       'البريد الإلكتروني': a.student.email,
+      'الفصل': a.student.section_name,
       'تاريخ التقديم': new Date(a.completed_at).toLocaleDateString(),
       'الدرجة (%)': a.score,
       'الحالة': a.score >= 50 ? 'ناجح' : 'راسب'
@@ -174,9 +227,10 @@ export default function ExamResults() {
     doc.text(`نتائج الاختبار: ${exam?.title || ''}`, 14, 15);
     
     autoTable(doc, {
-      head: [['الطالب', 'تاريخ التقديم', 'الدرجة (%)', 'الحالة']],
-      body: attempts.map(a => [
+      head: [['الطالب', 'الفصل', 'تاريخ التقديم', 'الدرجة (%)', 'الحالة']],
+      body: filteredAttempts.map(a => [
         a.student.full_name,
+        a.student.section_name,
         new Date(a.completed_at).toLocaleDateString(),
         a.score.toString(),
         a.score >= 50 ? 'ناجح' : 'راسب'
@@ -376,13 +430,30 @@ export default function ExamResults() {
             <h3 className="text-2xl font-black text-slate-900 tracking-tight">نتائج الطلاب التفصيلية</h3>
             <p className="text-slate-500 font-bold">قائمة كاملة بمحاولات الطلاب ودرجاتهم</p>
           </div>
-          <div className="relative group max-w-xs w-full">
-            <Search className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 group-focus-within:text-indigo-600 transition-colors" />
-            <input 
-              type="text" 
-              placeholder="البحث عن طالب..."
-              className="w-full pr-12 pl-4 py-4 rounded-2xl border-0 bg-slate-50 ring-1 ring-inset ring-slate-100 text-sm font-bold focus:ring-2 focus:ring-indigo-600 outline-none transition-all"
-            />
+          <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
+            <div className="relative group max-w-xs w-full">
+              <Filter className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 group-focus-within:text-indigo-600 transition-colors" />
+              <select
+                value={selectedSection}
+                onChange={(e) => setSelectedSection(e.target.value)}
+                className="w-full pr-12 pl-4 py-4 rounded-2xl border-0 bg-slate-50 ring-1 ring-inset ring-slate-100 text-sm font-bold focus:ring-2 focus:ring-indigo-600 outline-none transition-all appearance-none"
+              >
+                <option value="all">جميع الفصول</option>
+                {availableSections.map(section => (
+                  <option key={section} value={section}>{section}</option>
+                ))}
+              </select>
+            </div>
+            <div className="relative group max-w-xs w-full">
+              <Search className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 group-focus-within:text-indigo-600 transition-colors" />
+              <input 
+                type="text" 
+                placeholder="البحث عن طالب..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pr-12 pl-4 py-4 rounded-2xl border-0 bg-slate-50 ring-1 ring-inset ring-slate-100 text-sm font-bold focus:ring-2 focus:ring-indigo-600 outline-none transition-all"
+              />
+            </div>
           </div>
         </div>
         <div className="overflow-x-auto">
@@ -390,6 +461,7 @@ export default function ExamResults() {
             <thead>
               <tr className="bg-slate-50/50 text-slate-400 text-xs font-black uppercase tracking-widest">
                 <th className="px-8 py-6">الطالب</th>
+                <th className="px-8 py-6">الفصل</th>
                 <th className="px-8 py-6">تاريخ التقديم</th>
                 <th className="px-8 py-6">الوقت المستغرق</th>
                 <th className="px-8 py-6">الدرجة</th>
@@ -398,7 +470,7 @@ export default function ExamResults() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {attempts.map((attempt) => (
+              {filteredAttempts.map((attempt) => (
                 <tr key={attempt.id} className="hover:bg-slate-50/50 transition-all group">
                   <td className="px-8 py-6">
                     <div className="flex items-center gap-4">
@@ -410,6 +482,11 @@ export default function ExamResults() {
                         <p className="text-xs text-slate-500 font-bold">{attempt.student.email}</p>
                       </div>
                     </div>
+                  </td>
+                  <td className="px-8 py-6 text-sm font-bold text-slate-600">
+                    <span className="px-3 py-1 rounded-xl bg-slate-100 text-slate-600 text-xs font-bold">
+                      {attempt.student.section_name}
+                    </span>
                   </td>
                   <td className="px-8 py-6 text-sm font-bold text-slate-600">
                     {new Date(attempt.completed_at).toLocaleDateString('ar-SA', { year: 'numeric', month: 'long', day: 'numeric' })}
@@ -451,13 +528,15 @@ export default function ExamResults() {
                   </td>
                 </tr>
               ))}
+              {filteredAttempts.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="px-8 py-12 text-center text-slate-500 font-bold">
+                    لا توجد نتائج مطابقة للبحث
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
-        </div>
-        <div className="p-6 bg-slate-50/50 border-t border-slate-100 text-center">
-          <button className="px-8 py-3 rounded-2xl text-sm font-black text-indigo-600 hover:bg-white hover:shadow-lg transition-all active:scale-95">
-            عرض المزيد من النتائج
-          </button>
         </div>
       </div>
     </div>

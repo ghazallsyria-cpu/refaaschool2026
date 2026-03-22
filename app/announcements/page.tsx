@@ -47,6 +47,7 @@ export default function AnnouncementsPage() {
   };
 
   const [userRole, setUserRole] = useState<string | null>(null);
+  const [selectedAnnouncement, setSelectedAnnouncement] = useState<Announcement | null>(null);
 
   const fetchAnnouncements = useCallback(async () => {
     setLoading(true);
@@ -77,8 +78,13 @@ export default function AnnouncementsPage() {
         `)
         .order('created_at', { ascending: false });
 
-      if (role && role !== 'admin' && role !== 'management') {
-        query = query.or(`target_role.eq.${role},target_role.is.null`);
+      if (role !== 'admin' && role !== 'management') {
+        if (role) {
+          query = query.or(`target_role.eq.${role},target_role.is.null`);
+        } else {
+          // If no role found, only show public announcements (target_role is null)
+          query = query.is('target_role', null);
+        }
       }
 
       const { data, error } = await query;
@@ -419,7 +425,10 @@ export default function AnnouncementsPage() {
                             +12
                           </div>
                         </div>
-                        <button className="text-indigo-600 font-black text-sm flex items-center gap-2 hover:gap-3 transition-all">
+                        <button 
+                          onClick={() => setSelectedAnnouncement(announcement)}
+                          className="text-indigo-600 font-black text-sm flex items-center gap-2 hover:gap-3 transition-all"
+                        >
                           عرض التفاصيل
                           <ArrowRight className="h-4 w-4 rtl:rotate-180" />
                         </button>
@@ -433,6 +442,68 @@ export default function AnnouncementsPage() {
             </AnimatePresence>
           </div>
         )}
+
+        {/* Announcement Detail Modal */}
+        <Dialog.Root open={!!selectedAnnouncement} onOpenChange={(open) => !open && setSelectedAnnouncement(null)}>
+          <Dialog.Portal>
+            <Dialog.Overlay className="fixed inset-0 bg-slate-900/40 backdrop-blur-xl z-[100] animate-in fade-in duration-300" />
+            <Dialog.Content className="fixed left-[50%] top-[50%] z-[101] w-full max-w-3xl translate-x-[-50%] translate-y-[-50%] rounded-[3.5rem] bg-white p-12 shadow-2xl focus:outline-none max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-300" dir="rtl">
+              {selectedAnnouncement && (
+                <div className="space-y-10">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-6">
+                      <div className={`h-20 w-20 rounded-[2.5rem] flex items-center justify-center shadow-xl ${getAudienceColor(selectedAnnouncement.target_role).split(' ')[0]}`}>
+                        <Bell className={`h-10 w-10 ${getAudienceColor(selectedAnnouncement.target_role).split(' ')[1]}`} />
+                      </div>
+                      <div>
+                        <Dialog.Title className="text-4xl font-black text-slate-900 tracking-tight leading-tight">
+                          {selectedAnnouncement.title}
+                        </Dialog.Title>
+                        <div className="flex flex-wrap items-center gap-4 mt-3 text-sm font-bold text-slate-500">
+                          <div className="flex items-center gap-2 bg-slate-50 px-4 py-1.5 rounded-2xl border border-slate-100">
+                            <Calendar className="h-4 w-4 text-indigo-500" />
+                            <span dir="ltr">{new Date(selectedAnnouncement.created_at).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                          </div>
+                          <div className={`flex items-center gap-2 px-4 py-1.5 rounded-2xl border ${getAudienceColor(selectedAnnouncement.target_role)}`}>
+                            <Users className="h-4 w-4" />
+                            <span>{getAudienceLabel(selectedAnnouncement.target_role)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <Dialog.Close className="h-12 w-12 flex items-center justify-center rounded-2xl hover:bg-slate-100 transition-colors">
+                      <X className="h-8 w-8 text-slate-400" />
+                    </Dialog.Close>
+                  </div>
+
+                  {selectedAnnouncement.image_url && (
+                    <div className="relative w-full aspect-video rounded-[2.5rem] overflow-hidden border border-slate-100 shadow-sm">
+                      <Image 
+                        src={selectedAnnouncement.image_url} 
+                        alt={selectedAnnouncement.title} 
+                        fill
+                        className="object-cover"
+                        referrerPolicy="no-referrer"
+                      />
+                    </div>
+                  )}
+
+                  <div className="prose prose-2xl prose-slate max-w-none text-slate-600 whitespace-pre-wrap leading-relaxed font-medium bg-slate-50/30 p-10 rounded-[3rem] border border-slate-100/50">
+                    {selectedAnnouncement.content}
+                  </div>
+
+                  <div className="flex justify-center pt-4">
+                    <Dialog.Close asChild>
+                      <button className="px-12 py-5 rounded-3xl bg-indigo-600 text-white font-black shadow-2xl shadow-indigo-100 hover:bg-indigo-700 transition-all active:scale-95">
+                        إغلاق الإعلان
+                      </button>
+                    </Dialog.Close>
+                  </div>
+                </div>
+              )}
+            </Dialog.Content>
+          </Dialog.Portal>
+        </Dialog.Root>
 
         {/* Delete Confirmation Modal */}
         <Dialog.Root open={!!announcementToDelete} onOpenChange={(open) => !open && setAnnouncementToDelete(null)}>

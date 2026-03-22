@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { Users, GraduationCap, BookOpen, CalendarDays, Plus, Bell, School, ArrowUpRight, Activity } from 'lucide-react';
 import Link from 'next/link';
 import { motion } from 'motion/react';
+import AnnouncementsWidget from '@/components/AnnouncementsWidget';
 
 const containerVariants: any = {
   hidden: { opacity: 0 },
@@ -254,6 +255,10 @@ export default function AdminDashboard() {
 
         {/* Quick Actions & Notifications */}
         <div className="space-y-8">
+          
+          {/* Announcements Widget */}
+          <AnnouncementsWidget role="admin" />
+
           <motion.div 
             variants={itemVariants}
             className="bg-white/70 backdrop-blur-xl rounded-[2.5rem] p-8 shadow-sm ring-1 ring-slate-200/50"

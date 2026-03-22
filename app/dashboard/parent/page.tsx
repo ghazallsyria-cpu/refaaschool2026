@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import Link from 'next/link';
+import AnnouncementsWidget from '@/components/AnnouncementsWidget';
 
 export default function ParentDashboard() {
   const [parentData, setParentData] = useState<any>(null);
@@ -186,6 +187,10 @@ export default function ParentDashboard() {
 
         {/* Quick Links & Support */}
         <div className="space-y-8">
+          
+          {/* Announcements Widget */}
+          <AnnouncementsWidget role="parent" />
+
           <div className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-sm ring-1 ring-slate-200/50 p-6 hover:shadow-md transition-all">
             <h2 className="text-xl font-bold text-slate-900 mb-6">روابط سريعة</h2>
             <div className="grid grid-cols-2 gap-3">

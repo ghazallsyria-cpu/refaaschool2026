@@ -12,6 +12,7 @@ import { motion } from 'motion/react';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { arSA } from 'date-fns/locale';
+import AnnouncementsWidget from '@/components/AnnouncementsWidget';
 
 export default function TeacherDashboard() {
   const [teacherData, setTeacherData] = useState<any>(null);
@@ -385,6 +386,9 @@ export default function TeacherDashboard() {
         {/* Sidebar Content - Right 1 Column */}
         <div className="space-y-8">
           
+          {/* Announcements Widget */}
+          <AnnouncementsWidget role="teacher" />
+
           {/* Recent Assignments */}
           <div className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-sm ring-1 ring-slate-200/50 overflow-hidden hover:shadow-md transition-all">
             <div className="p-6 border-b border-slate-100/50 flex items-center justify-between bg-white/50">

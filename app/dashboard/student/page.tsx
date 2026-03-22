@@ -16,6 +16,7 @@ import {
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { arSA } from 'date-fns/locale';
+import AnnouncementsWidget from '@/components/AnnouncementsWidget';
 
 export default function StudentDashboard() {
   const [studentData, setStudentData] = useState<any>(null);
@@ -301,6 +302,9 @@ export default function StudentDashboard() {
         {/* Sidebar Content - Right 1 Column */}
         <div className="space-y-8">
           
+          {/* Announcements Widget */}
+          <AnnouncementsWidget role="student" />
+
           {/* Attendance Widget */}
           <div className="rounded-3xl bg-white/80 backdrop-blur-xl p-6 shadow-sm ring-1 ring-slate-200/50 hover:shadow-md transition-all">
             <h2 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-2">

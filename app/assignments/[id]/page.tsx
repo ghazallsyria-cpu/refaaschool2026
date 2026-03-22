@@ -23,7 +23,7 @@ type Assignment = {
   file_url: string;
   subjects?: { name: string };
   sections?: { name: string; classes?: { name: string } };
-  teachers?: { users?: { full_name: string } };
+  teachers?: { users?: { id: string; full_name: string } };
 };
 
 type Submission = {
@@ -159,7 +159,7 @@ export default function AssignmentDetailsPage({ params }: { params: Promise<{ id
           file_url,
           subjects (name),
           sections (name, classes (name)),
-          teachers (users (full_name))
+          teachers (users (id, full_name))
         `)
         .eq('id', assignmentId)
         .single();
@@ -309,6 +309,18 @@ export default function AssignmentDetailsPage({ params }: { params: Promise<{ id
 
       const { error: answersError } = await supabase.from('assignment_answers').insert(answersPayload);
       if (answersError) throw answersError;
+
+      // Notify teacher
+      if (assignment?.teachers?.users?.id) {
+        await supabase.from('notifications').insert([{
+          user_id: assignment.teachers.users.id,
+          type: 'assignment',
+          title: 'تسليم واجب جديد',
+          content: `قام الطالب بتسليم الواجب: ${assignment.title}`,
+          link: `/assignments/${assignmentId}`,
+          is_read: false
+        }]);
+      }
 
       showNotification('success', 'تم تسليم الواجب بنجاح!');
       await fetchData();

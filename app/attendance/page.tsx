@@ -219,17 +219,29 @@ export default function AttendancePage() {
       
       // Send Notifications for absent/late students
       try {
-        const notificationPromises = records
-          .filter(r => r.status === 'absent' || r.status === 'late')
-          .map(async (record) => {
-            // Get user_id for the student
+        const absentLateRecords = records.filter(r => r.status === 'absent' || r.status === 'late');
+        
+        if (absentLateRecords.length > 0) {
+          const notificationPayloads: any[] = [];
+          
+          for (const record of absentLateRecords) {
             const student = students.find(s => s.id === record.student_id);
-            if (student && student.users) {
+            if (student) {
               const statusText = record.status === 'absent' ? 'غائب' : 'متأخر';
-              console.log(`Notification: ${student.id} - تنبيه حضور - تم تسجيلك كـ ${statusText} بتاريخ ${record.date}`);
+              notificationPayloads.push({
+                user_id: student.id,
+                title: 'تنبيه حضور',
+                content: `تم تسجيلك كـ ${statusText} بتاريخ ${record.date}`,
+                type: 'attendance',
+                link: '/attendance'
+              });
             }
-          });
-        await Promise.all(notificationPromises);
+          }
+
+          if (notificationPayloads.length > 0) {
+            await supabase.from('notifications').insert(notificationPayloads);
+          }
+        }
       } catch (notifErr) {
         console.error('Error sending attendance notifications:', notifErr);
       }

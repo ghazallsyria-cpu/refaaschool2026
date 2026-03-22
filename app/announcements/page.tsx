@@ -139,10 +139,14 @@ export default function AnnouncementsPage() {
           const { data: targetUsers } = await usersQuery;
 
           if (targetUsers && targetUsers.length > 0) {
-            const notificationPromises = targetUsers.map(user => {
-              console.log(`Notification: ${user.id} - إعلان جديد - ${payload.title}`);
-            });
-            await Promise.all(notificationPromises);
+            const notificationPayloads = targetUsers.map(user => ({
+              user_id: user.id,
+              title: 'إعلان جديد',
+              content: payload.title,
+              type: 'announcement',
+              link: '/announcements'
+            }));
+            await supabase.from('notifications').insert(notificationPayloads);
           }
         } catch (notifErr) {
           console.error('Error sending announcement notifications:', notifErr);

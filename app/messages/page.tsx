@@ -68,7 +68,7 @@ export default function MessagesPage() {
           ? activeThread.sender_id 
           : (activeThread.sender_id === user.id ? activeThread.receiver_id : activeThread.sender_id);
 
-        const { error } = await supabase
+        const { data: sentMsg, error } = await supabase
           .from('messages')
           .insert([{
             sender_id: user.id,
@@ -77,9 +77,21 @@ export default function MessagesPage() {
             subject: activeThread.subject,
             content: replyContent,
             is_read: false
-          }]);
+          }])
+          .select()
+          .single();
 
         if (error) throw error;
+
+        // Send notification to receiver
+        await supabase.from('notifications').insert([{
+          user_id: receiverId,
+          type: 'message',
+          title: 'رسالة جديدة',
+          content: `لديك رسالة جديدة من ${currentUser?.full_name || 'مستخدم'}: ${activeThread.subject}`,
+          link: '/messages',
+          is_read: false
+        }]);
       }
 
       setReplyContent('');
@@ -488,7 +500,7 @@ export default function MessagesPage() {
         if (!response.ok) throw new Error(result.error || 'حدث خطأ أثناء إرسال الرسالة الجماعية');
       } else {
         // Individual message
-        const { error } = await supabase
+        const { data: sentMsg, error } = await supabase
           .from('messages')
           .insert([{
             sender_id: user.id,
@@ -496,9 +508,21 @@ export default function MessagesPage() {
             subject: newMessage.subject,
             content: newMessage.content,
             is_read: false
-          }]);
+          }])
+          .select()
+          .single();
 
         if (error) throw error;
+
+        // Send notification to receiver
+        await supabase.from('notifications').insert([{
+          user_id: newMessage.receiver_id,
+          type: 'message',
+          title: 'رسالة جديدة',
+          content: `لديك رسالة جديدة من ${currentUser?.full_name || 'مستخدم'}: ${newMessage.subject}`,
+          link: '/messages',
+          is_read: false
+        }]);
       }
       
       showNotification('success', isGroupMessage ? 'تم إرسال الرسالة الجماعية بنجاح' : 'تم إرسال الرسالة بنجاح');
@@ -544,10 +568,16 @@ export default function MessagesPage() {
         const { data: targetUsers } = await usersQuery;
 
         if (targetUsers && targetUsers.length > 0) {
-          const notificationPromises = targetUsers.map(u => {
-            console.log(`Notification: ${u.id} - إعلان جديد - ${newAnnouncement.title}`);
-          });
-          await Promise.all(notificationPromises);
+          const notifications = targetUsers.map(u => ({
+            user_id: u.id,
+            type: 'announcement',
+            title: 'إعلان جديد',
+            content: `تم نشر إعلان جديد: ${newAnnouncement.title}`,
+            link: '/messages',
+            is_read: false
+          }));
+          
+          await supabase.from('notifications').insert(notifications);
         }
       } catch (notifErr) {
         console.error('Error sending announcement notifications:', notifErr);

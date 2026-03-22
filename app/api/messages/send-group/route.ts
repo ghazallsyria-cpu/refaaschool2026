@@ -55,7 +55,19 @@ export async function POST(req: Request) {
       throw insertError;
     }
 
-    console.log('Messages inserted successfully');
+    // 5. Send notifications
+    const notifications = students.map(student => ({
+      user_id: student.id,
+      type: 'message',
+      title: 'رسالة جماعية جديدة',
+      content: `لديك رسالة جماعية جديدة: ${subject}`,
+      link: '/messages',
+      is_read: false
+    }));
+
+    await supabase.from('notifications').insert(notifications);
+
+    console.log('Messages and notifications inserted successfully');
     return NextResponse.json({ success: true });
   } catch (error: any) {
     console.error('Error in send-group API:', error);

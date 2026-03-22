@@ -198,7 +198,14 @@ export default function TakeQuiz() {
           const studentName = userData.user?.user_metadata?.full_name || 'طالب';
 
           if (examInfo?.teacher_id) {
-            console.log(`Notification: ${examInfo.teacher_id} - تسليم اختبار جديد - قام الطالب ${studentName} بتسليم اختبار: ${examInfo.title}`);
+            await supabase.from('notifications').insert([{
+              user_id: examInfo.teacher_id,
+              type: 'exam',
+              title: 'تسليم اختبار جديد',
+              content: `قام الطالب ${studentName} بتسليم اختبار: ${examInfo.title}`,
+              link: `/exams/results/${params.id}`,
+              is_read: false
+            }]);
           }
         } catch (notifErr) {
           console.error('Error sending teacher notification:', notifErr);

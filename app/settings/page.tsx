@@ -271,19 +271,17 @@ export default function SettingsPage() {
                 الملف الشخصي
               </button>
             )}
-            {!isStudent && (
-              <button
-                onClick={() => setActiveTab('notifications')}
-                className={`flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-colors ${
-                  activeTab === 'notifications' 
-                    ? 'bg-indigo-50 text-indigo-700' 
-                    : 'text-slate-700 hover:bg-slate-50 hover:text-slate-900'
-                }`}
-              >
-                <Bell className={`h-5 w-5 ${activeTab === 'notifications' ? 'text-indigo-700' : 'text-slate-400'}`} />
-                الإشعارات
-              </button>
-            )}
+            <button
+              onClick={() => setActiveTab('notifications')}
+              className={`flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-colors ${
+                activeTab === 'notifications' 
+                  ? 'bg-indigo-50 text-indigo-700' 
+                  : 'text-slate-700 hover:bg-slate-50 hover:text-slate-900'
+              }`}
+            >
+              <Bell className={`h-5 w-5 ${activeTab === 'notifications' ? 'text-indigo-700' : 'text-slate-400'}`} />
+              الإشعارات
+            </button>
             <button
               onClick={() => setActiveTab('security')}
               className={`flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-colors ${

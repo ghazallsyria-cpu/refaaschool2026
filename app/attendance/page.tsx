@@ -134,11 +134,14 @@ export default function AttendancePage() {
 
         if (attendanceError) throw attendanceError;
         
-        setStudentAttendance(attendanceData || []);
+        setStudentAttendance(attendanceData?.filter(a => a.status === 'absent') || []);
         
         const stats = { present: 0, absent: 0, late: 0, excused: 0 };
         attendanceData?.forEach(a => {
-          stats[a.status as AttendanceStatus]++;
+          const status = a.status as AttendanceStatus;
+          if (stats[status] !== undefined) {
+            stats[status]++;
+          }
         });
         setStudentStats(stats);
         return;

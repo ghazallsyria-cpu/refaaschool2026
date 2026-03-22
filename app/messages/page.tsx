@@ -296,7 +296,7 @@ export default function MessagesPage() {
         .order('created_at', { ascending: false });
 
       if (currentUserData?.role === 'student') {
-        query = query.eq('target_role', 'student');
+        query = query.or(`target_role.eq.student,target_role.is.null`);
       } else if (currentUserData?.role === 'parent') {
         query = query.or(`target_role.eq.parent,target_role.is.null`);
       }
@@ -633,7 +633,7 @@ export default function MessagesPage() {
               <Plus className="ml-2 h-5 w-5" />
               رسالة جديدة
             </button>
-          ) : currentUser?.role !== 'teacher' ? (
+          ) : (currentUser?.role === 'admin' || currentUser?.role === 'management') ? (
             <button 
               onClick={() => setShowNewAnnouncement(true)}
               className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 px-8 py-3.5 text-sm font-bold text-white shadow-xl shadow-emerald-200 hover:shadow-emerald-300 transition-all active:scale-95"

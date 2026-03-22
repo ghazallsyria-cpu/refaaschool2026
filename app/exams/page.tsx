@@ -446,7 +446,9 @@ export default function ExamsDashboard() {
                             <CheckCircle className="h-5 w-5 text-emerald-600" />
                             <span className="text-sm font-black text-emerald-700">مكتمل</span>
                           </div>
-                          <span className="text-lg font-black text-emerald-600">{exam.studentAttempt.score}%</span>
+                          <span className="text-lg font-black text-emerald-600">
+                            {exam.studentAttempt.score !== null ? `${exam.studentAttempt.score}%` : 'قيد التقييم'}
+                          </span>
                         </div>
                       ) : (
                         <Link href={`/exams/take/${exam.id}`} className="w-full">

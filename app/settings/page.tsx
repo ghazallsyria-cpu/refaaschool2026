@@ -15,10 +15,11 @@ import {
 type Tab = 'school' | 'profile' | 'notifications' | 'security' | 'platform';
 
 export default function SettingsPage() {
-  const [activeTab, setActiveTab] = useState<Tab>('school');
+  const [activeTab, setActiveTab] = useState<Tab>('profile');
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState({ text: '', type: '' });
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isStudent, setIsStudent] = useState(false);
 
   const [platformSettings, setPlatformSettings] = useState({
     id: '',
@@ -85,6 +86,10 @@ export default function SettingsPage() {
         
         if (userData?.role === 'admin' || userData?.role === 'management') {
           setIsAdmin(true);
+          setActiveTab('school');
+        } else if (userData?.role === 'student') {
+          setIsStudent(true);
+          setActiveTab('security');
         }
       }
 
@@ -253,28 +258,32 @@ export default function SettingsPage() {
                 إعدادات المدرسة
               </button>
             )}
-            <button
-              onClick={() => setActiveTab('profile')}
-              className={`flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-colors ${
-                activeTab === 'profile' 
-                  ? 'bg-indigo-50 text-indigo-700' 
-                  : 'text-slate-700 hover:bg-slate-50 hover:text-slate-900'
-              }`}
-            >
-              <User className={`h-5 w-5 ${activeTab === 'profile' ? 'text-indigo-700' : 'text-slate-400'}`} />
-              الملف الشخصي
-            </button>
-            <button
-              onClick={() => setActiveTab('notifications')}
-              className={`flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-colors ${
-                activeTab === 'notifications' 
-                  ? 'bg-indigo-50 text-indigo-700' 
-                  : 'text-slate-700 hover:bg-slate-50 hover:text-slate-900'
-              }`}
-            >
-              <Bell className={`h-5 w-5 ${activeTab === 'notifications' ? 'text-indigo-700' : 'text-slate-400'}`} />
-              الإشعارات
-            </button>
+            {!isStudent && (
+              <button
+                onClick={() => setActiveTab('profile')}
+                className={`flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-colors ${
+                  activeTab === 'profile' 
+                    ? 'bg-indigo-50 text-indigo-700' 
+                    : 'text-slate-700 hover:bg-slate-50 hover:text-slate-900'
+                }`}
+              >
+                <User className={`h-5 w-5 ${activeTab === 'profile' ? 'text-indigo-700' : 'text-slate-400'}`} />
+                الملف الشخصي
+              </button>
+            )}
+            {!isStudent && (
+              <button
+                onClick={() => setActiveTab('notifications')}
+                className={`flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-colors ${
+                  activeTab === 'notifications' 
+                    ? 'bg-indigo-50 text-indigo-700' 
+                    : 'text-slate-700 hover:bg-slate-50 hover:text-slate-900'
+                }`}
+              >
+                <Bell className={`h-5 w-5 ${activeTab === 'notifications' ? 'text-indigo-700' : 'text-slate-400'}`} />
+                الإشعارات
+              </button>
+            )}
             <button
               onClick={() => setActiveTab('security')}
               className={`flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-colors ${

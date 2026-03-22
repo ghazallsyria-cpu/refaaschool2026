@@ -249,7 +249,7 @@ export default function AnnouncementsPage() {
             <p className="text-xl text-slate-500 font-medium max-w-2xl">إدارة ونشر الإعلانات الموجهة لمجتمع المدرسة بكفاءة وشفافية.</p>
           </div>
           
-          {userRole !== 'student' && userRole !== 'parent' && (
+          { (userRole === 'admin' || userRole === 'management') && (
             <motion.button 
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
@@ -360,7 +360,7 @@ export default function AnnouncementsPage() {
                           </div>
                         </div>
                         
-                        {userRole !== 'student' && userRole !== 'parent' && (
+                        { (userRole === 'admin' || userRole === 'management') && (
                           <div className="flex gap-3 opacity-0 group-hover:opacity-100 transition-all translate-x-4 group-hover:translate-x-0">
                             <motion.button 
                               whileHover={{ scale: 1.1 }}

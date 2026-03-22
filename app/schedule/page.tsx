@@ -6,7 +6,6 @@ import { Printer, User, Users, Info, X, Plus, Calendar, AlertCircle } from 'luci
 import { cn } from '@/lib/utils';
 
 const DAYS = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
-const PERIODS = [1, 2, 3, 4, 5];
 
 export default function SchedulePage() {
   const [viewType, setViewType] = useState<'teacher' | 'section'>('teacher');
@@ -15,6 +14,7 @@ export default function SchedulePage() {
   const [subjects, setSubjects] = useState<any[]>([]);
   const [selectedId, setSelectedId] = useState<string>('');
   const [scheduleData, setScheduleData] = useState<any[]>([]);
+  const [periods, setPeriods] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -46,17 +46,19 @@ export default function SchedulePage() {
         setIsAdmin(false);
       }
 
-      const [teachersRes, sectionsRes, subjectsRes, assignmentsRes] = await Promise.all([
+      const [teachersRes, sectionsRes, subjectsRes, assignmentsRes, periodsRes] = await Promise.all([
         supabase.from('teachers').select('id, specialization, users(full_name)'),
         supabase.from('sections').select('id, name, classes(name)'),
         supabase.from('subjects').select('id, name'),
-        supabase.from('teacher_sections').select('teacher_id, section_id, subject_id')
+        supabase.from('teacher_sections').select('teacher_id, section_id, subject_id'),
+        supabase.from('class_periods').select('*').order('period_number')
       ]);
 
       if (teachersRes.data) setTeachers(teachersRes.data);
       if (sectionsRes.data) setSections(sectionsRes.data);
       if (subjectsRes.data) setSubjects(subjectsRes.data);
       if (assignmentsRes.data) setAssignments(assignmentsRes.data);
+      if (periodsRes.data) setPeriods(periodsRes.data);
 
       if (currentUserRole === 'teacher' && user) {
         setSelectedId(user.id);
@@ -679,10 +681,10 @@ export default function SchedulePage() {
                   <div className="h-14 flex items-center justify-center bg-slate-50 rounded-xl border border-slate-100">
                     <span className="text-xs font-black text-slate-400 uppercase tracking-widest">اليوم / الحصة</span>
                   </div>
-                  {PERIODS.map(p => (
-                    <div key={p} className="h-14 flex flex-col items-center justify-center bg-slate-50 rounded-xl border border-slate-100">
-                      <span className="text-xs font-black text-slate-900">الحصة {p}</span>
-                      <span className="text-[10px] text-slate-400 font-bold">08:00 - 08:45</span>
+                  {periods.map(p => (
+                    <div key={p.id} className="h-14 flex flex-col items-center justify-center bg-slate-50 rounded-xl border border-slate-100">
+                      <span className="text-xs font-black text-slate-900">الحصة {p.period_number}</span>
+                      <span className="text-[10px] text-slate-400 font-bold">{p.start_time.slice(0, 5)} - {p.end_time.slice(0, 5)}</span>
                     </div>
                   ))}
 
@@ -697,7 +699,8 @@ export default function SchedulePage() {
                     <div className="font-bold text-center p-4 bg-slate-50 rounded-lg flex items-center justify-center">
                       {day}
                     </div>
-                    {PERIODS.map(period => {
+                    {periods.map(p => {
+                      const period = p.period_number;
                       const slot = scheduleData.find(s => 
                         s.day_of_week === dayIndex && 
                         s.period === period && 
@@ -850,14 +853,15 @@ export default function SchedulePage() {
             <thead>
               <tr>
                 <th className="w-32">اليوم / الحصة</th>
-                {PERIODS.map(p => <th key={p}>الحصة {p}</th>)}
+                {periods.map(p => <th key={p.id}>الحصة {p.period_number}</th>)}
               </tr>
             </thead>
             <tbody>
               {DAYS.map((day, dayIndex) => (
                 <tr key={day}>
                   <td className="font-bold bg-slate-50">{day}</td>
-                  {PERIODS.map(period => {
+                  {periods.map(p => {
+                    const period = p.period_number;
                     const slot = scheduleData.find(s => 
                       s.day_of_week === dayIndex && 
                       s.period === period && 
@@ -871,7 +875,7 @@ export default function SchedulePage() {
                     ) : [];
 
                     return (
-                      <td key={period} className="h-28">
+                      <td key={p.id} className="h-28">
                         {slot ? (
                           <div className="flex flex-col items-center justify-center h-full gap-1">
                             <div className="font-bold text-sm text-indigo-800">{slot.subjects?.name}</div>

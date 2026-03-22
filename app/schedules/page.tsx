@@ -33,6 +33,13 @@ type Schedule = {
   teachers?: { users?: { full_name: string } };
 };
 
+type Period = {
+  id: string;
+  period_number: number;
+  start_time: string;
+  end_time: string;
+};
+
 const DAYS = [
   { id: 1, name: 'الأحد' },
   { id: 2, name: 'الإثنين' },
@@ -41,10 +48,9 @@ const DAYS = [
   { id: 5, name: 'الخميس' },
 ];
 
-const PERIODS = [1, 2, 3, 4, 5];
-
 export default function SchedulesPage() {
   const [sections, setSections] = useState<Section[]>([]);
+  const [periods, setPeriods] = useState<Period[]>([]);
   const [selectedSectionId, setSelectedSectionId] = useState<string>('');
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [teacherAssignments, setTeacherAssignments] = useState<any[]>([]); // New state
@@ -88,17 +94,19 @@ export default function SchedulesPage() {
   const fetchInitialData = async () => {
     setLoading(true);
     try {
-      const [sectionsRes, subjectsRes, teachersRes, assignmentsRes] = await Promise.all([
+      const [sectionsRes, subjectsRes, teachersRes, assignmentsRes, periodsRes] = await Promise.all([
         supabase.from('sections').select('id, name, classes(name)').order('name'),
         supabase.from('subjects').select('id, name').order('name'),
         supabase.from('teachers').select('id, users(full_name)'),
-        supabase.from('teacher_sections').select('teacher_id, section_id, subject_id')
+        supabase.from('teacher_sections').select('teacher_id, section_id, subject_id'),
+        supabase.from('class_periods').select('*').order('period_number')
       ]);
 
       if (sectionsRes.data) setSections((sectionsRes.data as unknown) as Section[]);
       if (subjectsRes.data) setSubjects((subjectsRes.data as unknown) as Subject[]);
       if (teachersRes.data) setTeachers((teachersRes.data as unknown) as Teacher[]);
       if (assignmentsRes.data) setTeacherAssignments(assignmentsRes.data);
+      if (periodsRes.data) setPeriods(periodsRes.data);
       
       if (sectionsRes.data && sectionsRes.data.length > 0) {
         setSelectedSectionId(sectionsRes.data[0].id);
@@ -321,9 +329,10 @@ export default function SchedulesPage() {
                   <th scope="col" className="py-3.5 px-4 text-center text-sm font-semibold text-slate-900 border-l border-slate-200 w-32 bg-slate-100">
                     اليوم / الحصة
                   </th>
-                  {PERIODS.map(period => (
-                    <th key={period} scope="col" className="py-3.5 px-4 text-center text-sm font-semibold text-slate-900 border-l border-slate-200 min-w-[140px]">
-                      الحصة {period}
+                  {periods.map(period => (
+                    <th key={period.id} scope="col" className="py-3.5 px-4 text-center text-sm font-semibold text-slate-900 border-l border-slate-200 min-w-[140px]">
+                      الحصة {period.period_number}<br/>
+                      <span className="text-xs font-normal text-slate-500">{period.start_time.slice(0,5)} - {period.end_time.slice(0,5)}</span>
                     </th>
                   ))}
                 </tr>
@@ -334,13 +343,13 @@ export default function SchedulesPage() {
                     <td className="whitespace-nowrap py-4 px-4 text-sm font-bold text-slate-900 border-l border-slate-200 text-center bg-slate-50">
                       {day.name}
                     </td>
-                    {PERIODS.map(period => {
-                      const cellData = getCellData(day.id, period);
+                    {periods.map(period => {
+                      const cellData = getCellData(day.id, period.period_number);
                       return (
                         <td 
-                          key={`${day.id}-${period}`} 
+                          key={`${day.id}-${period.period_number}`} 
                           className="relative p-2 border-l border-slate-200 h-24 align-top group cursor-pointer hover:bg-indigo-50/50 transition-colors"
-                          onClick={() => openCellModal(day.id, period, cellData)}
+                          onClick={() => openCellModal(day.id, period.period_number, cellData)}
                         >
                           {cellData ? (
                             <div className="h-full flex flex-col justify-between bg-indigo-50 rounded-md p-2 border border-indigo-100">

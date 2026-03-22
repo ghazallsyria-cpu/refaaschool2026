@@ -104,6 +104,10 @@ export default function AttendancePage() {
     }
   }, [selectedSection, date]);
 
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const [studentStats, setStudentStats] = useState<any>(null);
+  const [studentAttendance, setStudentAttendance] = useState<any[]>([]);
+
   const fetchSections = useCallback(async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -116,11 +120,31 @@ export default function AttendancePage() {
         .eq('id', user.id)
         .single();
       
-      console.log('User Role:', userData?.role);
+      const role = userData?.role;
+      setUserRole(role);
+      console.log('User Role:', role);
+
+      if (role === 'student') {
+        // Fetch student's own attendance
+        const { data: attendanceData, error: attendanceError } = await supabase
+          .from('attendance')
+          .select('status, date')
+          .eq('student_id', user.id)
+          .order('date', { ascending: false });
+
+        if (attendanceError) throw attendanceError;
+        
+        setStudentAttendance(attendanceData || []);
+        
+        const stats = { present: 0, absent: 0, late: 0, excused: 0 };
+        attendanceData?.forEach(a => {
+          stats[a.status as AttendanceStatus]++;
+        });
+        setStudentStats(stats);
+        return;
+      }
 
       let sectionsData: any[] = [];
-
-      const role = userData?.role;
       const isTeacher = role === 'teacher' || (typeof role === 'string' && role.includes('teacher'));
       const isAdmin = role === 'admin' || (typeof role === 'string' && role.includes('admin'));
 
@@ -224,6 +248,90 @@ export default function AttendancePage() {
     });
     setAttendance(newAttendance);
   };
+
+  if (userRole === 'student') {
+    return (
+      <div className="space-y-10 max-w-6xl mx-auto pb-24 p-4 sm:p-8">
+        <div className="space-y-2">
+          <h1 className="text-4xl font-black text-slate-900 tracking-tight">سجل الحضور والغياب</h1>
+          <p className="text-lg text-slate-500 font-medium">إحصائيات وسجل حضورك الشخصي</p>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+          <div className="glass-card p-6 rounded-3xl border border-emerald-100 bg-emerald-50/30 flex flex-col items-center justify-center text-center gap-3 shadow-xl shadow-emerald-100/20">
+            <div className="h-14 w-14 rounded-2xl bg-emerald-100 flex items-center justify-center text-emerald-600">
+              <CheckCircle2 className="h-7 w-7" />
+            </div>
+            <div>
+              <p className="text-sm font-black text-emerald-600/70 uppercase tracking-widest mb-1">حاضر</p>
+              <p className="text-4xl font-black text-emerald-600">{studentStats?.present || 0}</p>
+            </div>
+          </div>
+          <div className="glass-card p-6 rounded-3xl border border-red-100 bg-red-50/30 flex flex-col items-center justify-center text-center gap-3 shadow-xl shadow-red-100/20">
+            <div className="h-14 w-14 rounded-2xl bg-red-100 flex items-center justify-center text-red-600">
+              <XCircle className="h-7 w-7" />
+            </div>
+            <div>
+              <p className="text-sm font-black text-red-600/70 uppercase tracking-widest mb-1">غائب</p>
+              <p className="text-4xl font-black text-red-600">{studentStats?.absent || 0}</p>
+            </div>
+          </div>
+          <div className="glass-card p-6 rounded-3xl border border-amber-100 bg-amber-50/30 flex flex-col items-center justify-center text-center gap-3 shadow-xl shadow-amber-100/20">
+            <div className="h-14 w-14 rounded-2xl bg-amber-100 flex items-center justify-center text-amber-600">
+              <Clock className="h-7 w-7" />
+            </div>
+            <div>
+              <p className="text-sm font-black text-amber-600/70 uppercase tracking-widest mb-1">متأخر</p>
+              <p className="text-4xl font-black text-amber-600">{studentStats?.late || 0}</p>
+            </div>
+          </div>
+          <div className="glass-card p-6 rounded-3xl border border-blue-100 bg-blue-50/30 flex flex-col items-center justify-center text-center gap-3 shadow-xl shadow-blue-100/20">
+            <div className="h-14 w-14 rounded-2xl bg-blue-100 flex items-center justify-center text-blue-600">
+              <AlertCircle className="h-7 w-7" />
+            </div>
+            <div>
+              <p className="text-sm font-black text-blue-600/70 uppercase tracking-widest mb-1">بعذر</p>
+              <p className="text-4xl font-black text-blue-600">{studentStats?.excused || 0}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="glass-card rounded-[2.5rem] shadow-2xl shadow-slate-200/50 border border-white/60 overflow-hidden">
+          <div className="p-8 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+            <h2 className="text-2xl font-black text-slate-800 tracking-tight">سجل الأيام السابقة</h2>
+          </div>
+          <div className="p-8">
+            {studentAttendance.length === 0 ? (
+              <div className="text-center py-12">
+                <Calendar className="h-12 w-12 text-slate-300 mx-auto mb-4" />
+                <p className="text-slate-500 font-medium">لا يوجد سجل حضور متاح لك حتى الآن.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                {studentAttendance.map((record, idx) => (
+                  <div key={idx} className="flex items-center justify-between p-4 rounded-2xl border border-slate-100 bg-white shadow-sm">
+                    <span className="text-sm font-bold text-slate-600" dir="ltr">
+                      {new Date(record.date).toLocaleDateString('ar-EG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                    </span>
+                    <span className={`px-3 py-1 rounded-xl text-xs font-black ${
+                      record.status === 'present' ? 'bg-emerald-100 text-emerald-700' :
+                      record.status === 'absent' ? 'bg-red-100 text-red-700' :
+                      record.status === 'late' ? 'bg-amber-100 text-amber-700' :
+                      'bg-blue-100 text-blue-700'
+                    }`}>
+                      {record.status === 'present' ? 'حاضر' :
+                       record.status === 'absent' ? 'غائب' :
+                       record.status === 'late' ? 'متأخر' : 'بعذر'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-10 max-w-6xl mx-auto pb-24">

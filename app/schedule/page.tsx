@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Printer, User, Users, Info, X, Plus } from 'lucide-react';
+import { Printer, User, Users, Info, X, Plus, Calendar } from 'lucide-react';
 
 const DAYS = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
 const PERIODS = [1, 2, 3, 4, 5];
@@ -39,7 +39,7 @@ export default function SchedulePage() {
         currentUserRole = profile?.role || null;
         setUserRole(currentUserRole);
         
-        const isSystemAdmin = profile?.role === 'admin' || profile?.role === 'management' || user.email === 'ghazallsyria@gmail.com';
+        const isSystemAdmin = profile?.role === 'admin' || profile?.role === 'management';
         setIsAdmin(isSystemAdmin);
       } else {
         setIsAdmin(false);
@@ -61,6 +61,18 @@ export default function SchedulePage() {
         setSelectedId(user.id);
         setViewType('teacher');
         setShowAllSchedules(false);
+      } else if (currentUserRole === 'student' && user) {
+        const { data: studentData } = await supabase
+          .from('students')
+          .select('section_id')
+          .eq('id', user.id)
+          .single();
+        
+        if (studentData?.section_id) {
+          setSelectedId(studentData.section_id);
+          setViewType('section');
+          setShowAllSchedules(false);
+        }
       } else if (teachersRes.data?.[0]) {
         setSelectedId(teachersRes.data[0].id);
       }
@@ -573,9 +585,23 @@ export default function SchedulePage() {
         </p>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm ring-1 ring-slate-200 overflow-hidden print:shadow-none print:ring-0 print:border-0">
-        <div className="overflow-x-auto print:hidden">
-          <div className="min-w-[800px] p-6">
+      {!selectedId && !showAllSchedules ? (
+        <div className="bg-white rounded-xl shadow-sm ring-1 ring-slate-200 p-12 text-center">
+          <div className="mx-auto h-24 w-24 bg-slate-50 rounded-full flex items-center justify-center mb-4">
+            <Calendar className="h-10 w-10 text-slate-400" />
+          </div>
+          <h3 className="text-xl font-bold text-slate-900 mb-2">لا يوجد جدول متاح</h3>
+          <p className="text-slate-500">
+            {userRole === 'student' 
+              ? 'لم يتم تعيينك في فصل دراسي بعد، أو لا يوجد جدول متاح لصفك.' 
+              : 'يرجى اختيار معلم أو فصل لعرض الجدول الدراسي.'}
+          </p>
+        </div>
+      ) : (
+        <>
+          <div className="bg-white rounded-xl shadow-sm ring-1 ring-slate-200 overflow-hidden print:shadow-none print:ring-0 print:border-0">
+            <div className="overflow-x-auto print:hidden">
+              <div className="min-w-[800px] p-6">
             <div className="grid grid-cols-6 gap-3">
               {/* Header Row */}
               <div className="font-bold text-center p-4 bg-slate-100 rounded-lg flex items-center justify-center">
@@ -743,6 +769,7 @@ export default function SchedulePage() {
             </div>
           </div>
         </div>
+        </div>
 
         {/* Vertical Table for Print (Days as Rows) */}
         <div className="hidden print:block p-4">
@@ -813,7 +840,8 @@ export default function SchedulePage() {
             </div>
           </div>
         </div>
-      </div>
+        </>
+      )}
     </div>
   );
 }

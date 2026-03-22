@@ -53,7 +53,7 @@ export default function ClassesPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         const { data: userData } = await supabase.from('users').select('role').eq('id', user.id).single();
-        if (userData?.role === 'admin' || userData?.role === 'management' || user.email === 'ghazallsyria@gmail.com') {
+        if (userData?.role === 'admin' || userData?.role === 'management') {
           setIsAdmin(true);
         }
       }

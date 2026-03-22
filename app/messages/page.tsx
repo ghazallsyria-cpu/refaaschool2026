@@ -229,28 +229,79 @@ export default function MessagesPage() {
     setTimeout(() => setNotification(null), 5000);
   };
 
-  const fetchUsers = useCallback(async () => {
+  const fetchUsers = useCallback(async (currentUserData?: any) => {
     try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('id, full_name, role')
-        .order('full_name');
-      if (error) throw error;
-      setUsers(data || []);
+      if (currentUserData?.role === 'student') {
+        // Fetch student's section
+        const { data: studentData } = await supabase
+          .from('students')
+          .select('section_id')
+          .eq('id', currentUserData.id)
+          .single();
+
+        if (studentData?.section_id) {
+          // Fetch teachers for this section
+          const { data: teacherSections } = await supabase
+            .from('teacher_sections')
+            .select('teacher_id')
+            .eq('section_id', studentData.section_id);
+
+          const teacherIds = teacherSections?.map(ts => ts.teacher_id) || [];
+          
+          if (teacherIds.length > 0) {
+            const { data, error } = await supabase
+              .from('users')
+              .select('id, full_name, role')
+              .or(`id.in.(${teacherIds.join(',')}),role.in.(admin,management)`)
+              .order('full_name');
+            if (error) throw error;
+            setUsers(data || []);
+          } else {
+            const { data, error } = await supabase
+              .from('users')
+              .select('id, full_name, role')
+              .in('role', ['admin', 'management'])
+              .order('full_name');
+            setUsers(data || []);
+          }
+        } else {
+          const { data, error } = await supabase
+            .from('users')
+            .select('id, full_name, role')
+            .in('role', ['admin', 'management'])
+            .order('full_name');
+          setUsers(data || []);
+        }
+      } else {
+        const { data, error } = await supabase
+          .from('users')
+          .select('id, full_name, role')
+          .order('full_name');
+        if (error) throw error;
+        setUsers(data || []);
+      }
     } catch (error) {
       console.error('Error fetching users:', error);
     }
   }, []);
 
-  const fetchAnnouncements = useCallback(async () => {
+  const fetchAnnouncements = useCallback(async (currentUserData?: any) => {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('announcements')
         .select(`
           *,
           author:author_id(full_name)
         `)
         .order('created_at', { ascending: false });
+
+      if (currentUserData?.role === 'student') {
+        query = query.eq('target_role', 'student');
+      } else if (currentUserData?.role === 'parent') {
+        query = query.or(`target_role.eq.parent,target_role.is.null`);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
       setAnnouncements(data || []);
@@ -325,9 +376,9 @@ export default function MessagesPage() {
           setTeacherSections(uniqueSections.filter(Boolean));
         }
         fetchMessages();
-        fetchAnnouncements();
+        fetchAnnouncements(userData);
+        fetchUsers(userData);
       }
-      fetchUsers();
     } catch (error) {
       console.error('Error fetching initial data:', error);
     }
@@ -979,21 +1030,23 @@ export default function MessagesPage() {
                             <User className="h-10 w-10" />
                           </div>
                           <span className="text-xl font-black text-slate-900">معلم / إدارة</span>
-                          <p className="text-sm text-slate-500 font-medium mt-2">مراسلة الزملاء أو الطاقم الإداري</p>
+                          <p className="text-sm text-slate-500 font-medium mt-2">مراسلة المعلمين أو الإدارة</p>
                         </button>
-                        <button
-                          onClick={() => {
-                            setRecipientType('student');
-                            setStep(2);
-                          }}
-                          className="flex flex-col items-center justify-center p-10 rounded-[2.5rem] border-2 border-slate-100 hover:border-emerald-600 hover:bg-emerald-50/50 transition-all group"
-                        >
-                          <div className="h-20 w-20 rounded-3xl bg-emerald-50 flex items-center justify-center text-emerald-600 mb-6 group-hover:scale-110 transition-transform">
-                            <Users className="h-10 w-10" />
-                          </div>
-                          <span className="text-xl font-black text-slate-900">طالب</span>
-                          <p className="text-sm text-slate-500 font-medium mt-2">مراسلة الطلاب في صفوفك</p>
-                        </button>
+                        {currentUser?.role !== 'student' && (
+                          <button
+                            onClick={() => {
+                              setRecipientType('student');
+                              setStep(2);
+                            }}
+                            className="flex flex-col items-center justify-center p-10 rounded-[2.5rem] border-2 border-slate-100 hover:border-emerald-600 hover:bg-emerald-50/50 transition-all group"
+                          >
+                            <div className="h-20 w-20 rounded-3xl bg-emerald-50 flex items-center justify-center text-emerald-600 mb-6 group-hover:scale-110 transition-transform">
+                              <Users className="h-10 w-10" />
+                            </div>
+                            <span className="text-xl font-black text-slate-900">طالب</span>
+                            <p className="text-sm text-slate-500 font-medium mt-2">مراسلة الطلاب في صفوفك</p>
+                          </button>
+                        )}
                       </div>
                     )}
 

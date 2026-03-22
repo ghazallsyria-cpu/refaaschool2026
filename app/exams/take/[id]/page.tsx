@@ -78,22 +78,49 @@ export default function TakeQuiz() {
         setTimeLeft(examData.duration * 60);
       }
 
-      // Create initial attempt
+      // Create or resume attempt
       const { data: user } = await supabase.auth.getUser();
       if (user.user) {
-        // In a real app, we'd check for existing ongoing attempts
-        const { data: attempt, error: attemptError } = await supabase
+        // Check for existing attempt
+        const { data: existingAttempt, error: existingError } = await supabase
           .from('exam_attempts')
-          .insert([{
-            exam_id: params.id,
-            student_id: user.user.id,
-            status: 'ongoing'
-          }])
-          .select()
-          .single();
-        
-        if (attemptError) console.error('Error creating attempt:', attemptError);
-        else setAttemptId(attempt.id);
+          .select('id, status, score')
+          .eq('exam_id', params.id)
+          .eq('student_id', user.user.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (existingError) {
+          console.error('Error checking existing attempt:', existingError);
+        }
+
+        if (existingAttempt) {
+          if (existingAttempt.status === 'completed' || existingAttempt.status === 'graded') {
+            // Already completed, redirect or show message
+            alert('لقد قمت بإتمام هذا الاختبار مسبقاً.');
+            window.location.href = '/exams';
+            return;
+          } else {
+            // Resume ongoing attempt
+            setAttemptId(existingAttempt.id);
+            // Optionally, fetch saved answers here if implemented
+          }
+        } else {
+          // Create new attempt
+          const { data: newAttempt, error: attemptError } = await supabase
+            .from('exam_attempts')
+            .insert([{
+              exam_id: params.id,
+              student_id: user.user.id,
+              status: 'ongoing'
+            }])
+            .select()
+            .single();
+          
+          if (attemptError) console.error('Error creating attempt:', attemptError);
+          else setAttemptId(newAttempt.id);
+        }
       }
 
     } catch (err) {

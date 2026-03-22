@@ -56,7 +56,7 @@ export function Sidebar({ onClose, userRole = 'admin' }: { onClose?: () => void,
     }
     
     if (userRole === 'student') {
-      return ['لوحة التحكم', 'الحضور والغياب', 'الاختبارات والدرجات', 'الجدول الدراسي', 'الواجبات', 'الرسائل', 'الإعلانات'].includes(item.name);
+      return ['لوحة التحكم', 'الحضور والغياب', 'الاختبارات والدرجات', 'الجدول الدراسي', 'الواجبات', 'الرسائل'].includes(item.name);
     }
     
     if (userRole === 'parent') {

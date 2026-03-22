@@ -42,10 +42,26 @@ export default function AnnouncementsPage() {
     setTimeout(() => setNotification(null), 5000);
   };
 
+  const [userRole, setUserRole] = useState<string | null>(null);
+
   const fetchAnnouncements = useCallback(async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      const { data: sessionData } = await supabase.auth.getSession();
+      const session = sessionData.session;
+      
+      let role = null;
+      if (session?.user?.id) {
+        const { data: userData } = await supabase
+          .from('users')
+          .select('role')
+          .eq('id', session.user.id)
+          .single();
+        role = userData?.role || null;
+        setUserRole(role);
+      }
+
+      let query = supabase
         .from('announcements')
         .select(`
           id,
@@ -55,6 +71,12 @@ export default function AnnouncementsPage() {
           created_at
         `)
         .order('created_at', { ascending: false });
+
+      if (role === 'student' || role === 'parent') {
+        query = query.or(`target_role.eq.${role},target_role.is.null`);
+      }
+
+      const { data, error } = await query;
 
       if (error) {
         console.error('Error fetching announcements:', error);
@@ -227,15 +249,17 @@ export default function AnnouncementsPage() {
             <p className="text-xl text-slate-500 font-medium max-w-2xl">إدارة ونشر الإعلانات الموجهة لمجتمع المدرسة بكفاءة وشفافية.</p>
           </div>
           
-          <motion.button 
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={openAddModal}
-            className="inline-flex items-center justify-center gap-3 rounded-3xl bg-indigo-600 px-10 py-5 text-base font-black text-white shadow-2xl shadow-indigo-200 hover:bg-indigo-700 transition-all self-start md:self-end"
-          >
-            <Plus className="h-6 w-6" />
-            إضافة إعلان جديد
-          </motion.button>
+          {userRole !== 'student' && userRole !== 'parent' && (
+            <motion.button 
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={openAddModal}
+              className="inline-flex items-center justify-center gap-3 rounded-3xl bg-indigo-600 px-10 py-5 text-base font-black text-white shadow-2xl shadow-indigo-200 hover:bg-indigo-700 transition-all self-start md:self-end"
+            >
+              <Plus className="h-6 w-6" />
+              إضافة إعلان جديد
+            </motion.button>
+          )}
         </motion.div>
 
         {/* Filters Section */}
@@ -336,24 +360,26 @@ export default function AnnouncementsPage() {
                           </div>
                         </div>
                         
-                        <div className="flex gap-3 opacity-0 group-hover:opacity-100 transition-all translate-x-4 group-hover:translate-x-0">
-                          <motion.button 
-                            whileHover={{ scale: 1.1 }}
-                            whileTap={{ scale: 0.9 }}
-                            onClick={() => openEditModal(announcement)}
-                            className="h-12 w-12 flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-2xl transition-all shadow-sm bg-white border border-slate-100"
-                          >
-                            <Edit2 className="h-5 w-5" />
-                          </motion.button>
-                          <motion.button 
-                            whileHover={{ scale: 1.1 }}
-                            whileTap={{ scale: 0.9 }}
-                            onClick={() => setAnnouncementToDelete(announcement.id)}
-                            className="h-12 w-12 flex items-center justify-center text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-2xl transition-all shadow-sm bg-white border border-slate-100"
-                          >
-                            <Trash2 className="h-5 w-5" />
-                          </motion.button>
-                        </div>
+                        {userRole !== 'student' && userRole !== 'parent' && (
+                          <div className="flex gap-3 opacity-0 group-hover:opacity-100 transition-all translate-x-4 group-hover:translate-x-0">
+                            <motion.button 
+                              whileHover={{ scale: 1.1 }}
+                              whileTap={{ scale: 0.9 }}
+                              onClick={() => openEditModal(announcement)}
+                              className="h-12 w-12 flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-2xl transition-all shadow-sm bg-white border border-slate-100"
+                            >
+                              <Edit2 className="h-5 w-5" />
+                            </motion.button>
+                            <motion.button 
+                              whileHover={{ scale: 1.1 }}
+                              whileTap={{ scale: 0.9 }}
+                              onClick={() => setAnnouncementToDelete(announcement.id)}
+                              className="h-12 w-12 flex items-center justify-center text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-2xl transition-all shadow-sm bg-white border border-slate-100"
+                            >
+                              <Trash2 className="h-5 w-5" />
+                            </motion.button>
+                          </div>
+                        )}
                       </div>
                       
                       <div className="prose prose-xl prose-slate max-w-none text-slate-600 whitespace-pre-wrap leading-relaxed font-medium bg-slate-50/30 p-8 rounded-[2rem] border border-slate-100/50">

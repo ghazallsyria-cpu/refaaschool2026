@@ -29,6 +29,7 @@ type Exam = {
     avg_score: number;
     total_students: number;
   };
+  studentAttempt?: any;
 };
 
 export default function ExamsDashboard() {
@@ -102,12 +103,25 @@ export default function ExamsDashboard() {
 
       if (error) throw error;
 
-      // Fetch real stats for each exam
+      // Fetch real stats for each exam and student attempts if role is student
       const examsWithStats = await Promise.all((data || []).map(async (exam) => {
         const [questionsRes, attemptsRes] = await Promise.all([
           supabase.from('questions').select('id', { count: 'exact', head: true }).eq('exam_id', exam.id),
           supabase.from('exam_attempts').select('score', { count: 'exact' }).eq('exam_id', exam.id)
         ]);
+
+        let studentAttempt = null;
+        if (role === 'student' && session?.user?.id) {
+          const { data: attemptData } = await supabase
+            .from('exam_attempts')
+            .select('id, status, score')
+            .eq('exam_id', exam.id)
+            .eq('student_id', session.user.id)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          studentAttempt = attemptData;
+        }
 
         const attempts = attemptsRes.data || [];
         const avgScore = attempts.length > 0 
@@ -123,7 +137,8 @@ export default function ExamsDashboard() {
           stats: {
             avg_score: avgScore,
             total_students: attemptsRes.count || 0
-          }
+          },
+          studentAttempt
         };
       }));
 
@@ -425,16 +440,26 @@ export default function ExamsDashboard() {
                         </Link>
                       </>
                     ) : (
-                      <Link href={`/exams/take/${exam.id}`} className="w-full">
-                        <motion.button 
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.98 }}
-                          className="w-full h-14 rounded-2xl bg-indigo-600 text-white text-sm font-black shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all flex items-center justify-center gap-3"
-                        >
-                          <Play className="h-5 w-5" />
-                          <span>بدء الاختبار</span>
-                        </motion.button>
-                      </Link>
+                      (exam.studentAttempt?.status === 'completed' || exam.studentAttempt?.status === 'graded') ? (
+                        <div className="w-full flex items-center justify-between px-4 py-3 bg-emerald-50 rounded-2xl border border-emerald-100">
+                          <div className="flex items-center gap-3">
+                            <CheckCircle className="h-5 w-5 text-emerald-600" />
+                            <span className="text-sm font-black text-emerald-700">مكتمل</span>
+                          </div>
+                          <span className="text-lg font-black text-emerald-600">{exam.studentAttempt.score}%</span>
+                        </div>
+                      ) : (
+                        <Link href={`/exams/take/${exam.id}`} className="w-full">
+                          <motion.button 
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                            className="w-full h-14 rounded-2xl bg-indigo-600 text-white text-sm font-black shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all flex items-center justify-center gap-3"
+                          >
+                            <Play className="h-5 w-5" />
+                            <span>{exam.studentAttempt?.status === 'ongoing' ? 'متابعة الاختبار' : 'بدء الاختبار'}</span>
+                          </motion.button>
+                        </Link>
+                      )
                     )}
                   </div>
                 </motion.div>

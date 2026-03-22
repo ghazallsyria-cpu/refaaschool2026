@@ -83,7 +83,7 @@ export default function SettingsPage() {
           });
         }
         
-        if (userData?.role === 'admin' || userData?.role === 'management' || user.email === 'ghazallsyria@gmail.com') {
+        if (userData?.role === 'admin' || userData?.role === 'management') {
           setIsAdmin(true);
         }
       }

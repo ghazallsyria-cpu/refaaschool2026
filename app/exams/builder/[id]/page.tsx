@@ -122,7 +122,7 @@ export default function QuizBuilder() {
       let userIsAdmin = false;
       if (user) {
         const { data: userData } = await supabase.from('users').select('role').eq('id', user.id).single();
-        if (userData?.role === 'admin' || userData?.role === 'management' || user.email === 'ghazallsyria@gmail.com') {
+        if (userData?.role === 'admin' || userData?.role === 'management') {
           userIsAdmin = true;
           setIsAdmin(true);
           const { data: teachersData } = await supabase.from('users').select('id, full_name').eq('role', 'teacher');

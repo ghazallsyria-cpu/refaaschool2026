@@ -67,7 +67,7 @@ export default function ExamResults() {
           *,
           student:students(
             id, 
-            users(full_name, email),
+            users(full_name),
             section:sections(name, classes(name))
           )
         `)
@@ -84,7 +84,6 @@ export default function ExamResults() {
           ...a,
           student: {
             full_name: studentData?.users?.full_name || 'طالب غير معروف',
-            email: studentData?.users?.email || '',
             section_name: sectionName
           }
         };
@@ -133,8 +132,7 @@ export default function ExamResults() {
 
     if (searchQuery) {
       filteredAttempts = filteredAttempts.filter(a => 
-        a.student.full_name.includes(searchQuery) || 
-        a.student.email.includes(searchQuery)
+        a.student.full_name.includes(searchQuery)
       );
     }
 
@@ -201,19 +199,17 @@ export default function ExamResults() {
   const filteredAttempts = attempts.filter(a => {
     const matchesSection = selectedSection === 'all' || a.student.section_name === selectedSection;
     const matchesSearch = !searchQuery || 
-      a.student.full_name.includes(searchQuery) || 
-      a.student.email.includes(searchQuery);
+      a.student.full_name.includes(searchQuery);
     return matchesSection && matchesSearch;
   });
 
   const exportToExcel = () => {
     const data = filteredAttempts.map(a => ({
       'الطالب': a.student.full_name,
-      'البريد الإلكتروني': a.student.email,
       'الفصل': a.student.section_name,
       'تاريخ التقديم': new Date(a.completed_at).toLocaleDateString('ar-SA'),
       'الدرجة (%)': a.score,
-      'الحالة': a.score >= 50 ? 'ناجح' : 'راسب'
+      'الحالة': a.score >= (exam?.passing_score || 50) ? 'ناجح' : 'راسب'
     }));
 
     const ws = XLSX.utils.json_to_sheet(data);
@@ -227,36 +223,8 @@ export default function ExamResults() {
     XLSX.writeFile(wb, `${exam?.title || 'نتائج_الاختبار'}.xlsx`);
   };
 
-  const exportToPDF = async () => {
-    try {
-      // Use html2canvas to capture the hidden printable area
-      const html2canvas = (await import('html2canvas')).default;
-      const element = document.getElementById('printable-area');
-      if (!element) return;
-
-      // Make it temporarily visible for capture
-      element.style.display = 'block';
-
-      const canvas = await html2canvas(element, {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: '#ffffff'
-      });
-
-      element.style.display = 'none';
-
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-      
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-      pdf.save(`${exam?.title || 'نتائج_الاختبار'}.pdf`);
-    } catch (error) {
-      console.error('Error generating PDF:', error);
-      alert('حدث خطأ أثناء إنشاء ملف PDF');
-    }
+  const exportToPDF = () => {
+    window.print();
   };
 
   if (loading) {
@@ -268,69 +236,92 @@ export default function ExamResults() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto p-4 sm:p-8 space-y-10 pb-24">
+    <div className="max-w-7xl mx-auto p-4 sm:p-8 space-y-10 pb-24 print:m-0 print:p-0">
+      <style jsx global>{`
+        @media print {
+          @page {
+            size: A4 portrait;
+            margin: 1cm;
+          }
+          body {
+            background: white !important;
+            color: black !important;
+            -webkit-print-color-adjust: exact;
+          }
+          .no-print {
+            display: none !important;
+          }
+          .print-only {
+            display: block !important;
+          }
+          .glass-card {
+            box-shadow: none !important;
+            border: 1px solid #e2e8f0 !important;
+            background: white !important;
+          }
+        }
+      `}</style>
+      
       {/* Hidden Printable Area for PDF Export */}
-      <div style={{ position: 'absolute', top: '-9999px', left: '-9999px', width: '800px' }}>
-        <div id="printable-area" style={{ display: 'none' }} className="p-8 bg-white w-full" dir="rtl">
-          <div className="text-center mb-8 border-b-2 border-slate-200 pb-6">
-            <h1 className="text-3xl font-black text-slate-900 mb-2">{exam?.title}</h1>
-            <p className="text-lg text-slate-600 font-bold">{exam?.subject?.name}</p>
-            <p className="text-sm text-slate-500 mt-2">تاريخ التقرير: {new Date().toLocaleDateString('ar-SA')}</p>
-          </div>
-          
-          <div className="grid grid-cols-4 gap-4 mb-8">
-            <div className="bg-slate-50 p-4 rounded-xl text-center border border-slate-100">
-              <p className="text-xs text-slate-500 font-bold mb-1">متوسط الدرجات</p>
-              <p className="text-xl font-black text-indigo-600">{stats?.avg_score}%</p>
-            </div>
-            <div className="bg-slate-50 p-4 rounded-xl text-center border border-slate-100">
-              <p className="text-xs text-slate-500 font-bold mb-1">نسبة النجاح</p>
-              <p className="text-xl font-black text-emerald-600">{stats?.pass_rate}%</p>
-            </div>
-            <div className="bg-slate-50 p-4 rounded-xl text-center border border-slate-100">
-              <p className="text-xs text-slate-500 font-bold mb-1">أعلى درجة</p>
-              <p className="text-xl font-black text-blue-600">{stats?.max_score}%</p>
-            </div>
-            <div className="bg-slate-50 p-4 rounded-xl text-center border border-slate-100">
-              <p className="text-xs text-slate-500 font-bold mb-1">المحاولات</p>
-              <p className="text-xl font-black text-amber-600">{stats?.total_attempts}</p>
-            </div>
-          </div>
-
-          <h2 className="text-xl font-black text-slate-900 mb-4">نتائج الطلاب التفصيلية</h2>
-          <table className="w-full text-right border-collapse">
-            <thead>
-              <tr className="bg-slate-100 text-slate-700 text-sm font-black">
-                <th className="p-3 border border-slate-200">الطالب</th>
-                <th className="p-3 border border-slate-200">الفصل</th>
-                <th className="p-3 border border-slate-200">تاريخ التقديم</th>
-                <th className="p-3 border border-slate-200">الدرجة</th>
-                <th className="p-3 border border-slate-200">الحالة</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredAttempts.map((attempt) => (
-                <tr key={attempt.id} className="border-b border-slate-100">
-                  <td className="p-3 text-sm font-bold text-slate-900 border border-slate-200">{attempt.student.full_name}</td>
-                  <td className="p-3 text-sm text-slate-600 border border-slate-200">{attempt.student.section_name}</td>
-                  <td className="p-3 text-sm text-slate-600 border border-slate-200">
-                    {new Date(attempt.completed_at).toLocaleDateString('ar-SA')}
-                  </td>
-                  <td className="p-3 text-sm font-black text-indigo-600 border border-slate-200" dir="ltr">{attempt.score}%</td>
-                  <td className="p-3 text-sm font-bold border border-slate-200">
-                    <span className={attempt.score >= 50 ? 'text-emerald-600' : 'text-red-600'}>
-                      {attempt.score >= 50 ? 'ناجح' : 'راسب'}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      <div className="hidden print:block w-full" dir="rtl">
+        <div className="text-center mb-8 border-b-2 border-slate-200 pb-6">
+          <h1 className="text-3xl font-black text-slate-900 mb-2">{exam?.title}</h1>
+          <p className="text-lg text-slate-600 font-bold">{exam?.subject?.name}</p>
+          <p className="text-sm text-slate-500 mt-2">تاريخ التقرير: {new Date().toLocaleDateString('ar-SA')}</p>
         </div>
+        
+        <div className="grid grid-cols-4 gap-4 mb-8">
+          <div className="bg-slate-50 p-4 rounded-xl text-center border border-slate-100">
+            <p className="text-xs text-slate-500 font-bold mb-1">متوسط الدرجات</p>
+            <p className="text-xl font-black text-indigo-600">{stats?.avg_score}%</p>
+          </div>
+          <div className="bg-slate-50 p-4 rounded-xl text-center border border-slate-100">
+            <p className="text-xs text-slate-500 font-bold mb-1">نسبة النجاح</p>
+            <p className="text-xl font-black text-emerald-600">{stats?.pass_rate}%</p>
+          </div>
+          <div className="bg-slate-50 p-4 rounded-xl text-center border border-slate-100">
+            <p className="text-xs text-slate-500 font-bold mb-1">أعلى درجة</p>
+            <p className="text-xl font-black text-blue-600">{stats?.max_score}%</p>
+          </div>
+          <div className="bg-slate-50 p-4 rounded-xl text-center border border-slate-100">
+            <p className="text-xs text-slate-500 font-bold mb-1">المحاولات</p>
+            <p className="text-xl font-black text-amber-600">{stats?.total_attempts}</p>
+          </div>
+        </div>
+
+        <h2 className="text-xl font-black text-slate-900 mb-4 mt-8">نتائج الطلاب التفصيلية</h2>
+        <table className="w-full text-right border-collapse">
+          <thead>
+            <tr className="bg-slate-100 text-slate-700 text-sm font-black">
+              <th className="p-3 border border-slate-200">الطالب</th>
+              <th className="p-3 border border-slate-200">الفصل</th>
+              <th className="p-3 border border-slate-200">تاريخ التقديم</th>
+              <th className="p-3 border border-slate-200">الدرجة</th>
+              <th className="p-3 border border-slate-200">الحالة</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredAttempts.map((attempt) => (
+              <tr key={attempt.id} className="border-b border-slate-100">
+                <td className="p-3 text-sm font-bold text-slate-900 border border-slate-200">{attempt.student.full_name}</td>
+                <td className="p-3 text-sm text-slate-600 border border-slate-200">{attempt.student.section_name}</td>
+                <td className="p-3 text-sm text-slate-600 border border-slate-200">
+                  {new Date(attempt.completed_at).toLocaleDateString('ar-SA')}
+                </td>
+                <td className="p-3 text-sm font-black text-indigo-600 border border-slate-200" dir="ltr">{attempt.score}%</td>
+                <td className="p-3 text-sm font-bold border border-slate-200">
+                  <span className={attempt.score >= 50 ? 'text-emerald-600' : 'text-red-600'}>
+                    {attempt.score >= 50 ? 'ناجح' : 'راسب'}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
 
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-8">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 print:hidden">
         <div className="flex items-center gap-6">
           <button 
             onClick={() => router.back()}
@@ -368,7 +359,7 @@ export default function ExamResults() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 print:hidden">
         {[
           { label: 'متوسط الدرجات', value: `${stats?.avg_score}%`, icon: BarChart2, color: 'text-indigo-600', bg: 'bg-indigo-50' },
           { label: 'نسبة النجاح', value: `${stats?.pass_rate}%`, icon: CheckCircle, color: 'text-emerald-600', bg: 'bg-emerald-50' },
@@ -394,7 +385,7 @@ export default function ExamResults() {
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-10 print:hidden">
         {/* Main Chart */}
         <div className="lg:col-span-2 glass-card p-8 rounded-4xl border border-white/60 shadow-2xl shadow-slate-200/50 space-y-8">
           <div className="flex items-center justify-between">
@@ -501,121 +492,132 @@ export default function ExamResults() {
         </div>
       </div>
 
-      {/* Student Results Table */}
-      <div className="glass-card rounded-4xl border border-white/60 shadow-2xl shadow-slate-200/50 overflow-hidden">
-        <div className="p-8 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-6">
-          <div>
-            <h3 className="text-2xl font-black text-slate-900 tracking-tight">نتائج الطلاب التفصيلية</h3>
-            <p className="text-slate-500 font-bold">قائمة كاملة بمحاولات الطلاب ودرجاتهم</p>
-          </div>
-          <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
-            <div className="relative group max-w-xs w-full">
-              <Filter className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 group-focus-within:text-indigo-600 transition-colors" />
-              <select
-                value={selectedSection}
-                onChange={(e) => setSelectedSection(e.target.value)}
-                className="w-full pr-12 pl-4 py-4 rounded-2xl border-0 bg-slate-50 ring-1 ring-inset ring-slate-100 text-sm font-bold focus:ring-2 focus:ring-indigo-600 outline-none transition-all appearance-none"
-              >
-                <option value="all">جميع الفصول</option>
-                {availableSections.map(section => (
-                  <option key={section} value={section}>{section}</option>
-                ))}
-              </select>
-            </div>
-            <div className="relative group max-w-xs w-full">
-              <Search className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 group-focus-within:text-indigo-600 transition-colors" />
-              <input 
-                type="text" 
-                placeholder="البحث عن طالب..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pr-12 pl-4 py-4 rounded-2xl border-0 bg-slate-50 ring-1 ring-inset ring-slate-100 text-sm font-bold focus:ring-2 focus:ring-indigo-600 outline-none transition-all"
-              />
-            </div>
-          </div>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-right">
-            <thead>
-              <tr className="bg-slate-50/50 text-slate-400 text-xs font-black uppercase tracking-widest">
-                <th className="px-8 py-6">الطالب</th>
-                <th className="px-8 py-6">الفصل</th>
-                <th className="px-8 py-6">تاريخ التقديم</th>
-                <th className="px-8 py-6">الوقت المستغرق</th>
-                <th className="px-8 py-6">الدرجة</th>
-                <th className="px-8 py-6">الحالة</th>
-                <th className="px-8 py-6 text-left">الإجراءات</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filteredAttempts.map((attempt) => (
-                <tr key={attempt.id} className="hover:bg-slate-50/50 transition-all group">
-                  <td className="px-8 py-6">
-                    <div className="flex items-center gap-4">
-                      <div className="h-12 w-12 rounded-2xl bg-indigo-100 flex items-center justify-center text-indigo-700 font-black text-lg shadow-inner">
-                        {attempt.student.full_name.charAt(0)}
-                      </div>
-                      <div>
-                        <p className="text-base font-black text-slate-900 tracking-tight">{attempt.student.full_name}</p>
-                        <p className="text-xs text-slate-500 font-bold">{attempt.student.email}</p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-8 py-6 text-sm font-bold text-slate-600">
-                    <span className="px-3 py-1 rounded-xl bg-slate-100 text-slate-600 text-xs font-bold">
-                      {attempt.student.section_name}
-                    </span>
-                  </td>
-                  <td className="px-8 py-6 text-sm font-bold text-slate-600">
-                    {new Date(attempt.completed_at).toLocaleDateString('ar-SA', { year: 'numeric', month: 'long', day: 'numeric' })}
-                  </td>
-                  <td className="px-8 py-6 text-sm font-bold text-slate-600">
-                    <div className="flex items-center gap-2">
-                      <Clock className="h-4 w-4 text-slate-400" />
-                      <span>
-                        {Math.round((new Date(attempt.completed_at).getTime() - new Date(attempt.started_at).getTime()) / 60000)} دقيقة
-                      </span>
-                    </div>
-                  </td>
-                  <td className="px-8 py-6">
-                    <div className="flex items-center gap-4">
-                      <div className="flex-1 h-2 w-24 bg-slate-100 rounded-full overflow-hidden shadow-inner">
-                        <div 
-                          className={`h-full rounded-full transition-all duration-1000 ${attempt.score >= 50 ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.3)]' : 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.3)]'}`}
-                          style={{ width: `${attempt.score}%` }}
-                        />
-                      </div>
-                      <span className={`text-base font-black tracking-tighter ${attempt.score >= 50 ? 'text-emerald-600' : 'text-red-600'}`}>
-                        {attempt.score}%
-                      </span>
-                    </div>
-                  </td>
-                  <td className="px-8 py-6">
-                    <span className={`inline-flex px-4 py-1.5 rounded-xl text-xs font-black uppercase tracking-widest border ${
-                      attempt.score >= 50 
-                        ? 'bg-emerald-50 text-emerald-700 border-emerald-100' 
-                        : 'bg-red-50 text-red-700 border-red-100'
-                    }`}>
-                      {attempt.score >= 50 ? 'ناجح' : 'راسب'}
-                    </span>
-                  </td>
-                  <td className="px-8 py-6 text-left">
-                    <button className="h-10 w-10 flex items-center justify-center rounded-xl bg-white shadow-sm border border-slate-100 text-slate-400 hover:text-indigo-600 hover:border-indigo-100 hover:shadow-md transition-all active:scale-95">
-                      <ChevronRight className="h-5 w-5 rotate-180" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-              {filteredAttempts.length === 0 && (
-                <tr>
-                  <td colSpan={7} className="px-8 py-12 text-center text-slate-500 font-bold">
-                    لا توجد نتائج مطابقة للبحث
-                  </td>
-                </tr>
+      {/* Student Results Tables */}
+      <div className="space-y-8 print:hidden">
+        {Object.entries(
+          filteredAttempts.reduce((acc, attempt) => {
+            const section = attempt.student.section_name;
+            if (!acc[section]) acc[section] = [];
+            acc[section].push(attempt);
+            return acc;
+          }, {} as Record<string, typeof filteredAttempts>)
+        ).map(([sectionName, sectionAttempts], index) => (
+          <div key={sectionName} className="glass-card rounded-4xl border border-white/60 shadow-2xl shadow-slate-200/50 overflow-hidden">
+            <div className="p-8 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+              <div>
+                <h3 className="text-2xl font-black text-slate-900 tracking-tight">نتائج الطلاب - {sectionName}</h3>
+                <p className="text-slate-500 font-bold">قائمة كاملة بمحاولات الطلاب ودرجاتهم في هذا الفصل</p>
+              </div>
+              {index === 0 && (
+                <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
+                  <div className="relative group max-w-xs w-full">
+                    <Filter className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 group-focus-within:text-indigo-600 transition-colors" />
+                    <select
+                      value={selectedSection}
+                      onChange={(e) => setSelectedSection(e.target.value)}
+                      className="w-full pr-12 pl-4 py-4 rounded-2xl border-0 bg-slate-50 ring-1 ring-inset ring-slate-100 text-sm font-bold focus:ring-2 focus:ring-indigo-600 outline-none transition-all appearance-none"
+                    >
+                      <option value="all">جميع الفصول</option>
+                      {availableSections.map(section => (
+                        <option key={section} value={section}>{section}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="relative group max-w-xs w-full">
+                    <Search className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 group-focus-within:text-indigo-600 transition-colors" />
+                    <input 
+                      type="text" 
+                      placeholder="البحث عن طالب..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full pr-12 pl-4 py-4 rounded-2xl border-0 bg-slate-50 ring-1 ring-inset ring-slate-100 text-sm font-bold focus:ring-2 focus:ring-indigo-600 outline-none transition-all"
+                    />
+                  </div>
+                </div>
               )}
-            </tbody>
-          </table>
-        </div>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-right">
+                <thead>
+                  <tr className="bg-slate-50/50 text-slate-400 text-xs font-black uppercase tracking-widest">
+                    <th className="px-8 py-6">الطالب</th>
+                    <th className="px-8 py-6">الفصل</th>
+                    <th className="px-8 py-6">تاريخ التقديم</th>
+                    <th className="px-8 py-6">الوقت المستغرق</th>
+                    <th className="px-8 py-6">الدرجة</th>
+                    <th className="px-8 py-6">الحالة</th>
+                    <th className="px-8 py-6 text-left">الإجراءات</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {sectionAttempts.map((attempt) => (
+                    <tr key={attempt.id} className="hover:bg-slate-50/50 transition-all group">
+                      <td className="px-8 py-6">
+                        <div className="flex items-center gap-4">
+                          <div className="h-12 w-12 rounded-2xl bg-indigo-100 flex items-center justify-center text-indigo-700 font-black text-lg shadow-inner">
+                            {attempt.student.full_name.charAt(0)}
+                          </div>
+                          <div>
+                            <p className="text-base font-black text-slate-900 tracking-tight">{attempt.student.full_name}</p>
+                            <p className="text-xs text-slate-500 font-bold">{attempt.student.email}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-8 py-6 text-sm font-bold text-slate-600">
+                        <span className="px-3 py-1 rounded-xl bg-slate-100 text-slate-600 text-xs font-bold">
+                          {attempt.student.section_name}
+                        </span>
+                      </td>
+                      <td className="px-8 py-6 text-sm font-bold text-slate-600">
+                        {new Date(attempt.completed_at).toLocaleDateString('ar-SA', { year: 'numeric', month: 'long', day: 'numeric' })}
+                      </td>
+                      <td className="px-8 py-6 text-sm font-bold text-slate-600">
+                        <div className="flex items-center gap-2">
+                          <Clock className="h-4 w-4 text-slate-400" />
+                          <span>
+                            {Math.round((new Date(attempt.completed_at).getTime() - new Date(attempt.started_at).getTime()) / 60000)} دقيقة
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-8 py-6">
+                        <div className="flex items-center gap-4">
+                          <div className="flex-1 h-2 w-24 bg-slate-100 rounded-full overflow-hidden shadow-inner">
+                            <div 
+                              className={`h-full rounded-full transition-all duration-1000 ${attempt.score >= 50 ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.3)]' : 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.3)]'}`}
+                              style={{ width: `${attempt.score}%` }}
+                            />
+                          </div>
+                          <span className={`text-base font-black tracking-tighter ${attempt.score >= 50 ? 'text-emerald-600' : 'text-red-600'}`}>
+                            {attempt.score}%
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-8 py-6">
+                        <span className={`inline-flex px-4 py-1.5 rounded-xl text-xs font-black uppercase tracking-widest border ${
+                          attempt.score >= 50 
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-100' 
+                            : 'bg-red-50 text-red-700 border-red-100'
+                        }`}>
+                          {attempt.score >= 50 ? 'ناجح' : 'راسب'}
+                        </span>
+                      </td>
+                      <td className="px-8 py-6 text-left">
+                        <button className="h-10 w-10 flex items-center justify-center rounded-xl bg-white shadow-sm border border-slate-100 text-slate-400 hover:text-indigo-600 hover:border-indigo-100 hover:shadow-md transition-all active:scale-95">
+                          <ChevronRight className="h-5 w-5 rotate-180" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ))}
+        {filteredAttempts.length === 0 && (
+          <div className="glass-card rounded-4xl border border-white/60 shadow-2xl shadow-slate-200/50 overflow-hidden p-12 text-center">
+            <p className="text-slate-500 font-bold">لا توجد نتائج مطابقة للبحث</p>
+          </div>
+        )}
       </div>
     </div>
   );

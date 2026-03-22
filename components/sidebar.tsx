@@ -111,6 +111,7 @@ export function Sidebar({ onClose, userRole = 'admin' }: { onClose?: () => void,
               if (userRole === 'student') itemHref = '/dashboard/student';
               else if (userRole === 'teacher') itemHref = '/dashboard/teacher';
               else if (userRole === 'parent') itemHref = '/dashboard/parent';
+              else if (userRole === 'admin' || userRole === 'management') itemHref = '/dashboard';
             }
 
             const isActive = pathname === itemHref || (itemHref !== '/' && pathname?.startsWith(itemHref));

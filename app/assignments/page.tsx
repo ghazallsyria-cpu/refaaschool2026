@@ -288,10 +288,14 @@ export default function AssignmentsPage() {
 
           if (students && students.length > 0) {
             const subjectName = subjects.find(s => s.id === payload.subject_id)?.name || 'المادة';
-            const notificationPromises = students.map(student => {
-              console.log(`Notification: ${student.id} - واجب جديد - تمت إضافة واجب جديد في مادة ${subjectName}: ${payload.title}`);
-            });
-            await Promise.all(notificationPromises);
+            const notificationPayloads = students.map(student => ({
+              user_id: student.id,
+              title: 'واجب جديد',
+              content: `تمت إضافة واجب جديد في مادة ${subjectName}: ${payload.title}`,
+              type: 'assignment',
+              link: `/assignments/${newAssignment.id}`
+            }));
+            await supabase.from('notifications').insert(notificationPayloads);
           }
         } catch (notifErr) {
           console.error('Error sending assignment notifications:', notifErr);

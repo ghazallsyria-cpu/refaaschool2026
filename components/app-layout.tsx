@@ -80,31 +80,27 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         let authorized = true;
         if (session && !isPublicPage) {
           const isRoot = pathname === '/';
-          const isStudentDashboard = pathname.startsWith('/dashboard/student');
-          const isTeacherDashboard = pathname.startsWith('/dashboard/teacher');
-          const isParentDashboard = pathname.startsWith('/dashboard/parent');
-          const isAdminDashboard = pathname.startsWith('/dashboard/admin');
           const isDashboardRoute = pathname.startsWith('/dashboard');
-          const isAdminByEmail = session?.user?.email === 'ghazallsyria@gmail.com';
+          const isEmailAdmin = session?.user?.email === 'ghazallsyria@gmail.com';
 
           if (role === 'student') {
-            if (isRoot || (isDashboardRoute && !isStudentDashboard)) {
+            if (isRoot || (isDashboardRoute && !pathname.startsWith('/dashboard/student'))) {
               router.push('/dashboard/student');
               authorized = false;
             }
           } else if (role === 'teacher') {
-            if (isRoot || (isDashboardRoute && !isTeacherDashboard)) {
+            if (isRoot || (isDashboardRoute && !pathname.startsWith('/dashboard/teacher'))) {
               router.push('/dashboard/teacher');
               authorized = false;
             }
           } else if (role === 'parent') {
-            if (isRoot || (isDashboardRoute && !isParentDashboard)) {
+            if (isRoot || (isDashboardRoute && !pathname.startsWith('/dashboard/parent'))) {
               router.push('/dashboard/parent');
               authorized = false;
             }
-          } else if (role === 'admin' || role === 'management' || isAdminByEmail) {
-            if (isAdminDashboard) {
-              router.push('/');
+          } else if (role === 'admin' || role === 'management' || isEmailAdmin) {
+            if (isRoot) {
+              router.push('/dashboard');
               authorized = false;
             }
           }

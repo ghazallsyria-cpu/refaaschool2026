@@ -2,7 +2,8 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Printer, User, Users, Info, X, Plus, Calendar } from 'lucide-react';
+import { Printer, User, Users, Info, X, Plus, Calendar, AlertCircle } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 const DAYS = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
 const PERIODS = [1, 2, 3, 4, 5];
@@ -107,7 +108,7 @@ export default function SchedulePage() {
   }, [fetchFilters]);
 
   const handleSwap = async (targetDay: number, targetPeriod: number, targetSlot: any | null) => {
-    if (!swappingFrom) return;
+    if (!swappingFrom || !isAdmin) return;
 
     try {
       setLoading(true);
@@ -115,10 +116,50 @@ export default function SchedulePage() {
       const sourceDay = swappingFrom.day_of_week;
       const sourcePeriod = swappingFrom.period;
 
+      // Conflict checks for the swap
+      // We need to check if swappingFrom's teacher/section has a conflict at (targetDay, targetPeriod)
+      // and if targetSlot's teacher/section has a conflict at (sourceDay, sourcePeriod)
+      
+      const { data: conflicts } = await supabase
+        .from('schedules')
+        .select('id, teacher_id, section_id, day_of_week, period')
+        .or(`day_of_week.eq.${targetDay},day_of_week.eq.${sourceDay}`)
+        .filter('period', 'in', `(${targetPeriod},${sourcePeriod})`);
+
+      if (conflicts) {
+        // Check for conflicts at target slot for swappingFrom's teacher/section
+        const targetConflicts = conflicts.filter(c => 
+          c.day_of_week === targetDay && 
+          c.period === targetPeriod && 
+          c.id !== targetSlot?.id && 
+          (c.teacher_id === swappingFrom.teacher_id || c.section_id === swappingFrom.section_id)
+        );
+
+        if (targetConflicts.length > 0) {
+          alert('تعذر التبديل: يوجد تعارض في الحصة المستهدفة للمعلم أو الفصل');
+          setLoading(false);
+          return;
+        }
+
+        // If targetSlot exists, check for conflicts at source slot
+        if (targetSlot) {
+          const sourceConflicts = conflicts.filter(c => 
+            c.day_of_week === sourceDay && 
+            c.period === sourcePeriod && 
+            c.id !== swappingFrom.id && 
+            (c.teacher_id === targetSlot.teacher_id || c.section_id === targetSlot.section_id)
+          );
+
+          if (sourceConflicts.length > 0) {
+            alert('تعذر التبديل: يوجد تعارض في الحصة الأصلية للمعلم أو الفصل المنقول');
+            setLoading(false);
+            return;
+          }
+        }
+      }
+
       if (targetSlot) {
         // Swap two lessons
-        // We do this in two steps. 
-        // Note: If there are unique constraints, this might need a temporary position.
         const { error: err1 } = await supabase
           .from('schedules')
           .update({ day_of_week: sourceDay, period: sourcePeriod })
@@ -140,6 +181,37 @@ export default function SchedulePage() {
           .eq('id', swappingFrom.id);
         
         if (error) throw error;
+      }
+
+      // Send notifications
+      const notifyUsers = async (lesson: any, newDay: number, newPeriod: number) => {
+        const dayName = DAYS[newDay];
+        const msg = `تم تغيير موعد حصة ${lesson.subjects?.name} إلى يوم ${dayName} الحصة ${newPeriod}`;
+        
+        // Notify teacher
+        await supabase.from('notifications').insert({
+          user_id: lesson.teacher_id,
+          title: 'تحديث الجدول الدراسي',
+          content: msg,
+          type: 'system'
+        });
+
+        // Notify students in the section
+        const { data: students } = await supabase.from('students').select('id').eq('section_id', lesson.section_id);
+        if (students) {
+          const studentNotifs = students.map(s => ({
+            user_id: s.id,
+            title: 'تحديث الجدول الدراسي',
+            content: msg,
+            type: 'system'
+          }));
+          await supabase.from('notifications').insert(studentNotifs);
+        }
+      };
+
+      await notifyUsers(swappingFrom, targetDay, targetPeriod);
+      if (targetSlot) {
+        await notifyUsers(targetSlot, sourceDay, sourcePeriod);
       }
 
       setSwappingFrom(null);
@@ -602,16 +674,17 @@ export default function SchedulePage() {
           <div className="bg-white rounded-xl shadow-sm ring-1 ring-slate-200 overflow-hidden print:shadow-none print:ring-0 print:border-0">
             <div className="overflow-x-auto print:hidden">
               <div className="min-w-[800px] p-6">
-            <div className="grid grid-cols-6 gap-3">
-              {/* Header Row */}
-              <div className="font-bold text-center p-4 bg-slate-100 rounded-lg flex items-center justify-center">
-                اليوم / الحصة
-              </div>
-              {PERIODS.map(p => (
-                <div key={p} className="font-bold text-center p-4 bg-slate-100 rounded-lg">
-                  الحصة {p}
-                </div>
-              ))}
+                <div className="grid grid-cols-6 gap-3">
+                  {/* Header Row */}
+                  <div className="h-14 flex items-center justify-center bg-slate-50 rounded-xl border border-slate-100">
+                    <span className="text-xs font-black text-slate-400 uppercase tracking-widest">اليوم / الحصة</span>
+                  </div>
+                  {PERIODS.map(p => (
+                    <div key={p} className="h-14 flex flex-col items-center justify-center bg-slate-50 rounded-xl border border-slate-100">
+                      <span className="text-xs font-black text-slate-900">الحصة {p}</span>
+                      <span className="text-[10px] text-slate-400 font-bold">08:00 - 08:45</span>
+                    </div>
+                  ))}
 
               {/* Body Rows */}
               {loading ? (

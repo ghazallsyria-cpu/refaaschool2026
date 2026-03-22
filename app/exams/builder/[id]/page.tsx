@@ -404,10 +404,14 @@ export default function QuizBuilder() {
 
           if (students && students.length > 0) {
             const subjectName = subjects.find(s => s.id === exam.subject_id)?.name || 'المادة';
-            const notificationPromises = students.map(student => {
-              console.log(`Notification: ${student.id} - اختبار جديد متاح - تم نشر اختبار جديد في مادة ${subjectName}: ${exam.title}`);
-            });
-            await Promise.all(notificationPromises);
+            const notificationPayloads = students.map(student => ({
+              user_id: student.id,
+              title: 'اختبار جديد متاح',
+              content: `تم نشر اختبار جديد في مادة ${subjectName}: ${exam.title}`,
+              type: 'exam',
+              link: `/exams/take/${examId}`
+            }));
+            await supabase.from('notifications').insert(notificationPayloads);
           }
         } catch (notifErr) {
           console.error('Error sending exam notifications:', notifErr);

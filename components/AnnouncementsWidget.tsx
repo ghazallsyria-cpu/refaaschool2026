@@ -143,7 +143,7 @@ export default function AnnouncementsWidget({ limit = 3, role }: { limit?: numbe
                       src={selectedAnnouncement.image_url} 
                       alt={selectedAnnouncement.title} 
                       fill
-                      className="object-cover"
+                      className="object-contain"
                       referrerPolicy="no-referrer"
                     />
                   </div>

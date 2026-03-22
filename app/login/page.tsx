@@ -99,7 +99,7 @@ export default function LoginPage() {
           src="https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?auto=format&fit=crop&q=80"
           alt="School Background"
           fill
-          className="object-cover opacity-40"
+          className="object-contain opacity-40"
           priority
           referrerPolicy="no-referrer"
         />

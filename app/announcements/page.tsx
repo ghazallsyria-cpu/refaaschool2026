@@ -408,7 +408,7 @@ export default function AnnouncementsPage() {
                             src={announcement.image_url} 
                             alt={announcement.title} 
                             fill
-                            className="object-cover"
+                            className="object-contain"
                             referrerPolicy="no-referrer"
                           />
                         </div>
@@ -482,7 +482,7 @@ export default function AnnouncementsPage() {
                         src={selectedAnnouncement.image_url} 
                         alt={selectedAnnouncement.title} 
                         fill
-                        className="object-cover"
+                        className="object-contain"
                         referrerPolicy="no-referrer"
                       />
                     </div>

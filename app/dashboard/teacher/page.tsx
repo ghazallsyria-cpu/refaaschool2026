@@ -6,7 +6,7 @@ import {
   Users, BookOpen, Calendar, CheckCircle2, 
   Clock, FileText, Plus, Search, 
   TrendingUp, BarChart2, UserCheck, MessageSquare,
-  Bell, ChevronLeft, MoreVertical, Edit, Trash2
+  Bell, ChevronLeft, MoreVertical, Edit, Trash2, AlertCircle
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import Link from 'next/link';
@@ -25,7 +25,8 @@ export default function TeacherDashboard() {
     totalStudents: 0,
     totalExams: 0,
     totalAssignments: 0,
-    avgAttendance: 0
+    avgAttendance: 0,
+    absenceRate: 0
   });
   const [assignmentStats, setAssignmentStats] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -86,7 +87,8 @@ export default function TeacherDashboard() {
           supabase
             .from('attendance')
             .select('status')
-            .in('section_id', sectionIds),
+            .in('section_id', sectionIds)
+            .gte('date', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]),
           supabase
             .from('exams')
             .select('id', { count: 'exact', head: true })
@@ -131,9 +133,15 @@ export default function TeacherDashboard() {
         // Calculate real attendance stats
         const attendanceData = attendanceRes.data || [];
         const presentCount = attendanceData.filter(a => a.status === 'present' || a.status === 'late').length;
+        const absentCount = attendanceData.filter(a => a.status === 'absent').length;
+        
         const avgAttendance = attendanceData.length > 0 
           ? Math.round((presentCount / attendanceData.length) * 100) 
           : 100;
+          
+        const absenceRate = attendanceData.length > 0
+          ? Math.round((absentCount / attendanceData.length) * 100)
+          : 0;
 
         // Calculate stats
         const totalStudents = sectionsData?.reduce((acc, s) => acc + (s.students?.[0]?.count || 0), 0) || 0;
@@ -141,7 +149,8 @@ export default function TeacherDashboard() {
           totalStudents,
           totalExams: examsCountRes.count || 0,
           totalAssignments: assignmentsCountRes.count || 0,
-          avgAttendance
+          avgAttendance,
+          absenceRate
         });
       }
     } catch (error) {
@@ -213,6 +222,7 @@ export default function TeacherDashboard() {
           { label: 'الاختبارات النشطة', value: stats.totalExams, icon: FileText, color: 'text-indigo-600', bg: 'bg-indigo-50', ring: 'ring-indigo-100' },
           { label: 'الواجبات الحالية', value: stats.totalAssignments, icon: BookOpen, color: 'text-amber-600', bg: 'bg-amber-50', ring: 'ring-amber-100' },
           { label: 'متوسط الحضور', value: `${stats.avgAttendance}%`, icon: BarChart2, color: 'text-emerald-600', bg: 'bg-emerald-50', ring: 'ring-emerald-100' },
+          { label: 'معدل الغياب', value: `${stats.absenceRate}%`, icon: AlertCircle, color: 'text-red-600', bg: 'bg-red-50', ring: 'ring-red-100' },
         ].map((stat, i) => (
           <motion.div 
             key={i}

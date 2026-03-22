@@ -597,7 +597,7 @@ export default function AssignmentDetailsPage({ params }: { params: Promise<{ id
                   ) : (
                     fileUrl && (
                       <div className="relative w-full h-48 mt-2">
-                        <Image src={fileUrl} alt="Assignment" fill className="object-cover rounded-lg" referrerPolicy="no-referrer" />
+                        <Image src={fileUrl} alt="Assignment" fill className="object-contain rounded-lg" referrerPolicy="no-referrer" />
                       </div>
                     )
                   )}
@@ -628,7 +628,7 @@ export default function AssignmentDetailsPage({ params }: { params: Promise<{ id
                   ) : (
                     fileUrl && (
                       <div className="relative w-full h-48 mt-2">
-                        <Image src={fileUrl} alt="Assignment" fill className="object-cover rounded-lg" referrerPolicy="no-referrer" />
+                        <Image src={fileUrl} alt="Assignment" fill className="object-contain rounded-lg" referrerPolicy="no-referrer" />
                       </div>
                     )
                   )}

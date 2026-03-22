@@ -96,7 +96,7 @@ export default function ImageUpload({ initialImageUrl, onUploadSuccess, label = 
         </label>
       ) : (
         <div className="relative w-full h-48">
-          <Image src={imageUrl} alt="Uploaded" fill className="object-cover rounded-lg" referrerPolicy="no-referrer" />
+          <Image src={imageUrl} alt="Uploaded" fill className="object-contain rounded-lg" referrerPolicy="no-referrer" />
           <button onClick={() => { setImageUrl(null); onUploadSuccess(null); }} className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full z-10">
             <X size={16} />
           </button>

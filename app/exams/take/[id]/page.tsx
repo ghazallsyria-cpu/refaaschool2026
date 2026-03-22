@@ -82,29 +82,45 @@ export default function TakeQuiz() {
       const { data: user } = await supabase.auth.getUser();
       if (user.user) {
         // Check for existing attempt
-        const { data: existingAttempt, error: existingError } = await supabase
+        const { data: attempts, error: existingError } = await supabase
           .from('exam_attempts')
           .select('id, status, score')
           .eq('exam_id', params.id)
-          .eq('student_id', user.user.id)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
+          .eq('student_id', user.user.id);
 
         if (existingError) {
           console.error('Error checking existing attempt:', existingError);
         }
 
-        if (existingAttempt) {
-          if (existingAttempt.status === 'completed' || existingAttempt.status === 'graded') {
+        if (attempts && attempts.length > 0) {
+          const completedAttempt = attempts.find(a => a.status === 'completed' || a.status === 'graded');
+          if (completedAttempt) {
             // Already completed, redirect or show message
-            alert('لقد قمت بإتمام هذا الاختبار مسبقاً.');
-            window.location.href = '/exams';
+            showNotification('error', 'لقد قمت بإتمام هذا الاختبار مسبقاً.');
+            setTimeout(() => {
+              router.push('/exams');
+            }, 2000);
             return;
-          } else {
+          }
+          
+          const ongoingAttempt = attempts.find(a => a.status === 'ongoing');
+          if (ongoingAttempt) {
             // Resume ongoing attempt
-            setAttemptId(existingAttempt.id);
-            // Optionally, fetch saved answers here if implemented
+            setAttemptId(ongoingAttempt.id);
+          } else {
+            // Create new attempt
+            const { data: newAttempt, error: attemptError } = await supabase
+              .from('exam_attempts')
+              .insert([{
+                exam_id: params.id,
+                student_id: user.user.id,
+                status: 'ongoing'
+              }])
+              .select()
+              .single();
+            
+            if (attemptError) console.error('Error creating attempt:', attemptError);
+            else setAttemptId(newAttempt.id);
           }
         } else {
           // Create new attempt
@@ -128,7 +144,7 @@ export default function TakeQuiz() {
     } finally {
       setLoading(false);
     }
-  }, [params.id]);
+  }, [params.id, router]);
 
   useEffect(() => {
     fetchQuiz();

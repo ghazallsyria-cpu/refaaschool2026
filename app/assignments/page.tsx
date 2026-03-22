@@ -228,6 +228,7 @@ export default function AssignmentsPage() {
         teacher_id: currentAssignment.teacher_id,
         due_date: new Date(currentAssignment.due_date).toISOString(),
         file_url: currentAssignment.file_url || null,
+        total_marks: questions.reduce((sum, q) => sum + (q.points || 0), 0),
       };
 
       if (currentAssignment.id) {
@@ -250,7 +251,7 @@ export default function AssignmentsPage() {
             options: q.options || null,
             points: q.points,
             is_required: q.isRequired,
-            order: index
+            order_index: index
           }));
           const { error: qError } = await supabase.from('assignment_questions').insert(questionsPayload);
           if (qError) throw qError;
@@ -273,7 +274,7 @@ export default function AssignmentsPage() {
             options: q.options || null,
             points: q.points,
             is_required: q.isRequired,
-            order: index
+            order_index: index
           }));
           const { error: qError } = await supabase.from('assignment_questions').insert(questionsPayload);
           if (qError) throw qError;

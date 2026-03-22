@@ -67,22 +67,29 @@ export default function StudentPerformancePage() {
       setStudentData(student);
 
       // Fetch exam attempts
-      const { data: attempts } = await supabase
+      console.log('Fetching exam attempts for user:', user.id);
+      const { data: attempts, error: attemptsError } = await supabase
         .from('exam_attempts')
         .select(`
           id,
           score,
           status,
           completed_at,
-          exams (title, total_marks, subjects (name))
+          exams!inner (title, total_marks, max_score, subjects!inner (name))
         `)
         .eq('student_id', user.id)
         .order('completed_at', { ascending: false });
 
+      if (attemptsError) {
+        console.error('Error fetching exam attempts:', attemptsError);
+      } else {
+        console.log('Fetched attempts:', attempts);
+      }
       setExamAttempts(attempts || []);
 
       // Fetch assignment submissions
-      const { data: submissions } = await supabase
+      console.log('Fetching assignment submissions for user:', user.id);
+      const { data: submissions, error: submissionsError } = await supabase
         .from('assignment_submissions')
         .select(`
           id,
@@ -90,11 +97,16 @@ export default function StudentPerformancePage() {
           feedback,
           submitted_at,
           status,
-          assignments (title, total_marks, subjects (name))
+          assignments!inner (title, total_marks, subjects!inner (name))
         `)
         .eq('student_id', user.id)
         .order('submitted_at', { ascending: false });
 
+      if (submissionsError) {
+        console.error('Error fetching assignment submissions:', submissionsError);
+      } else {
+        console.log('Fetched submissions:', submissions);
+      }
       setAssignmentSubmissions(submissions || []);
 
       // Calculate stats
@@ -268,7 +280,7 @@ export default function StudentPerformancePage() {
                     </div>
                     <div className="text-left">
                       <div className="text-lg font-black text-indigo-600">
-                        {attempt.score !== null ? `${attempt.score} / ${attempt.exams?.total_marks}` : 'قيد التصحيح'}
+                        {attempt.score !== null ? `${attempt.score} / ${attempt.exams?.total_marks || attempt.exams?.max_score || 100}` : 'قيد التصحيح'}
                       </div>
                       <div className={`text-[10px] font-bold uppercase tracking-widest mt-1 ${
                         attempt.status === 'graded' ? 'text-emerald-500' : 'text-amber-500'
@@ -328,7 +340,7 @@ export default function StudentPerformancePage() {
                     </div>
                     <div className="text-left">
                       <div className="text-lg font-black text-indigo-600">
-                        {submission.grade !== null ? `${submission.grade} / ${submission.assignments?.total_marks}` : 'لم يتم التقييم'}
+                        {submission.grade !== null ? `${submission.grade} / ${submission.assignments?.total_marks || 100}` : 'لم يتم التقييم'}
                       </div>
                       <div className={`text-[10px] font-bold uppercase tracking-widest mt-1 ${
                         submission.status === 'graded' ? 'text-emerald-500' : 'text-amber-500'

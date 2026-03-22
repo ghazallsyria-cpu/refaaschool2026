@@ -112,15 +112,16 @@ export default function ExamsDashboard() {
 
         let studentAttempt = null;
         if (role === 'student' && session?.user?.id) {
-          const { data: attemptData } = await supabase
+          const { data: attemptsData } = await supabase
             .from('exam_attempts')
             .select('id, status, score')
             .eq('exam_id', exam.id)
-            .eq('student_id', session.user.id)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .maybeSingle();
-          studentAttempt = attemptData;
+            .eq('student_id', session.user.id);
+          
+          // Prioritize completed/graded attempts
+          studentAttempt = attemptsData?.find(a => a.status === 'completed' || a.status === 'graded') || 
+                          attemptsData?.find(a => a.status === 'ongoing') || 
+                          null;
         }
 
         const attempts = attemptsRes.data || [];

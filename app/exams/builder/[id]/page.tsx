@@ -345,7 +345,7 @@ export default function QuizBuilder() {
         console.log('Inserting exam:', { ...examPayload, max_score: exam.max_score || 100, teacher_id: finalTeacherId, status: exam.status });
         const { data: newExam, error } = await supabase
           .from('exams')
-          .insert([{ ...examPayload, max_score: exam.max_score || 100, teacher_id: finalTeacherId, status: exam.status }])
+          .insert([{ ...examPayload, max_score: exam.max_score || 100, total_marks: exam.max_score || 100, teacher_id: finalTeacherId, status: exam.status }])
           .select()
           .single();
         if (error) throw error;
@@ -354,7 +354,7 @@ export default function QuizBuilder() {
         console.log('Updating exam:', { ...examPayload, max_score: exam.max_score || 100, teacher_id: finalTeacherId, status: exam.status });
         const { error } = await supabase
           .from('exams')
-          .update({ ...examPayload, max_score: exam.max_score || 100, teacher_id: finalTeacherId, status: exam.status })
+          .update({ ...examPayload, max_score: exam.max_score || 100, total_marks: exam.max_score || 100, teacher_id: finalTeacherId, status: exam.status })
           .eq('id', examId);
         if (error) throw error;
       }

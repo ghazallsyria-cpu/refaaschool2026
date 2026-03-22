@@ -29,8 +29,22 @@ export default function PeriodsPage() {
   }, []);
 
   useEffect(() => {
-    fetchPeriods();
-  }, [fetchPeriods]);
+    let mounted = true;
+    const load = async () => {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('class_periods')
+        .select('*')
+        .order('period_number');
+      if (mounted) {
+        if (error) console.error('Error fetching periods:', error);
+        else setPeriods(data || []);
+        setLoading(false);
+      }
+    };
+    load();
+    return () => { mounted = false; };
+  }, []);
 
   const handleAddPeriod = async (e: React.FormEvent) => {
     e.preventDefault();

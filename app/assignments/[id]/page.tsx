@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation';
 import * as Dialog from '@radix-ui/react-dialog';
 import AssignmentForm from '@/components/assignment-form';
 import AssignmentBuilder from '@/components/assignment-builder';
+import AssignmentUpload from '@/components/AssignmentUpload';
 import { Question } from '@/components/assignment-builder';
 import { format } from 'date-fns';
 import { arSA } from 'date-fns/locale';
@@ -271,7 +272,9 @@ export default function AssignmentDetailsPage({ params }: { params: Promise<{ id
         assignment_id: assignmentId,
         student_id: studentId,
         status: 'submitted',
-        submitted_at: new Date().toISOString()
+        submitted_at: new Date().toISOString(),
+        content: content,
+        file_url: fileUrl
       };
 
       let submissionId: string;
@@ -559,7 +562,25 @@ export default function AssignmentDetailsPage({ params }: { params: Promise<{ id
                 isSubmitting={isSubmitting}
                 initialAnswers={myAnswers}
                 readOnly={mySubmission?.grade !== undefined && mySubmission?.grade !== null}
-              />
+              >
+                <div className="glass-card p-8 rounded-4xl border border-white/60 shadow-xl shadow-slate-200/50">
+                  <label className="block text-sm font-bold text-slate-700 mb-4">صورة الواجب (اختياري)</label>
+                  {studentId && assignmentId && (!mySubmission || (mySubmission.grade === undefined || mySubmission.grade === null)) ? (
+                    <AssignmentUpload
+                      studentId={studentId}
+                      assignmentId={assignmentId}
+                      initialImageUrl={fileUrl}
+                      onUploadSuccess={(url) => setFileUrl(url || '')}
+                    />
+                  ) : (
+                    fileUrl && (
+                      <div className="relative w-full h-48 mt-2">
+                        <img src={fileUrl} alt="Assignment" className="w-full h-full object-cover rounded-lg" />
+                      </div>
+                    )
+                  )}
+                </div>
+              </AssignmentForm>
             ) : (
               <form onSubmit={(e) => { e.preventDefault(); handleSubmitAnswers({}); }} className="space-y-6">
                 <div>
@@ -575,16 +596,21 @@ export default function AssignmentDetailsPage({ params }: { params: Promise<{ id
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-2">رابط ملف الإجابة (اختياري)</label>
-                  <input
-                    type="url"
-                    className="block w-full rounded-2xl border-0 py-4 px-4 text-slate-900 bg-slate-50 ring-1 ring-inset ring-slate-200 placeholder:text-slate-400 focus:ring-2 focus:ring-indigo-600 sm:text-sm transition-all"
-                    placeholder="https://..."
-                    value={fileUrl}
-                    onChange={(e) => setFileUrl(e.target.value)}
-                    disabled={mySubmission?.grade !== undefined && mySubmission?.grade !== null}
-                  />
-                  <p className="mt-2 text-xs text-slate-500">يمكنك رفع الملف على Google Drive أو أي خدمة سحابية ووضع الرابط هنا.</p>
+                  <label className="block text-sm font-bold text-slate-700 mb-2">صورة الواجب (اختياري)</label>
+                  {studentId && assignmentId && (!mySubmission || (mySubmission.grade === undefined || mySubmission.grade === null)) ? (
+                    <AssignmentUpload
+                      studentId={studentId}
+                      assignmentId={assignmentId}
+                      initialImageUrl={fileUrl}
+                      onUploadSuccess={(url) => setFileUrl(url || '')}
+                    />
+                  ) : (
+                    fileUrl && (
+                      <div className="relative w-full h-48 mt-2">
+                        <img src={fileUrl} alt="Assignment" className="w-full h-full object-cover rounded-lg" />
+                      </div>
+                    )
+                  )}
                 </div>
 
                 {(!mySubmission || (mySubmission.grade === undefined || mySubmission.grade === null)) && (

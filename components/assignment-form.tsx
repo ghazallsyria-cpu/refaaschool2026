@@ -11,9 +11,10 @@ interface AssignmentFormProps {
   isSubmitting?: boolean;
   initialAnswers?: Record<string, any>;
   readOnly?: boolean;
+  children?: React.ReactNode;
 }
 
-export default function AssignmentForm({ questions, onSubmit, isSubmitting, initialAnswers = {}, readOnly = false }: AssignmentFormProps) {
+export default function AssignmentForm({ questions, onSubmit, isSubmitting, initialAnswers = {}, readOnly = false, children }: AssignmentFormProps) {
   const [answers, setAnswers] = useState<Record<string, any>>(initialAnswers);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -195,6 +196,8 @@ export default function AssignmentForm({ questions, onSubmit, isSubmitting, init
           </div>
         </motion.div>
       ))}
+
+      {children}
 
       {!readOnly && (
         <div className="pt-8">

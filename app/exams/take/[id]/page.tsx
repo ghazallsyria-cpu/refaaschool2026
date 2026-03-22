@@ -27,6 +27,9 @@ type Exam = {
   title: string;
   description: string;
   duration: number;
+  exam_date: string;
+  start_time: string;
+  end_time: string;
   settings: any;
 };
 
@@ -60,6 +63,35 @@ export default function TakeQuiz() {
         .single();
 
       if (examError) throw examError;
+      
+      // Check if exam is available based on date and time
+      const now = new Date();
+      const examDate = new Date(examData.exam_date);
+      
+      // Combine date and time for start and end
+      const startTimeParts = (examData.start_time || '00:00').split(':');
+      const endTimeParts = (examData.end_time || '23:59').split(':');
+      
+      const startDateTime = new Date(examDate);
+      startDateTime.setHours(parseInt(startTimeParts[0]), parseInt(startTimeParts[1]), 0);
+      
+      const endDateTime = new Date(examDate);
+      endDateTime.setHours(parseInt(endTimeParts[0]), parseInt(endTimeParts[1]), 0);
+      
+      if (now < startDateTime) {
+        showNotification('error', `هذا الاختبار غير متاح بعد. سيبدأ في ${examData.start_time} بتاريخ ${examData.exam_date}`);
+        setTimeout(() => router.push('/exams'), 3000);
+        setLoading(false);
+        return;
+      }
+      
+      if (now > endDateTime) {
+        showNotification('error', 'انتهى الوقت المخصص لهذا الاختبار. تم إغلاق الاختبار تلقائياً.');
+        setTimeout(() => router.push('/exams'), 3000);
+        setLoading(false);
+        return;
+      }
+
       setExam(examData);
 
       const { data: questionsData, error: questionsError } = await supabase
@@ -75,7 +107,20 @@ export default function TakeQuiz() {
       setQuestions(questionsData || []);
 
       if (examData.duration) {
-        setTimeLeft(examData.duration * 60);
+        const durationSeconds = examData.duration * 60;
+        
+        // Also check if end_time is sooner than duration
+        const now = new Date();
+        const examDate = new Date(examData.exam_date);
+        const endTimeParts = (examData.end_time || '23:59').split(':');
+        const endDateTime = new Date(examDate);
+        endDateTime.setHours(parseInt(endTimeParts[0]), parseInt(endTimeParts[1]), 0);
+        
+        const secondsUntilEnd = Math.floor((endDateTime.getTime() - now.getTime()) / 1000);
+        
+        // Use the smaller of the two
+        const finalTimeLeft = Math.min(durationSeconds, secondsUntilEnd);
+        setTimeLeft(finalTimeLeft > 0 ? finalTimeLeft : 0);
       }
 
       // Create or resume attempt

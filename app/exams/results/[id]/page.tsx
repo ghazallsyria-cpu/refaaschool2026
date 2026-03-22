@@ -50,6 +50,7 @@ export default function ExamResults() {
   const [searchQuery, setSearchQuery] = useState('');
   const [questionsData, setQuestionsData] = useState<any[]>([]);
   const [answersData, setAnswersData] = useState<any[]>([]);
+  const [allStudents, setAllStudents] = useState<any[]>([]);
 
   const fetchData = useCallback(async () => {
     try {
@@ -60,6 +61,33 @@ export default function ExamResults() {
         .eq('id', params.id)
         .single();
       setExam(examData);
+
+      // Fetch all students in the assigned sections
+      let currentAllStudents: any[] = [];
+      if (examData?.section_ids && examData.section_ids.length > 0) {
+        const { data: studentsData } = await supabase
+          .from('students')
+          .select(`
+            id,
+            users(full_name, email),
+            section:sections(name, classes(name))
+          `)
+          .in('section_id', examData.section_ids);
+        
+        currentAllStudents = (studentsData || []).map(s => {
+          const sectionData = s.section as any;
+          const className = Array.isArray(sectionData?.classes) ? sectionData?.classes[0]?.name : sectionData?.classes?.name;
+          const sectionName = sectionData?.name ? `${className ? className + ' - ' : ''}${sectionData.name}` : 'غير محدد';
+          
+          return {
+            id: s.id,
+            full_name: (s.users as any)?.full_name || 'طالب غير معروف',
+            email: (s.users as any)?.email || '',
+            section_name: sectionName
+          };
+        });
+        setAllStudents(currentAllStudents);
+      }
 
       const { data: attemptsData } = await supabase
         .from('exam_attempts')
@@ -83,15 +111,38 @@ export default function ExamResults() {
         return {
           ...a,
           student: {
+            id: studentData?.id,
             full_name: studentData?.users?.full_name || 'طالب غير معروف',
             section_name: sectionName
           }
         };
       });
-      setAttempts(formattedAttempts);
+
+      // Merge with all students to include those who didn't attempt
+      const mergedAttempts = [...formattedAttempts];
+      const attemptedStudentIds = new Set(formattedAttempts.map(a => a.student.id));
+
+      currentAllStudents.forEach(student => {
+        if (!attemptedStudentIds.has(student.id)) {
+          mergedAttempts.push({
+            id: `missing-${student.id}`,
+            student: {
+              id: student.id,
+              full_name: student.full_name,
+              section_name: student.section_name
+            },
+            started_at: '',
+            completed_at: '',
+            score: 0,
+            status: 'not_attempted'
+          } as any);
+        }
+      });
+
+      setAttempts(mergedAttempts);
 
       // Extract unique sections for the filter
-      const sections = Array.from(new Set(formattedAttempts.map(a => a.student.section_name))).filter(Boolean);
+      const sections = Array.from(new Set(mergedAttempts.map(a => a.student.section_name))).filter(Boolean);
       setAvailableSections(sections);
 
       // Fetch Questions and Answers for real analytics
@@ -306,12 +357,12 @@ export default function ExamResults() {
                 <td className="p-3 text-sm font-bold text-slate-900 border border-slate-200">{attempt.student.full_name}</td>
                 <td className="p-3 text-sm text-slate-600 border border-slate-200">{attempt.student.section_name}</td>
                 <td className="p-3 text-sm text-slate-600 border border-slate-200">
-                  {new Date(attempt.completed_at).toLocaleDateString('ar-SA')}
+                  {attempt.completed_at ? new Date(attempt.completed_at).toLocaleDateString('ar-SA') : 'لم يتقدم'}
                 </td>
                 <td className="p-3 text-sm font-black text-indigo-600 border border-slate-200" dir="ltr">{attempt.score}%</td>
                 <td className="p-3 text-sm font-bold border border-slate-200">
-                  <span className={attempt.score >= 50 ? 'text-emerald-600' : 'text-red-600'}>
-                    {attempt.score >= 50 ? 'ناجح' : 'راسب'}
+                  <span className={attempt.status === 'not_attempted' ? 'text-slate-400' : attempt.score >= 50 ? 'text-emerald-600' : 'text-red-600'}>
+                    {attempt.status === 'not_attempted' ? 'لم يتقدم' : attempt.score >= 50 ? 'ناجح' : 'راسب'}
                   </span>
                 </td>
               </tr>
@@ -569,13 +620,17 @@ export default function ExamResults() {
                         </span>
                       </td>
                       <td className="px-8 py-6 text-sm font-bold text-slate-600">
-                        {new Date(attempt.completed_at).toLocaleDateString('ar-SA', { year: 'numeric', month: 'long', day: 'numeric' })}
+                        {attempt.completed_at 
+                          ? new Date(attempt.completed_at).toLocaleDateString('ar-SA', { year: 'numeric', month: 'long', day: 'numeric' })
+                          : 'لم يتم التقديم'}
                       </td>
                       <td className="px-8 py-6 text-sm font-bold text-slate-600">
                         <div className="flex items-center gap-2">
                           <Clock className="h-4 w-4 text-slate-400" />
                           <span>
-                            {Math.round((new Date(attempt.completed_at).getTime() - new Date(attempt.started_at).getTime()) / 60000)} دقيقة
+                            {attempt.completed_at && attempt.started_at
+                              ? `${Math.round((new Date(attempt.completed_at).getTime() - new Date(attempt.started_at).getTime()) / 60000)} دقيقة`
+                              : '-'}
                           </span>
                         </div>
                       </td>
@@ -583,22 +638,24 @@ export default function ExamResults() {
                         <div className="flex items-center gap-4">
                           <div className="flex-1 h-2 w-24 bg-slate-100 rounded-full overflow-hidden shadow-inner">
                             <div 
-                              className={`h-full rounded-full transition-all duration-1000 ${attempt.score >= 50 ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.3)]' : 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.3)]'}`}
+                              className={`h-full rounded-full transition-all duration-1000 ${attempt.status === 'not_attempted' ? 'bg-slate-300' : attempt.score >= 50 ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.3)]' : 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.3)]'}`}
                               style={{ width: `${attempt.score}%` }}
                             />
                           </div>
-                          <span className={`text-base font-black tracking-tighter ${attempt.score >= 50 ? 'text-emerald-600' : 'text-red-600'}`}>
+                          <span className={`text-base font-black tracking-tighter ${attempt.status === 'not_attempted' ? 'text-slate-400' : attempt.score >= 50 ? 'text-emerald-600' : 'text-red-600'}`}>
                             {attempt.score}%
                           </span>
                         </div>
                       </td>
                       <td className="px-8 py-6">
                         <span className={`inline-flex px-4 py-1.5 rounded-xl text-xs font-black uppercase tracking-widest border ${
-                          attempt.score >= 50 
-                            ? 'bg-emerald-50 text-emerald-700 border-emerald-100' 
-                            : 'bg-red-50 text-red-700 border-red-100'
+                          attempt.status === 'not_attempted'
+                            ? 'bg-slate-50 text-slate-500 border-slate-100'
+                            : attempt.score >= 50 
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-100' 
+                              : 'bg-red-50 text-red-700 border-red-100'
                         }`}>
-                          {attempt.score >= 50 ? 'ناجح' : 'راسب'}
+                          {attempt.status === 'not_attempted' ? 'لم يتقدم' : attempt.score >= 50 ? 'ناجح' : 'راسب'}
                         </span>
                       </td>
                       <td className="px-8 py-6 text-left">

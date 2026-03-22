@@ -47,6 +47,8 @@ type ExamData = {
   max_attempts: number;
   max_score: number; // Added max_score
   exam_date: string;
+  start_time?: string;
+  end_time?: string;
   status: 'draft' | 'published';
   settings: {
     shuffle_questions: boolean;
@@ -73,6 +75,8 @@ export default function QuizBuilder() {
     max_attempts: 1,
     max_score: 100, // Default to 100
     exam_date: new Date().toISOString().split('T')[0],
+    start_time: '08:00',
+    end_time: '23:59',
     status: 'draft',
     settings: {
       shuffle_questions: false,
@@ -347,7 +351,15 @@ export default function QuizBuilder() {
         console.log('Inserting exam:', { ...examPayload, max_score: exam.max_score || 100, teacher_id: finalTeacherId, status: exam.status });
         const { data: newExam, error } = await supabase
           .from('exams')
-          .insert([{ ...examPayload, max_score: exam.max_score || 100, total_marks: exam.max_score || 100, teacher_id: finalTeacherId, status: exam.status }])
+          .insert([{ 
+            ...examPayload, 
+            max_score: exam.max_score || 100, 
+            total_marks: exam.max_score || 100, 
+            teacher_id: finalTeacherId, 
+            status: exam.status,
+            start_time: exam.start_time,
+            end_time: exam.end_time
+          }])
           .select()
           .single();
         if (error) throw error;
@@ -356,7 +368,15 @@ export default function QuizBuilder() {
         console.log('Updating exam:', { ...examPayload, max_score: exam.max_score || 100, teacher_id: finalTeacherId, status: exam.status });
         const { error } = await supabase
           .from('exams')
-          .update({ ...examPayload, max_score: exam.max_score || 100, total_marks: exam.max_score || 100, teacher_id: finalTeacherId, status: exam.status })
+          .update({ 
+            ...examPayload, 
+            max_score: exam.max_score || 100, 
+            total_marks: exam.max_score || 100, 
+            teacher_id: finalTeacherId, 
+            status: exam.status,
+            start_time: exam.start_time,
+            end_time: exam.end_time
+          })
           .eq('id', examId);
         if (error) throw error;
       }
@@ -675,6 +695,24 @@ export default function QuizBuilder() {
                 type="date"
                 value={exam.exam_date}
                 onChange={(e) => setExam({...exam, exam_date: e.target.value})}
+                className="w-full px-5 py-4 rounded-2xl bg-slate-50 border-0 ring-1 ring-inset ring-slate-100 focus:ring-2 focus:ring-indigo-600 outline-none font-bold text-slate-700 transition-all appearance-none cursor-pointer"
+              />
+            </div>
+            <div className="space-y-3">
+              <label className="text-xs font-black text-slate-400 uppercase tracking-widest block">وقت البداية</label>
+              <input 
+                type="time"
+                value={exam.start_time}
+                onChange={(e) => setExam({...exam, start_time: e.target.value})}
+                className="w-full px-5 py-4 rounded-2xl bg-slate-50 border-0 ring-1 ring-inset ring-slate-100 focus:ring-2 focus:ring-indigo-600 outline-none font-bold text-slate-700 transition-all appearance-none cursor-pointer"
+              />
+            </div>
+            <div className="space-y-3">
+              <label className="text-xs font-black text-slate-400 uppercase tracking-widest block">وقت النهاية</label>
+              <input 
+                type="time"
+                value={exam.end_time}
+                onChange={(e) => setExam({...exam, end_time: e.target.value})}
                 className="w-full px-5 py-4 rounded-2xl bg-slate-50 border-0 ring-1 ring-inset ring-slate-100 focus:ring-2 focus:ring-indigo-600 outline-none font-bold text-slate-700 transition-all appearance-none cursor-pointer"
               />
             </div>

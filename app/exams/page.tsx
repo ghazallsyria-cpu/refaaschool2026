@@ -19,6 +19,9 @@ type Exam = {
   status: 'draft' | 'published' | 'archived';
   created_at: string;
   duration: number;
+  exam_date: string;
+  start_time?: string;
+  end_time?: string;
   subject: { name: string };
   section: { name: string } | null;
   _count?: {
@@ -190,6 +193,26 @@ export default function ExamsDashboard() {
   };
 
   const isTeacherOrAdmin = userRole === 'teacher' || userRole === 'admin' || userRole === 'management';
+  
+  const getExamStatus = (exam: Exam) => {
+    if (exam.status !== 'published') return null;
+    
+    const now = new Date();
+    const examDate = new Date(exam.exam_date);
+    
+    const startTimeParts = (exam.start_time || '00:00').split(':');
+    const endTimeParts = (exam.end_time || '23:59').split(':');
+    
+    const startDateTime = new Date(examDate);
+    startDateTime.setHours(parseInt(startTimeParts[0]), parseInt(startTimeParts[1]), 0);
+    
+    const endDateTime = new Date(examDate);
+    endDateTime.setHours(parseInt(endTimeParts[0]), parseInt(endTimeParts[1]), 0);
+    
+    if (now < startDateTime) return 'not_started';
+    if (now > endDateTime) return 'expired';
+    return 'available';
+  };
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] pb-24">
@@ -334,6 +357,17 @@ export default function ExamsDashboard() {
                       <div className={`px-5 py-2 rounded-2xl text-xs font-black uppercase tracking-widest border shadow-sm ${getStatusColor(exam.status)}`}>
                         {getStatusLabel(exam.status)}
                       </div>
+                      {!isTeacherOrAdmin && exam.status === 'published' && (
+                        <div className={`px-5 py-2 rounded-2xl text-xs font-black uppercase tracking-widest border shadow-sm ${
+                          getExamStatus(exam) === 'available' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
+                          getExamStatus(exam) === 'not_started' ? 'bg-blue-50 text-blue-700 border-blue-100' :
+                          'bg-red-50 text-red-700 border-red-100'
+                        }`}>
+                          {getExamStatus(exam) === 'available' ? 'متاح الآن' :
+                           getExamStatus(exam) === 'not_started' ? 'لم يبدأ بعد' :
+                           'منتهي'}
+                        </div>
+                      )}
                       {isTeacherOrAdmin && (
                         <DropdownMenu.Root>
                           <DropdownMenu.Trigger asChild>
@@ -456,10 +490,19 @@ export default function ExamsDashboard() {
                           <motion.button 
                             whileHover={{ scale: 1.02 }}
                             whileTap={{ scale: 0.98 }}
-                            className="w-full h-14 rounded-2xl bg-indigo-600 text-white text-sm font-black shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all flex items-center justify-center gap-3"
+                            disabled={getExamStatus(exam) !== 'available'}
+                            className={`w-full h-14 rounded-2xl text-white text-sm font-black shadow-lg transition-all flex items-center justify-center gap-3 ${
+                              getExamStatus(exam) === 'available' 
+                                ? 'bg-indigo-600 shadow-indigo-200 hover:bg-indigo-700' 
+                                : 'bg-slate-400 shadow-slate-200 cursor-not-allowed'
+                            }`}
                           >
                             <Play className="h-5 w-5" />
-                            <span>{exam.studentAttempt?.status === 'ongoing' ? 'متابعة الاختبار' : 'بدء الاختبار'}</span>
+                            <span>
+                              {getExamStatus(exam) === 'not_started' ? 'لم يبدأ بعد' :
+                               getExamStatus(exam) === 'expired' ? 'انتهى الوقت' :
+                               exam.studentAttempt?.status === 'ongoing' ? 'متابعة الاختبار' : 'بدء الاختبار'}
+                            </span>
                           </motion.button>
                         </Link>
                       )

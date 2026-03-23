@@ -474,7 +474,7 @@ export default function SchedulePage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 print:hidden">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">
-            {userRole === 'teacher' ? 'جدولي الدراسي' : 'الجدول الدراسي'}
+            {userRole === 'teacher' ? 'جدولي الدراسي ✅' : 'الجدول الدراسي ✅'}
           </h1>
           <p className="text-slate-500">
             {userRole === 'teacher' 

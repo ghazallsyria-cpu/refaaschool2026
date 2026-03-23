@@ -240,7 +240,7 @@ export default function ClassesPage() {
     }).filter(sec => sec.students.length > 0 || sec.name.toLowerCase().includes(searchTerm.toLowerCase()));
     
     return { ...cls, sections: filteredSections };
-  }).filter(Boolean).filter((cls: any) => cls.sections.length > 0 || cls.name.toLowerCase().includes(searchTerm.toLowerCase()));
+  }).filter(Boolean).filter((cls: any) => cls && (cls.sections.length > 0 || cls.name.toLowerCase().includes(searchTerm.toLowerCase())));
 
   const middleCount = classes.filter(c => c.level <= 9).reduce((acc, c) => acc + c.sections.reduce((s, sec) => s + sec.students.length, 0), 0);
   const highCount   = classes.filter(c => c.level > 9).reduce((acc, c) => acc + c.sections.reduce((s, sec) => s + sec.students.length, 0), 0);

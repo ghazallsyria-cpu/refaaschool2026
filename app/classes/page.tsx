@@ -35,6 +35,7 @@ export default function ClassesPage() {
   const [expandedClass, setExpandedClass] = useState<string | null>(null);
   const [expandedSection, setExpandedSection] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [stageFilter, setStageFilter] = useState<'all' | 'middle' | 'high'>('all');
   const [isAdmin, setIsAdmin] = useState(false);
 
   // Modal State
@@ -224,9 +225,12 @@ export default function ClassesPage() {
   };
 
   const filteredClasses = classes.map(cls => {
+    // فلتر المرحلة
+    if (stageFilter === 'middle' && cls.level > 9) return null;
+    if (stageFilter === 'high' && cls.level <= 9) return null;
+
     if (!searchTerm) return cls;
     
-    // Filter sections and students based on search term
     const filteredSections = cls.sections.map(sec => {
       const filteredStudents = sec.students.filter(stu => 
         stu.user.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -236,7 +240,10 @@ export default function ClassesPage() {
     }).filter(sec => sec.students.length > 0 || sec.name.toLowerCase().includes(searchTerm.toLowerCase()));
     
     return { ...cls, sections: filteredSections };
-  }).filter(cls => cls.sections.length > 0 || cls.name.toLowerCase().includes(searchTerm.toLowerCase()));
+  }).filter(Boolean).filter((cls: any) => cls.sections.length > 0 || cls.name.toLowerCase().includes(searchTerm.toLowerCase()));
+
+  const middleCount = classes.filter(c => c.level <= 9).reduce((acc, c) => acc + c.sections.reduce((s, sec) => s + sec.students.length, 0), 0);
+  const highCount   = classes.filter(c => c.level > 9).reduce((acc, c) => acc + c.sections.reduce((s, sec) => s + sec.students.length, 0), 0);
 
   if (loading) {
     return (
@@ -259,6 +266,22 @@ export default function ClassesPage() {
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.1 }}
         >
+          <div className="flex flex-wrap gap-2 mb-3">
+            {[
+              { key: 'all',    label: `🏫 الكل (${classes.reduce((a,c) => a + c.sections.reduce((s,sec) => s + sec.students.length, 0), 0)} طالب)` },
+              { key: 'middle', label: `📚 المتوسطة — ${middleCount} طالب`,  active: 'bg-emerald-600' },
+              { key: 'high',   label: `🎓 الثانوية — ${highCount} طالب`,    active: 'bg-amber-500' },
+            ].map(s => (
+              <button key={s.key} onClick={() => setStageFilter(s.key as any)}
+                className={`px-4 py-2 rounded-2xl text-xs font-black transition-all ${
+                  stageFilter === s.key
+                    ? `${(s as any).active || 'bg-indigo-600'} text-white shadow-md`
+                    : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                }`}>
+                {s.label}
+              </button>
+            ))}
+          </div>
           <h1 className="text-4xl font-black text-slate-900 tracking-tight mb-2">إدارة الفصول والشعب</h1>
           <p className="text-slate-500 font-medium text-lg">
             تنظيم وعرض الطلاب حسب صفوفهم وشعبهم الدراسية 

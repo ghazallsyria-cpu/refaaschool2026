@@ -249,9 +249,18 @@ export default function QuizBuilder() {
 
   const deleteQuestion = async (id: string) => {
     const question = questions.find(q => q.id === id);
+
+    // حذف الصورة من Cloudinary أولاً
     if (question?.media_url) {
       await deleteFromCloudinary(question.media_url);
     }
+
+    // حذف من قاعدة البيانات إذا كان الاختبار موجوداً (غير جديد)
+    if (!isNew) {
+      await supabase.from('questions').delete().eq('id', id);
+    }
+
+    // حذف من الحالة المحلية
     setQuestions(questions.filter(q => q.id !== id));
   };
 

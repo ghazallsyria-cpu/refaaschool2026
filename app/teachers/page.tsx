@@ -33,6 +33,25 @@ export default function TeachersPage() {
 
   const [notification, setNotification] = useState<{type: 'success' | 'error', message: string} | null>(null);
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
+  const [stageFilter, setStageFilter] = useState<'all' | 'middle' | 'high' | 'shared'>('all');
+  const [teacherLevels, setTeacherLevels] = useState<Record<string, number[]>>({});
+
+  // تحديد مرحلة المعلم بناءً على الصفوف التي يدرسها
+  const getTeacherStage = (levels: number[]) => {
+    const hasMiddle = levels.some(l => l >= 6 && l <= 9);
+    const hasHigh   = levels.some(l => l >= 10 && l <= 12);
+    if (hasMiddle && hasHigh) return 'shared';
+    if (hasMiddle) return 'middle';
+    if (hasHigh)   return 'high';
+    return 'none';
+  };
+
+  const stageLabel = (stage: string) => {
+    if (stage === 'middle') return { text: 'متوسطة', color: 'bg-emerald-50 text-emerald-700 border-emerald-100' };
+    if (stage === 'high')   return { text: 'ثانوية',  color: 'bg-amber-50 text-amber-700 border-amber-100' };
+    if (stage === 'shared') return { text: 'مشترك',  color: 'bg-violet-50 text-violet-700 border-violet-100' };
+    return { text: 'غير محدد', color: 'bg-slate-50 text-slate-500 border-slate-100' };
+  };
 
   const showNotification = (type: 'success' | 'error', message: string) => {
     setNotification({ type, message });
@@ -235,6 +254,21 @@ export default function TeachersPage() {
 
       if (error) throw error;
       setTeachers(data || []);
+
+      // جلب مستويات الصفوف لكل معلم لتحديد المرحلة
+      const { data: tsData } = await supabase
+        .from('teacher_sections')
+        .select('teacher_id, sections(class_id, classes(level))');
+
+      const levelsMap: Record<string, number[]> = {};
+      tsData?.forEach((ts: any) => {
+        const level = ts.sections?.classes?.level;
+        if (level && ts.teacher_id) {
+          if (!levelsMap[ts.teacher_id]) levelsMap[ts.teacher_id] = [];
+          if (!levelsMap[ts.teacher_id].includes(level)) levelsMap[ts.teacher_id].push(level);
+        }
+      });
+      setTeacherLevels(levelsMap);
     } catch (error) {
       console.error('Error fetching teachers:', error);
     } finally {
@@ -379,11 +413,13 @@ export default function TeachersPage() {
     ...teachers.map(t => t.specialization).filter(Boolean)
   ])) as string[];
 
-  const filteredTeachers = teachers.filter(teacher => 
-    (selectedFolder ? (teacher.specialization || 'غير محدد') === selectedFolder : (activeTab === 'الكل' || teacher.specialization === activeTab)) &&
-    (teacher.users?.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    teacher.national_id?.includes(searchQuery))
-  );
+  const filteredTeachers = teachers.filter(teacher => {
+    const matchFolder = selectedFolder ? (teacher.specialization || 'غير محدد') === selectedFolder : (activeTab === 'الكل' || teacher.specialization === activeTab);
+    const matchSearch = teacher.users?.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) || teacher.national_id?.includes(searchQuery);
+    const teacherStage = getTeacherStage(teacherLevels[teacher.id] || []);
+    const matchStage = stageFilter === 'all' || teacherStage === stageFilter;
+    return matchFolder && matchSearch && matchStage;
+  });
 
   const groupedTeachers = filteredTeachers.reduce((acc, teacher) => {
     const spec = teacher.specialization || 'غير محدد';
@@ -466,6 +502,30 @@ export default function TeachersPage() {
           إضافة معلم جديد
         </motion.button>
       </div>
+
+      {/* فلتر المرحلة */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex flex-wrap gap-2 sm:gap-3"
+      >
+        {[
+          { key: 'all',    label: '🏫 الكل',              color: 'bg-slate-600' },
+          { key: 'middle', label: '📚 المتوسطة (6-9)',    color: 'bg-emerald-600' },
+          { key: 'high',   label: '🎓 الثانوية (10-12)',  color: 'bg-amber-500' },
+          { key: 'shared', label: '🔄 مشترك',             color: 'bg-violet-600' },
+        ].map(s => (
+          <button key={s.key} onClick={() => setStageFilter(s.key as any)}
+            className={`px-3 py-2 sm:px-5 sm:py-2.5 rounded-2xl text-xs font-black transition-all ${
+              stageFilter === s.key ? `${s.color} text-white shadow-lg` : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+            }`}>
+            {s.label}
+            <span className="mr-1 opacity-70">
+              ({teachers.filter(t => s.key === 'all' || getTeacherStage(teacherLevels[t.id] || []) === s.key).length})
+            </span>
+          </button>
+        ))}
+      </motion.div>
 
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
@@ -612,7 +672,12 @@ export default function TeachersPage() {
                         </div>
                       </td>
                       <td className="whitespace-nowrap px-4 py-6">
-                        <span className="text-sm font-bold text-slate-600 font-mono">{teacher.national_id}</span>
+                        <div className="flex flex-col gap-1.5">
+                          <span className="text-sm font-bold text-slate-600 font-mono">{teacher.national_id}</span>
+                          <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[9px] font-black border w-fit ${stageLabel(getTeacherStage(teacherLevels[teacher.id] || [])).color}`}>
+                            {stageLabel(getTeacherStage(teacherLevels[teacher.id] || [])).text}
+                          </span>
+                        </div>
                       </td>
                       <td className="whitespace-nowrap px-4 py-6">
                         <span className="inline-flex items-center px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest bg-slate-100 text-slate-600 border border-slate-200">

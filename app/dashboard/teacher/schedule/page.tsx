@@ -74,19 +74,22 @@ export default function TeacherSchedulePage() {
   };
 
   const getPeriodStatus = (day: number, period: number): PeriodStatus => {
-    const todayDay = now.getDay();
-    const todayId = todayDay === 0 ? 1 : todayDay === 1 ? 2 : todayDay === 2 ? 3 :
-                    todayDay === 3 ? 4 : todayDay === 4 ? 5 : 0;
+    // JS getDay(): 0=Sun,1=Mon,2=Tue,3=Wed,4=Thu
+    // DB day_of_week: 1=Sun,2=Mon,3=Tue,4=Wed,5=Thu
+    const jsDay = now.getDay();
+    const dbDay = jsDay === 0 ? 1 : jsDay === 1 ? 2 : jsDay === 2 ? 3 :
+                  jsDay === 3 ? 4 : jsDay === 4 ? 5 : 0;
 
-    if (day !== todayId) return "upcoming";
+    if (day !== dbDay) return "upcoming";
 
     const p = getPeriodTimes(period);
-    if (!p) return "upcoming";
+    if (!p || !p.start_time || !p.end_time) return "upcoming";
 
     const nowMin = now.getHours() * 60 + now.getMinutes();
     const startMin = timeToMinutes(p.start_time);
     const endMin = timeToMinutes(p.end_time);
 
+    if (startMin === 0 && endMin === 0) return "upcoming";
     if (nowMin >= startMin && nowMin < endMin) return "current";
     if (nowMin < startMin && startMin - nowMin <= 15) return "next";
     if (nowMin >= endMin) return "past";
@@ -137,6 +140,19 @@ export default function TeacherSchedulePage() {
           </div>
         ))}
       </div>
+
+      {/* DEBUG — احذف هذا بعد التشخيص */}
+      {process.env.NODE_ENV === "development" || true ? (
+        <div className="bg-slate-900 text-green-400 p-4 rounded-2xl font-mono text-xs space-y-1">
+          <div>🕐 الوقت الآن: {now.toLocaleTimeString("ar-EG")} ({now.getHours()}:{now.getMinutes().toString().padStart(2,"0")})</div>
+          <div>📅 اليوم JS: {now.getDay()} → DB id: {now.getDay() === 0 ? 1 : now.getDay() === 1 ? 2 : now.getDay() === 2 ? 3 : now.getDay() === 3 ? 4 : now.getDay() === 4 ? 5 : 0}</div>
+          <div>📋 عدد الحصص في class_periods: {periods.length}</div>
+          <div>📚 عدد الحصص في الجدول: {schedule.length}</div>
+          {periods.map(p => (
+            <div key={p.period_number}>⏱ حصة {p.period_number}: {p.start_time} → {p.end_time}</div>
+          ))}
+        </div>
+      ) : null}
 
       <div className="glass-card rounded-[2.5rem] shadow-2xl border-white/40 overflow-hidden">
         {loading ? (

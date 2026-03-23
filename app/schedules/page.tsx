@@ -529,11 +529,15 @@ export default function SchedulesPage() {
                           className={`relative p-2 border-l border-slate-200 h-24 align-top group transition-colors ${
                             userRole === 'admin' || userRole === 'management'
                               ? 'cursor-pointer hover:bg-indigo-50/50'
+                              : cellData && (cellData as any).teachers?.zoom_link
+                              ? 'cursor-pointer hover:bg-indigo-50/30'
                               : 'cursor-default'
                           }`}
                           onClick={() => {
                             if (userRole === 'admin' || userRole === 'management') {
                               openCellModal(day.id, period.period_number, cellData);
+                            } else if (userRole === 'student' && cellData && (cellData as any).teachers?.zoom_link) {
+                              window.open((cellData as any).teachers.zoom_link, '_blank');
                             }
                           }}
                         >

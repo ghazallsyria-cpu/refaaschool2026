@@ -176,14 +176,14 @@ export default function DocumentsPage() {
     try {
       // Get the document to find its file_url
       const docToDelete = documents.find(d => d.id === documentToDelete);
-      
-      const { error } = await supabase.from('documents').delete().eq('id', documentToDelete);
-      if (error) throw error;
 
-      // Delete from Cloudinary if it's a Cloudinary URL
+      // حذف من Cloudinary أولاً قبل DB
       if (docToDelete?.file_url) {
         await deleteFromCloudinary(docToDelete.file_url, 'raw');
       }
+
+      const { error } = await supabase.from('documents').delete().eq('id', documentToDelete);
+      if (error) throw error;
 
       await fetchDocuments();
       showNotification('success', 'تم حذف المستند بنجاح');

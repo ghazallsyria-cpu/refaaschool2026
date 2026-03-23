@@ -200,8 +200,8 @@ export default function TakeQuiz() {
     setIsSubmitting(true);
 
     try {
-      // 1. Calculate Score (Simplified for demo)
-      // In a real app, this should happen server-side or via a secure function
+      // ⚠️ ملاحظة: حساب الدرجة هنا في الـ frontend للأسئلة الموضوعية فقط
+      // الأسئلة المقالية تحتاج تصحيح يدوي من المعلم
       let totalScore = 0;
       const studentAnswersPayload = [];
 
@@ -256,7 +256,13 @@ export default function TakeQuiz() {
             .single();
           
           const { data: userData } = await supabase.auth.getUser();
-          const studentName = userData.user?.user_metadata?.full_name || 'طالب';
+          // جلب اسم الطالب من جدول users وليس من metadata
+          const { data: studentUserData } = await supabase
+            .from('users')
+            .select('full_name')
+            .eq('id', userData.user?.id || '')
+            .single();
+          const studentName = studentUserData?.full_name || 'طالب';
 
           if (examInfo?.teacher_id) {
             await supabase.from('notifications').insert([{
@@ -527,7 +533,13 @@ export default function TakeQuiz() {
 
           {currentQuestionIdx === questions.length - 1 ? (
             <button
-              onClick={handleSubmit}
+              onClick={() => {
+                const unanswered = questions.filter(q => !answers[q.id] && answers[q.id] !== 0).length;
+                const msg = unanswered > 0
+                  ? `لديك ${unanswered} سؤال بدون إجابة. هل تريد الإرسال الآن؟`
+                  : 'هل أنت متأكد من إرسال الاختبار؟ لا يمكن التعديل بعد الإرسال.';
+                if (confirm(msg)) handleSubmit();
+              }}
               disabled={isSubmitting}
               className="flex items-center gap-2 px-8 py-3 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 shadow-lg shadow-emerald-200 transition-all disabled:opacity-50"
             >

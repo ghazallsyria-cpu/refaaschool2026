@@ -46,7 +46,7 @@ export default function TeachersReportPage() {
   const todayName = DAY_MAP[now.getDay()];
   const dateLabel = `${now.getDate()} ${MONTH_MAP[now.getMonth()]} ${now.getFullYear()}`;
 
-  useEffect(() => { fetchData(); }, [reportType]);
+  useEffect(() => { fetchData(); }, [reportType, fetchData]);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -118,6 +118,7 @@ export default function TeachersReportPage() {
     } finally {
       setLoading(false);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reportType]);
 
   const toggleSelect = (id: string) => {

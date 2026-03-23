@@ -205,15 +205,25 @@ export default function MessagesPage() {
     }
   };
   const handleDeleteMessage = async (messageIds: string[]) => {
-    if (!confirm('هل أنت متأكد من حذف هذه الرسائل؟')) return;
+    if (!confirm('هل أنت متأكد من حذف هذه الرسائل؟ ستُحذف من عندك فقط.')) return;
     
     try {
-      const { error } = await supabase
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Soft delete — يحذف من عند المستخدم فقط بدون مسح الرسالة للطرف الآخر
+      const { data: msgs } = await supabase
         .from('messages')
-        .delete()
+        .select('id, sender_id, receiver_id')
         .in('id', messageIds);
-      
-      if (error) throw error;
+
+      for (const msg of (msgs || [])) {
+        if (msg.sender_id === user.id) {
+          await supabase.from('messages').update({ deleted_by_sender: true }).eq('id', msg.id);
+        } else {
+          await supabase.from('messages').update({ deleted_by_receiver: true }).eq('id', msg.id);
+        }
+      }
       
       showNotification('success', 'تم حذف الرسائل بنجاح');
       if (activeThread && messageIds.some(id => activeThread.allIds.includes(id))) {
@@ -423,6 +433,30 @@ export default function MessagesPage() {
     fetchInitialData();
   }, [fetchInitialData]);
 
+  // اشتراك Realtime لاستقبال الرسائل الجديدة فوراً
+  useEffect(() => {
+    if (!currentUser) return;
+    
+    const channel = supabase
+      .channel('messages-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `receiver_id=eq.${currentUser.id}`,
+        },
+        () => {
+          fetchMessages();
+          showNotification('success', '📩 وصلتك رسالة جديدة');
+        }
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [currentUser, fetchMessages]);
+
   const getFilteredRecipients = () => {
     if (!recipientType) return [];
     
@@ -515,7 +549,7 @@ export default function MessagesPage() {
             sectionId: selectedSectionId,
             subject: newMessage.subject,
             content: newMessage.content,
-            senderId: user.id,
+            // senderId يُحدَّد على السيرفر من الجلسة
           }),
         });
 
@@ -717,8 +751,7 @@ export default function MessagesPage() {
             <MessageSquare className="h-4 w-4" />
             صندوق الوارد
           </button>
-          {currentUser?.role !== 'teacher' && (
-            <button
+          <button
               onClick={() => setActiveTab('announcements')}
               className={`flex-1 md:flex-none px-8 py-3 rounded-[1.75rem] text-sm font-black transition-all flex items-center justify-center gap-3 ${
                 activeTab === 'announcements' 
@@ -729,7 +762,6 @@ export default function MessagesPage() {
               <Megaphone className="h-4 w-4" />
               لوحة الإعلانات
             </button>
-          )}
         </div>
 
         <div className="relative flex-1 group px-2">
@@ -900,9 +932,25 @@ export default function MessagesPage() {
                       </div>
                       <span>{announcement.author?.full_name || 'الإدارة'}</span>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Clock className="h-3 w-3" />
-                      <span>{new Date(announcement.created_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}</span>
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        <span>{new Date(announcement.created_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}</span>
+                      </div>
+                      {(currentUser?.role === 'admin' || currentUser?.role === 'management') && (
+                        <button
+                          onClick={async () => {
+                            if (!confirm('هل تريد حذف هذا الإعلان؟')) return;
+                            const { error } = await supabase.from('announcements').delete().eq('id', announcement.id);
+                            if (!error) { showNotification('success', 'تم حذف الإعلان'); fetchAnnouncements(currentUser); }
+                            else showNotification('error', 'حدث خطأ أثناء الحذف');
+                          }}
+                          className="p-1.5 rounded-lg hover:bg-red-50 text-slate-300 hover:text-red-500 transition-colors"
+                          title="حذف الإعلان"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      )}
                     </div>
                   </div>
                   

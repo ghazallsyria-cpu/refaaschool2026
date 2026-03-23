@@ -32,6 +32,13 @@ export default function StudentsPage() {
   const [sections, setSections] = useState<any[]>([]);
   const [parents, setParents] = useState<any[]>([]);
   const [selectedSection, setSelectedSection] = useState('all');
+  const [stageFilter, setStageFilter] = useState<'all' | 'middle' | 'high'>('all');
+
+  const getStudentStage = (student: any): 'middle' | 'high' | null => {
+    const level = student.sections?.classes?.level;
+    if (!level) return null;
+    return level <= 9 ? 'middle' : 'high';
+  };
 
   useEffect(() => {
     fetchStudents();
@@ -216,7 +223,7 @@ export default function StudentsPage() {
           gender,
           parent_id,
           users (full_name, email, phone),
-          sections (name, classes (name)),
+          sections (name, classes (name, level)),
           parents (users (full_name))
         `);
 
@@ -284,10 +291,14 @@ export default function StudentsPage() {
     XLSX.writeFile(workbook, "قائمة_الطلاب.xlsx");
   };
 
-  const filteredStudents = students.filter(s => 
-    s.users?.full_name?.includes(searchTerm) || 
-    s.national_id?.includes(searchTerm)
-  );
+  const filteredStudents = students.filter(s => {
+    const matchSearch = s.users?.full_name?.includes(searchTerm) || s.national_id?.includes(searchTerm);
+    const matchStage = stageFilter === 'all' || getStudentStage(s) === stageFilter;
+    return matchSearch && matchStage;
+  });
+
+  const middleCount = students.filter(s => getStudentStage(s) === 'middle').length;
+  const highCount   = students.filter(s => getStudentStage(s) === 'high').length;
 
   return (
     <div className="relative min-h-screen">
@@ -360,11 +371,34 @@ export default function StudentsPage() {
         </div>
       </div>
 
+      {/* فلتر المرحلة */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.15 }}
+        className="flex flex-wrap gap-3"
+      >
+        {[
+          { key: 'all',    label: `🏫 جميع الطلاب (${students.length})` },
+          { key: 'middle', label: `📚 المتوسطة (${middleCount})`,  active: 'bg-emerald-600' },
+          { key: 'high',   label: `🎓 الثانوية (${highCount})`,    active: 'bg-amber-500' },
+        ].map(s => (
+          <button key={s.key} onClick={() => setStageFilter(s.key as any)}
+            className={`px-3 py-2 sm:px-5 sm:py-2.5 rounded-2xl text-xs font-black transition-all ${
+              stageFilter === s.key
+                ? `${s.active || 'bg-indigo-600'} text-white shadow-lg`
+                : 'bg-white/70 text-slate-600 border border-white/20 hover:bg-white'
+            }`}>
+            {s.label}
+          </button>
+        ))}
+      </motion.div>
+
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
-        className="glass-card p-8 rounded-[2.5rem] flex flex-col lg:flex-row lg:items-center gap-6"
+        className="glass-card p-4 sm:p-8 rounded-[2.5rem] flex flex-col lg:flex-row lg:items-center gap-4 sm:gap-6"
       >
         <div className="relative flex-1 group">
           <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-5">

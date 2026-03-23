@@ -1,4 +1,3 @@
-// hooks/usePushNotifications.ts
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -9,7 +8,6 @@ export function usePushNotifications() {
   const [subscribed, setSubscribed] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  // تسجيل Service Worker عند تحميل الصفحة
   useEffect(() => {
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
 
@@ -25,7 +23,6 @@ export function usePushNotifications() {
     setPermission(Notification.permission);
   }, []);
 
-  // الاشتراك في الإشعارات
   const subscribe = async () => {
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
       alert('متصفحك لا يدعم الإشعارات');
@@ -34,7 +31,6 @@ export function usePushNotifications() {
 
     setLoading(true);
     try {
-      // طلب إذن الإشعارات
       const perm = await Notification.requestPermission();
       setPermission(perm);
 
@@ -44,18 +40,22 @@ export function usePushNotifications() {
         return;
       }
 
-      // الحصول على Service Worker المسجل
       const registration = await navigator.serviceWorker.ready;
 
-      // الاشتراك في Push
+      const rawKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!;
+      const padding = '='.repeat((4 - (rawKey.length % 4)) % 4);
+      const base64 = (rawKey + padding).replace(/-/g, '+').replace(/_/g, '/');
+      const rawData = window.atob(base64);
+      const applicationServerKey = new Uint8Array(rawData.length);
+      for (let i = 0; i < rawData.length; ++i) {
+        applicationServerKey[i] = rawData.charCodeAt(i);
+      }
+
       const subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(
-          process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!
-        ),
+        applicationServerKey: applicationServerKey.buffer,
       });
 
-      // إرسال الاشتراك للسيرفر
       const { data: { session } } = await supabase.auth.getSession();
       const response = await fetch('/api/push/subscribe', {
         method: 'POST',
@@ -77,7 +77,6 @@ export function usePushNotifications() {
     }
   };
 
-  // إلغاء الاشتراك
   const unsubscribe = async () => {
     setLoading(true);
     try {
@@ -100,16 +99,4 @@ export function usePushNotifications() {
   };
 
   return { permission, subscribed, loading, subscribe, unsubscribe };
-}
-
-// تحويل VAPID public key من Base64 لـ Uint8Array
-function urlBase64ToUint8Array(base64String: string): Uint8Array {
-  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
-  const rawData = window.atob(base64);
-  const outputArray = new Uint8Array(rawData.length);
-  for (let i = 0; i < rawData.length; ++i) {
-    outputArray[i] = rawData.charCodeAt(i);
-  }
-  return outputArray;
 }

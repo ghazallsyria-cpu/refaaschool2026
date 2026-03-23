@@ -115,7 +115,8 @@ export default function TeacherSchedulePage() {
     <div className="space-y-8 pb-8">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-4xl font-black text-slate-900 tracking-tight">جدولي الدراسي</h1>
+          <h1 className="text-4xl font-black text-slate-900 tracking-tight">جدولي الدراسي — {periods.length}
+</h1>
           <p className="text-slate-500 mt-2 font-medium">عرض كامل للحصص الدراسية المسندة إليك خلال الأسبوع</p>
         </div>
         <div className="flex items-center gap-3 bg-indigo-600 text-white px-5 py-3 rounded-2xl shadow-lg shadow-indigo-200">

@@ -30,6 +30,7 @@ const navigation = [
   { name: 'الطلاب', href: '/students', icon: Users },
   { name: 'المعلمين', href: '/teachers', icon: GraduationCap },
   { name: 'تعيينات المعلمين', href: '/admin/teacher-assignments', icon: BookOpen },
+  { name: 'متابعة المعلمين', href: '/admin/teachers-monitor', icon: BarChart3 },
   { name: 'أولياء الأمور', href: '/parents', icon: Users },
   { name: 'الفصول', href: '/classes', icon: School },
   { name: 'المواد الدراسية', href: '/subjects', icon: BookOpen },

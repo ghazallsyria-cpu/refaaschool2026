@@ -5,31 +5,37 @@ import { supabase } from "@/lib/supabase";
 import { motion } from "motion/react";
 import {
   CheckCircle2, XCircle, AlertTriangle, Bell,
-  BookOpen, FileText, Users, TrendingUp, TrendingDown,
-  Minus, Search, Filter
+  Clock, TrendingUp, Search
 } from "lucide-react";
 
 interface TeacherStat {
   id: string;
   name: string;
   specialization: string;
-  sections: number;
-  attendance: {
-    recorded: number;
+  todaySchedule: {
     total: number;
+    recorded: number;
+    missing: number;
+    dayEnded: boolean;
+  };
+  weekSchedule: {
+    total: number;
+    recorded: number;
     percent: number;
-    lastRecorded: string | null;
   };
-  assignments: {
-    count: number;
-    thisWeek: number;
-  };
-  exams: {
-    count: number;
-    thisWeek: number;
-  };
+  assignments: { thisWeek: number };
+  exams: { thisWeek: number };
+  lastRecorded: string | null;
   status: "excellent" | "good" | "warning" | "critical";
 }
+
+const DAY_MAP: Record<number, string> = {
+  0: "الأحد", 1: "الاثنين", 2: "الثلاثاء",
+  3: "الأربعاء", 4: "الخميس", 5: "الجمعة", 6: "السبت"
+};
+
+// نهاية الدوام 12:35
+const END_OF_DAY = "12:35";
 
 export default function TeachersMonitorPage() {
   const [teachers, setTeachers] = useState<TeacherStat[]>([]);
@@ -38,81 +44,113 @@ export default function TeachersMonitorPage() {
   const [filter, setFilter] = useState("all");
   const [sendingAlert, setSendingAlert] = useState<string | null>(null);
   const [notification, setNotification] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 60000);
+    return () => clearInterval(timer);
+  }, []);
 
   const showNotification = (type: "success" | "error", message: string) => {
     setNotification({ type, message });
     setTimeout(() => setNotification(null), 4000);
   };
 
-  useEffect(() => {
-    fetchTeachersStats();
-  }, []);
+  useEffect(() => { fetchTeachersStats(); }, []);
 
   const fetchTeachersStats = async () => {
     setLoading(true);
     try {
       const now = new Date();
+      const todayDay = now.getDay();
+      const todayStr = now.toISOString().split("T")[0];
+      const currentTimeStr = now.toTimeString().slice(0, 5);
+      const dayHasEnded = currentTimeStr >= END_OF_DAY;
+
       const weekAgo = new Date(now);
       weekAgo.setDate(weekAgo.getDate() - 7);
       const weekAgoStr = weekAgo.toISOString().split("T")[0];
-      const todayStr = now.toISOString().split("T")[0];
 
       const { data: teachersData } = await supabase
         .from("teachers")
-        .select("id, national_id, specialization, users(full_name), teacher_sections(section_id)");
+        .select("id, specialization, users(full_name)");
 
       if (!teachersData) return;
 
       const stats: TeacherStat[] = await Promise.all(
         teachersData.map(async (teacher: any) => {
-          const sectionIds = teacher.teacher_sections?.map((ts: any) => ts.section_id) || [];
 
-          // جلب سجلات الحضور التي سجّلها هذا المعلم هذا الأسبوع
+          // جدول المعلم لليوم الحالي
+          const { data: todaySchedule } = await supabase
+            .from("schedules")
+            .select("period, section_id")
+            .eq("teacher_id", teacher.id)
+            .eq("day_of_week", todayDay);
+
+          // جدول المعلم للأسبوع كاملاً (أيام 0-4 = أحد-خميس)
+          const { data: weekSchedule } = await supabase
+            .from("schedules")
+            .select("period, section_id, day_of_week")
+            .eq("teacher_id", teacher.id)
+            .in("day_of_week", [0, 1, 2, 3, 4]);
+
+          // سجلات الحضور هذا الأسبوع
           const { data: attendanceData } = await supabase
             .from("attendance")
             .select("date, section_id")
             .eq("recorded_by", teacher.id)
             .gte("date", weekAgoStr);
 
-          // احسب أيام العمل هذا الأسبوع (5 أيام)
-          const workDays = 5;
-          const expectedRecords = sectionIds.length * workDays;
-          const uniqueDays = new Set(attendanceData?.map((a: any) => a.date + a.section_id) || []).size;
-          const attendancePercent = expectedRecords > 0
-            ? Math.round((uniqueDays / expectedRecords) * 100)
-            : 0;
+          // حصص اليوم
+          const todayTotal = todaySchedule?.length || 0;
+          const todayRecorded = todaySchedule?.filter((slot: any) =>
+            attendanceData?.some(
+              a => a.date === todayStr && a.section_id === slot.section_id
+            )
+          ).length || 0;
+          const todayMissing = todayTotal - todayRecorded;
 
+          // حصص الأسبوع
+          // نحسب الحصص المتوقعة لكل يوم مضى هذا الأسبوع
+          const weekTotal = weekSchedule?.length || 0;
+          const weekRecorded = weekSchedule?.filter((slot: any) => {
+            return attendanceData?.some(
+              a => a.section_id === slot.section_id
+            );
+          }).length || 0;
+          const weekPercent = weekTotal > 0
+            ? Math.round((weekRecorded / weekTotal) * 100)
+            : 100;
+
+          // آخر تسجيل
           const lastRecorded = attendanceData && attendanceData.length > 0
-            ? attendanceData.sort((a: any, b: any) => b.date.localeCompare(a.date))[0].date
+            ? [...attendanceData].sort((a, b) => b.date.localeCompare(a.date))[0].date
             : null;
 
-          // جلب الواجبات
+          // الواجبات
           const { data: assignmentsData } = await supabase
             .from("assignments")
             .select("id, created_at")
-            .eq("teacher_id", teacher.id);
+            .eq("teacher_id", teacher.id)
+            .gte("created_at", weekAgoStr);
 
-          const weeklyAssignments = assignmentsData?.filter((a: any) =>
-            new Date(a.created_at) >= weekAgo
-          ).length || 0;
-
-          // جلب الاختبارات
+          // الاختبارات
           const { data: examsData } = await supabase
             .from("exams")
             .select("id, created_at")
-            .eq("teacher_id", teacher.id);
-
-          const weeklyExams = examsData?.filter((e: any) =>
-            new Date(e.created_at) >= weekAgo
-          ).length || 0;
+            .eq("teacher_id", teacher.id)
+            .gte("created_at", weekAgoStr);
 
           // تحديد الحالة
+          // المعلم مقصر فقط إذا انتهى اليوم ولم يسجّل
           let status: TeacherStat["status"] = "excellent";
-          if (attendancePercent < 50 || (weeklyAssignments === 0 && weeklyExams === 0)) {
+          const missedAfterDayEnd = dayHasEnded && todayMissing > 0;
+
+          if (missedAfterDayEnd || weekPercent < 60) {
             status = "critical";
-          } else if (attendancePercent < 80 || weeklyAssignments === 0) {
+          } else if (weekPercent < 85 || (assignmentsData?.length || 0) === 0) {
             status = "warning";
-          } else if (attendancePercent < 95) {
+          } else if (weekPercent < 95) {
             status = "good";
           }
 
@@ -120,21 +158,16 @@ export default function TeachersMonitorPage() {
             id: teacher.id,
             name: teacher.users?.full_name || "غير محدد",
             specialization: teacher.specialization || "غير محدد",
-            sections: sectionIds.length,
-            attendance: {
-              recorded: uniqueDays,
-              total: expectedRecords,
-              percent: attendancePercent,
-              lastRecorded,
+            todaySchedule: {
+              total: todayTotal,
+              recorded: todayRecorded,
+              missing: todayMissing,
+              dayEnded: dayHasEnded,
             },
-            assignments: {
-              count: assignmentsData?.length || 0,
-              thisWeek: weeklyAssignments,
-            },
-            exams: {
-              count: examsData?.length || 0,
-              thisWeek: weeklyExams,
-            },
+            weekSchedule: { total: weekTotal, recorded: weekRecorded, percent: weekPercent },
+            assignments: { thisWeek: assignmentsData?.length || 0 },
+            exams: { thisWeek: examsData?.length || 0 },
+            lastRecorded,
             status,
           };
         })
@@ -142,7 +175,7 @@ export default function TeachersMonitorPage() {
 
       setTeachers(stats);
     } catch (error) {
-      console.error("Error fetching teacher stats:", error);
+      console.error("Error:", error);
     } finally {
       setLoading(false);
     }
@@ -152,22 +185,25 @@ export default function TeachersMonitorPage() {
     setSendingAlert(teacher.id);
     try {
       const issues = [];
-      if (teacher.attendance.percent < 80) issues.push("تسجيل الغياب اليومي");
-      if (teacher.assignments.thisWeek === 0) issues.push("إضافة واجب أسبوعي");
-      if (teacher.exams.thisWeek === 0) issues.push("إضافة اختبار أسبوعي");
-
-      const message = `تنبيه: يرجى الالتزام بـ ${issues.join(" و")} هذا الأسبوع`;
+      if (teacher.todaySchedule.dayEnded && teacher.todaySchedule.missing > 0)
+        issues.push(`لم يسجّل غياب ${teacher.todaySchedule.missing} حصة اليوم`);
+      if (teacher.weekSchedule.percent < 85)
+        issues.push(`نسبة التسجيل الأسبوعية ${teacher.weekSchedule.percent}% فقط`);
+      if (teacher.assignments.thisWeek === 0)
+        issues.push("لم يضف أي واجب هذا الأسبوع");
+      if (teacher.exams.thisWeek === 0)
+        issues.push("لم يضف أي اختبار هذا الأسبوع");
 
       await supabase.from("notifications").insert({
         user_id: teacher.id,
-        title: "تنبيه من الإدارة",
-        content: message,
+        title: "⚠️ تنبيه من الإدارة",
+        content: issues.join(" | "),
         type: "warning",
         link: "/attendance",
       });
 
-      showNotification("success", `تم إرسال إنذار للمعلم ${teacher.name} بنجاح`);
-    } catch (error) {
+      showNotification("success", `تم إرسال إنذار للمعلم ${teacher.name}`);
+    } catch {
       showNotification("error", "فشل إرسال الإنذار");
     } finally {
       setSendingAlert(null);
@@ -175,53 +211,41 @@ export default function TeachersMonitorPage() {
   };
 
   const sendAlertAll = async () => {
-    const criticalTeachers = teachers.filter(t => t.status === "critical" || t.status === "warning");
-    for (const teacher of criticalTeachers) {
-      await sendAlert(teacher);
-    }
-    showNotification("success", `تم إرسال إنذار لـ ${criticalTeachers.length} معلم مقصر`);
+    const problematic = teachers.filter(t => t.status === "critical" || t.status === "warning");
+    for (const t of problematic) await sendAlert(t);
+    showNotification("success", `تم إرسال إنذار لـ ${problematic.length} معلم`);
   };
 
-  const getStatusConfig = (status: TeacherStat["status"]) => {
-    switch (status) {
-      case "excellent":
-        return { label: "ممتاز", color: "bg-emerald-50 text-emerald-700 border-emerald-100", icon: <CheckCircle2 className="h-3.5 w-3.5" />, row: "" };
-      case "good":
-        return { label: "جيد", color: "bg-blue-50 text-blue-700 border-blue-100", icon: <TrendingUp className="h-3.5 w-3.5" />, row: "" };
-      case "warning":
-        return { label: "تحذير", color: "bg-amber-50 text-amber-700 border-amber-100", icon: <AlertTriangle className="h-3.5 w-3.5" />, row: "bg-amber-50/30" };
-      case "critical":
-        return { label: "حرج", color: "bg-red-50 text-red-700 border-red-100", icon: <XCircle className="h-3.5 w-3.5" />, row: "bg-red-50/30" };
-    }
+  const statusConfig = {
+    excellent: { label: "ممتاز", color: "bg-emerald-50 text-emerald-700 border-emerald-100", row: "" },
+    good:      { label: "جيد",   color: "bg-blue-50 text-blue-700 border-blue-100",         row: "" },
+    warning:   { label: "تحذير", color: "bg-amber-50 text-amber-700 border-amber-100",       row: "bg-amber-50/20" },
+    critical:  { label: "حرج",   color: "bg-red-50 text-red-700 border-red-100",             row: "bg-red-50/20" },
   };
 
-  const getPercentColor = (percent: number) => {
-    if (percent >= 90) return "text-emerald-600";
-    if (percent >= 70) return "text-amber-600";
-    return "text-red-600";
-  };
+  const filtered = teachers.filter(t =>
+    (t.name.includes(search) || t.specialization.includes(search)) &&
+    (filter === "all" || t.status === filter)
+  );
 
-  const filtered = teachers.filter(t => {
-    const matchSearch = t.name.includes(search) || t.specialization.includes(search);
-    const matchFilter = filter === "all" || t.status === filter;
-    return matchSearch && matchFilter;
-  });
-
-  const stats = {
+  const counts = {
     excellent: teachers.filter(t => t.status === "excellent").length,
-    good: teachers.filter(t => t.status === "good").length,
-    warning: teachers.filter(t => t.status === "warning").length,
-    critical: teachers.filter(t => t.status === "critical").length,
+    good:      teachers.filter(t => t.status === "good").length,
+    warning:   teachers.filter(t => t.status === "warning").length,
+    critical:  teachers.filter(t => t.status === "critical").length,
   };
+
+  const todayName = DAY_MAP[currentTime.getDay()];
+  const timeStr = currentTime.toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" });
+  const dayEnded = currentTime.toTimeString().slice(0, 5) >= END_OF_DAY;
 
   return (
     <div className="space-y-8 pb-20">
-      {/* Notification */}
+
       {notification && (
         <motion.div
           initial={{ opacity: 0, y: -20, x: "-50%" }}
           animate={{ opacity: 1, y: 0, x: "-50%" }}
-          exit={{ opacity: 0 }}
           className={`fixed top-8 left-1/2 z-50 px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 text-white text-sm font-bold ${
             notification.type === "success" ? "bg-emerald-500" : "bg-red-500"
           }`}
@@ -234,80 +258,68 @@ export default function TeachersMonitorPage() {
       {/* Header */}
       <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
         <div>
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-red-50 text-red-600 border border-red-100 mb-3">
-            <TrendingUp className="h-4 w-4" />
-            <span className="text-[10px] font-black uppercase tracking-[0.2em]">متابعة الأداء</span>
+          <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full border mb-3 ${
+            dayEnded ? "bg-slate-100 text-slate-600 border-slate-200" : "bg-emerald-50 text-emerald-600 border-emerald-100"
+          }`}>
+            <Clock className="h-4 w-4" />
+            <span className="text-[10px] font-black uppercase tracking-[0.2em]">
+              {todayName} — {timeStr} {dayEnded ? "| انتهى الدوام" : "| جارٍ الدوام"}
+            </span>
           </div>
           <h1 className="text-4xl font-black text-slate-900 tracking-tight">لوحة متابعة المعلمين</h1>
-          <p className="text-slate-500 mt-1 font-medium">متابعة التزام المعلمين بتسجيل الغياب والواجبات والاختبارات</p>
+          <p className="text-slate-500 mt-1 font-medium">
+            التقصير يُحسب بعد نهاية الدوام الساعة {END_OF_DAY}
+          </p>
         </div>
         <div className="flex gap-3">
-          <button
-            onClick={fetchTeachersStats}
-            className="px-6 py-3 rounded-2xl bg-white border border-slate-200 text-slate-600 text-sm font-bold hover:bg-slate-50 transition-all"
-          >
+          <button onClick={fetchTeachersStats}
+            className="px-6 py-3 rounded-2xl bg-white border border-slate-200 text-slate-600 text-sm font-bold hover:bg-slate-50 transition-all">
             تحديث
           </button>
-          <button
-            onClick={sendAlertAll}
-            disabled={stats.warning + stats.critical === 0}
-            className="px-6 py-3 rounded-2xl bg-red-600 text-white text-sm font-bold hover:bg-red-700 transition-all disabled:opacity-50 flex items-center gap-2 shadow-lg shadow-red-200"
-          >
+          <button onClick={sendAlertAll}
+            disabled={counts.warning + counts.critical === 0}
+            className="px-6 py-3 rounded-2xl bg-red-600 text-white text-sm font-bold hover:bg-red-700 transition-all disabled:opacity-50 flex items-center gap-2 shadow-lg shadow-red-200">
             <Bell className="h-4 w-4" />
-            إنذار جماعي للمقصرين ({stats.warning + stats.critical})
+            إنذار جماعي ({counts.warning + counts.critical})
           </button>
         </div>
       </div>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
-          { label: "ممتاز", count: stats.excellent, color: "emerald", icon: <CheckCircle2 className="h-6 w-6" /> },
-          { label: "جيد", count: stats.good, color: "blue", icon: <TrendingUp className="h-6 w-6" /> },
-          { label: "تحذير", count: stats.warning, color: "amber", icon: <AlertTriangle className="h-6 w-6" /> },
-          { label: "حرج", count: stats.critical, color: "red", icon: <XCircle className="h-6 w-6" /> },
-        ].map((item, idx) => (
-          <motion.div
-            key={item.label}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: idx * 0.1 }}
-            onClick={() => setFilter(filter === ["all","all","warning","critical"][idx] ? "all" : ["excellent","good","warning","critical"][idx])}
+        {(["excellent","good","warning","critical"] as const).map((key, idx) => (
+          <motion.div key={key}
+            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.1 }}
+            onClick={() => setFilter(filter === key ? "all" : key)}
             className={`glass-card p-6 rounded-3xl cursor-pointer hover:scale-105 transition-all border-2 ${
-              filter === ["excellent","good","warning","critical"][idx] ? `border-${item.color}-300` : "border-transparent"
-            }`}
-          >
-            <div className={`h-12 w-12 rounded-2xl bg-${item.color}-50 text-${item.color}-600 flex items-center justify-center mb-3`}>
-              {item.icon}
+              filter === key ? "border-slate-400" : "border-transparent"
+            }`}>
+            <div className={`text-3xl font-black mb-1 ${
+              key === "excellent" ? "text-emerald-600" : key === "good" ? "text-blue-600" :
+              key === "warning" ? "text-amber-600" : "text-red-600"
+            }`}>{counts[key]}</div>
+            <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+              {statusConfig[key].label}
             </div>
-            <div className={`text-3xl font-black text-${item.color}-600`}>{item.count}</div>
-            <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">{item.label}</div>
           </motion.div>
         ))}
       </div>
 
-      {/* Search & Filter */}
-      <div className="glass-card p-6 rounded-3xl flex flex-col sm:flex-row gap-4">
+      {/* Search */}
+      <div className="glass-card p-5 rounded-3xl flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1">
           <Search className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
-          <input
-            type="text"
-            placeholder="ابحث باسم المعلم أو التخصص..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="w-full rounded-2xl bg-slate-50 border-0 py-3 pr-12 pl-4 text-sm ring-1 ring-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none"
-          />
+          <input type="text" placeholder="ابحث باسم المعلم أو التخصص..."
+            value={search} onChange={e => setSearch(e.target.value)}
+            className="w-full rounded-2xl bg-slate-50 border-0 py-3 pr-12 pl-4 text-sm ring-1 ring-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none" />
         </div>
-        <select
-          value={filter}
-          onChange={e => setFilter(e.target.value)}
-          className="rounded-2xl bg-slate-50 border-0 py-3 px-4 text-sm ring-1 ring-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-slate-700"
-        >
-          <option value="all">جميع المعلمين</option>
-          <option value="excellent">ممتاز فقط</option>
-          <option value="good">جيد فقط</option>
-          <option value="warning">تحذير فقط</option>
-          <option value="critical">حرج فقط</option>
+        <select value={filter} onChange={e => setFilter(e.target.value)}
+          className="rounded-2xl bg-slate-50 border-0 py-3 px-4 text-sm ring-1 ring-slate-200 font-bold text-slate-700 outline-none">
+          <option value="all">الكل</option>
+          <option value="excellent">ممتاز</option>
+          <option value="good">جيد</option>
+          <option value="warning">تحذير</option>
+          <option value="critical">حرج</option>
         </select>
       </div>
 
@@ -319,146 +331,124 @@ export default function TeachersMonitorPage() {
               <tr>
                 <th className="py-5 pr-8 pl-4 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">المعلم</th>
                 <th className="px-4 py-5 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">الحالة</th>
-                <th className="px-4 py-5 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">تسجيل الغياب</th>
+                <th className="px-4 py-5 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">اليوم ({todayName})</th>
+                <th className="px-4 py-5 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">الأسبوع</th>
                 <th className="px-4 py-5 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">واجبات الأسبوع</th>
                 <th className="px-4 py-5 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">اختبارات الأسبوع</th>
-                <th className="px-4 py-5 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">آخر تسجيل</th>
                 <th className="px-4 py-5 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">إنذار</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {loading ? (
-                <tr>
-                  <td colSpan={7} className="py-20 text-center">
-                    <div className="h-10 w-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-                    <p className="text-slate-400 font-bold text-sm">جاري تحليل بيانات المعلمين...</p>
-                  </td>
-                </tr>
+                <tr><td colSpan={7} className="py-20 text-center">
+                  <div className="h-10 w-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+                  <p className="text-slate-400 font-bold text-sm">جاري تحليل الجداول والحضور...</p>
+                </td></tr>
               ) : filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="py-20 text-center text-slate-400 font-bold">لا يوجد نتائج</td>
-                </tr>
-              ) : (
-                filtered.map((teacher, idx) => {
-                  const statusConfig = getStatusConfig(teacher.status);
-                  return (
-                    <motion.tr
-                      key={teacher.id}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: idx * 0.05 }}
-                      className={`hover:bg-white/60 transition-all ${statusConfig.row}`}
-                    >
-                      {/* المعلم */}
-                      <td className="py-5 pr-8 pl-4">
-                        <div className="flex items-center gap-3">
-                          <div className="h-10 w-10 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white font-black text-sm shadow-lg">
-                            {teacher.name.charAt(0)}
-                          </div>
-                          <div>
-                            <div className="font-black text-slate-900 text-sm">{teacher.name}</div>
-                            <div className="text-[10px] text-slate-400 font-bold mt-0.5">
-                              {teacher.specialization} • {teacher.sections} فصول
-                            </div>
-                          </div>
-                        </div>
-                      </td>
+                <tr><td colSpan={7} className="py-20 text-center text-slate-400 font-bold">لا يوجد نتائج</td></tr>
+              ) : filtered.map((teacher, idx) => {
+                const cfg = statusConfig[teacher.status];
+                return (
+                  <motion.tr key={teacher.id}
+                    initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.04 }}
+                    className={`hover:bg-white/60 transition-all ${cfg.row}`}>
 
-                      {/* الحالة */}
-                      <td className="px-4 py-5 text-center">
-                        <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-black border ${statusConfig.color}`}>
-                          {statusConfig.icon}
-                          {statusConfig.label}
-                        </span>
-                      </td>
+                    <td className="py-5 pr-8 pl-4">
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white font-black text-sm shadow-lg">
+                          {teacher.name.charAt(0)}
+                        </div>
+                        <div>
+                          <div className="font-black text-slate-900 text-sm">{teacher.name}</div>
+                          <div className="text-[10px] text-slate-400 font-bold">{teacher.specialization}</div>
+                        </div>
+                      </div>
+                    </td>
 
-                      {/* تسجيل الغياب */}
-                      <td className="px-4 py-5 text-center">
-                        <div className={`text-xl font-black ${getPercentColor(teacher.attendance.percent)}`}>
-                          {teacher.attendance.percent}%
-                        </div>
-                        <div className="text-[10px] text-slate-400 font-bold mt-0.5">
-                          {teacher.attendance.recorded}/{teacher.attendance.total} حصة
-                        </div>
-                        <div className="mt-2 h-1.5 w-20 mx-auto bg-slate-100 rounded-full overflow-hidden">
-                          <div
-                            className={`h-full rounded-full transition-all ${
-                              teacher.attendance.percent >= 90 ? "bg-emerald-500" :
-                              teacher.attendance.percent >= 70 ? "bg-amber-500" : "bg-red-500"
-                            }`}
-                            style={{ width: `${teacher.attendance.percent}%` }}
-                          />
-                        </div>
-                      </td>
+                    <td className="px-4 py-5 text-center">
+                      <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-black border ${cfg.color}`}>
+                        {cfg.label}
+                      </span>
+                    </td>
 
-                      {/* الواجبات */}
-                      <td className="px-4 py-5 text-center">
-                        <div className={`text-xl font-black ${teacher.assignments.thisWeek > 0 ? "text-emerald-600" : "text-red-500"}`}>
-                          {teacher.assignments.thisWeek}
-                        </div>
-                        <div className="text-[10px] text-slate-400 font-bold mt-0.5">
-                          إجمالي: {teacher.assignments.count}
-                        </div>
-                        {teacher.assignments.thisWeek === 0 && (
-                          <span className="text-[9px] font-black text-red-500 bg-red-50 px-2 py-0.5 rounded-lg mt-1 inline-block">
-                            لم يضف
-                          </span>
-                        )}
-                      </td>
-
-                      {/* الاختبارات */}
-                      <td className="px-4 py-5 text-center">
-                        <div className={`text-xl font-black ${teacher.exams.thisWeek > 0 ? "text-emerald-600" : "text-amber-500"}`}>
-                          {teacher.exams.thisWeek}
-                        </div>
-                        <div className="text-[10px] text-slate-400 font-bold mt-0.5">
-                          إجمالي: {teacher.exams.count}
-                        </div>
-                        {teacher.exams.thisWeek === 0 && (
-                          <span className="text-[9px] font-black text-amber-600 bg-amber-50 px-2 py-0.5 rounded-lg mt-1 inline-block">
-                            لم يضف
-                          </span>
-                        )}
-                      </td>
-
-                      {/* آخر تسجيل */}
-                      <td className="px-4 py-5 text-center">
-                        {teacher.attendance.lastRecorded ? (
-                          <div className="text-sm font-bold text-slate-700">
-                            {new Date(teacher.attendance.lastRecorded).toLocaleDateString("ar-EG", {
-                              day: "numeric", month: "short"
-                            })}
-                          </div>
-                        ) : (
-                          <span className="text-xs font-black text-red-500">لم يسجّل</span>
-                        )}
-                      </td>
-
-                      {/* إنذار */}
-                      <td className="px-4 py-5 text-center">
-                        {teacher.status !== "excellent" ? (
-                          <button
-                            onClick={() => sendAlert(teacher)}
-                            disabled={sendingAlert === teacher.id}
-                            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-red-600 text-white text-xs font-black hover:bg-red-700 transition-all disabled:opacity-50 shadow-sm"
-                          >
-                            {sendingAlert === teacher.id ? (
-                              <div className="h-3 w-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                            ) : (
-                              <Bell className="h-3.5 w-3.5" />
+                    {/* اليوم */}
+                    <td className="px-4 py-5 text-center">
+                      {teacher.todaySchedule.total === 0 ? (
+                        <span className="text-xs text-slate-400 font-bold">لا حصص اليوم</span>
+                      ) : (
+                        <div>
+                          <div className="flex items-center justify-center gap-2 text-sm font-black">
+                            <span className="text-emerald-600">{teacher.todaySchedule.recorded} ✓</span>
+                            {teacher.todaySchedule.missing > 0 && (
+                              <span className={teacher.todaySchedule.dayEnded ? "text-red-600" : "text-amber-500"}>
+                                {teacher.todaySchedule.missing} {teacher.todaySchedule.dayEnded ? "✗" : "⏳"}
+                              </span>
                             )}
-                            إنذار
-                          </button>
-                        ) : (
-                          <span className="text-emerald-500">
-                            <CheckCircle2 className="h-5 w-5 mx-auto" />
-                          </span>
-                        )}
-                      </td>
-                    </motion.tr>
-                  );
-                })
-              )}
+                          </div>
+                          <div className="text-[10px] text-slate-400 mt-0.5">
+                            من {teacher.todaySchedule.total} حصة
+                            {!teacher.todaySchedule.dayEnded && teacher.todaySchedule.missing > 0 && (
+                              <span className="text-amber-500"> (لم ينته الدوام)</span>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </td>
+
+                    {/* الأسبوع */}
+                    <td className="px-4 py-5 text-center">
+                      <div className={`text-xl font-black ${
+                        teacher.weekSchedule.percent >= 90 ? "text-emerald-600" :
+                        teacher.weekSchedule.percent >= 75 ? "text-amber-600" : "text-red-600"
+                      }`}>{teacher.weekSchedule.percent}%</div>
+                      <div className="mt-1.5 h-1.5 w-16 mx-auto bg-slate-100 rounded-full overflow-hidden">
+                        <div className={`h-full rounded-full ${
+                          teacher.weekSchedule.percent >= 90 ? "bg-emerald-500" :
+                          teacher.weekSchedule.percent >= 75 ? "bg-amber-500" : "bg-red-500"
+                        }`} style={{ width: `${teacher.weekSchedule.percent}%` }} />
+                      </div>
+                      <div className="text-[10px] text-slate-400 mt-1">
+                        {teacher.weekSchedule.recorded}/{teacher.weekSchedule.total}
+                      </div>
+                    </td>
+
+                    {/* الواجبات */}
+                    <td className="px-4 py-5 text-center">
+                      <div className={`text-xl font-black ${teacher.assignments.thisWeek > 0 ? "text-emerald-600" : "text-red-500"}`}>
+                        {teacher.assignments.thisWeek}
+                      </div>
+                      {teacher.assignments.thisWeek === 0 && (
+                        <span className="text-[9px] font-black text-red-500 bg-red-50 px-2 py-0.5 rounded-lg mt-1 inline-block">لم يضف</span>
+                      )}
+                    </td>
+
+                    {/* الاختبارات */}
+                    <td className="px-4 py-5 text-center">
+                      <div className={`text-xl font-black ${teacher.exams.thisWeek > 0 ? "text-emerald-600" : "text-amber-500"}`}>
+                        {teacher.exams.thisWeek}
+                      </div>
+                      {teacher.exams.thisWeek === 0 && (
+                        <span className="text-[9px] font-black text-amber-600 bg-amber-50 px-2 py-0.5 rounded-lg mt-1 inline-block">لم يضف</span>
+                      )}
+                    </td>
+
+                    {/* إنذار */}
+                    <td className="px-4 py-5 text-center">
+                      {teacher.status !== "excellent" ? (
+                        <button onClick={() => sendAlert(teacher)} disabled={sendingAlert === teacher.id}
+                          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-red-600 text-white text-xs font-black hover:bg-red-700 transition-all disabled:opacity-50 shadow-sm">
+                          {sendingAlert === teacher.id ? (
+                            <div className="h-3 w-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                          ) : <Bell className="h-3.5 w-3.5" />}
+                          إنذار
+                        </button>
+                      ) : (
+                        <CheckCircle2 className="h-5 w-5 text-emerald-500 mx-auto" />
+                      )}
+                    </td>
+                  </motion.tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

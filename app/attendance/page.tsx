@@ -9,6 +9,7 @@ type AttendanceStatus = 'present' | 'absent' | 'late' | 'excused';
 export default function AttendancePage() {
   const [sections, setSections] = useState<any[]>([]);
   const [selectedSection, setSelectedSection] = useState<string>('');
+  const [stageFilter, setStageFilter] = useState<'all' | 'middle' | 'high'>('all');
   const [date, setDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [students, setStudents] = useState<any[]>([]);
   const [attendance, setAttendance] = useState<Record<string, AttendanceStatus>>({});
@@ -173,7 +174,7 @@ export default function AttendancePage() {
         // المعلم يرى فصوله فقط
         const { data: teacherSections } = await supabase
           .from('teacher_sections')
-          .select('section_id, section:sections(id, name, classes(name))')
+          .select('section_id, section:sections(id, name, classes(name, level))')
           .eq('teacher_id', user.id);
         
         sectionsData = (teacherSections?.map(ts => ts.section) || []) as any[];
@@ -182,7 +183,7 @@ export default function AttendancePage() {
         // المدير يرى كل الفصول
         const { data: allSections } = await supabase
           .from('sections')
-          .select('id, name, classes(name)');
+          .select('id, name, classes(name, level)');
         sectionsData = allSections || [];
         console.log('Admin sections:', sectionsData);
       } else {
@@ -344,8 +345,8 @@ export default function AttendancePage() {
           <p className="text-lg text-slate-500 font-medium">إحصائيات وسجل حضورك الشخصي</p>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-          <div className="glass-card p-8 rounded-4xl border border-emerald-100 bg-emerald-50/30 flex flex-col items-center justify-center text-center gap-4 shadow-xl shadow-emerald-100/20 relative overflow-hidden group">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-6">
+          <div className="glass-card p-4 sm:p-8 rounded-3xl sm:rounded-4xl border border-emerald-100 bg-emerald-50/30 flex flex-col items-center justify-center text-center gap-4 shadow-xl shadow-emerald-100/20 relative overflow-hidden group">
             <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full -mr-12 -mt-12 transition-transform group-hover:scale-110" />
             <div className="h-16 w-16 rounded-2xl bg-white flex items-center justify-center text-emerald-600 shadow-sm group-hover:scale-110 transition-transform">
               <CheckCircle2 className="h-8 w-8" />
@@ -480,14 +481,42 @@ export default function AttendancePage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           <div className="space-y-2">
             <label className="text-sm font-black text-slate-700 mr-1">الفصل / الشعبة</label>
+            {/* فلتر المرحلة — للمدير فقط */}
+            {(userRole === 'admin' || userRole === 'management') && (
+              <div className="flex gap-2 mb-2">
+                {[
+                  { key: 'all',    label: 'الكل' },
+                  { key: 'middle', label: 'المتوسطة' },
+                  { key: 'high',   label: 'الثانوية' },
+                ].map(s => (
+                  <button key={s.key} type="button" onClick={() => setStageFilter(s.key as any)}
+                    className={`px-2 py-1 sm:px-3 sm:py-1.5 rounded-xl text-xs font-black transition-all ${
+                      stageFilter === s.key
+                        ? s.key === 'middle' ? 'bg-emerald-600 text-white'
+                          : s.key === 'high' ? 'bg-amber-500 text-white'
+                          : 'bg-indigo-600 text-white'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}>
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+            )}
             <select
               value={selectedSection}
               onChange={(e) => setSelectedSection(e.target.value)}
               className="block w-full rounded-2xl border-0 py-4 px-4 text-slate-900 bg-slate-50 ring-1 ring-inset ring-slate-100 focus:ring-2 focus:ring-indigo-600 sm:text-sm transition-all font-bold"
             >
-              {sections.map(s => (
-                <option key={s.id} value={s.id}>{s.classes?.name} - {s.name}</option>
-              ))}
+              {sections
+                .filter(s => {
+                  if (stageFilter === 'all') return true;
+                  const level = s.classes?.level;
+                  if (!level) return true;
+                  return stageFilter === 'middle' ? level <= 9 : level >= 10;
+                })
+                .map(s => (
+                  <option key={s.id} value={s.id}>{s.classes?.name} - {s.name}</option>
+                ))}
             </select>
           </div>
           <div className="space-y-2">

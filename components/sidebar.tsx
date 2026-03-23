@@ -22,7 +22,8 @@ import {
   Settings,
   Database,
   Award,
-  X
+  X,
+  Radio
 } from 'lucide-react';
 
 const navigation = [
@@ -32,6 +33,7 @@ const navigation = [
   { name: 'تعيينات المعلمين', href: '/admin/teacher-assignments', icon: BookOpen },
   { name: 'متابعة المعلمين', href: '/admin/teachers-monitor', icon: BarChart3 },
   { name: 'تقرير المعلمين', href: '/admin/teachers-report', icon: FileText },
+  { name: 'الحصص الحية 🔴', href: '/live', icon: Radio },
   { name: 'أولياء الأمور', href: '/parents', icon: Users },
   { name: 'الفصول', href: '/classes', icon: School },
   { name: 'المواد الدراسية', href: '/subjects', icon: BookOpen },

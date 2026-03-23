@@ -259,6 +259,38 @@ export default function AdminDashboard() {
           {/* Announcements Widget */}
           <AnnouncementsWidget role="admin" />
 
+          {/* Live Monitor Card */}
+          <motion.div variants={itemVariants}
+            className="bg-gradient-to-br from-red-600 to-rose-700 rounded-[2.5rem] p-6 shadow-xl shadow-red-200 text-white relative overflow-hidden"
+          >
+            <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16 blur-2xl" />
+            <div className="relative z-10">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="h-10 w-10 rounded-2xl bg-white/20 flex items-center justify-center text-lg">🔴</div>
+                <div>
+                  <div className="font-black text-lg">الحصص الحية</div>
+                  <div className="text-red-200 text-xs font-bold">للمراقبين التربويين</div>
+                </div>
+              </div>
+              <div className="bg-white/15 rounded-2xl px-3 py-2 mb-3 text-xs font-black text-white/90 truncate">
+                {typeof window !== "undefined" ? window.location.origin : "ehab2026.netlify.app"}/live
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => { if (typeof window !== "undefined") navigator.clipboard.writeText(window.location.origin + "/live"); }}
+                  className="flex-1 py-2.5 rounded-2xl bg-white text-red-600 text-xs font-black hover:bg-red-50 transition-all"
+                >
+                  📋 نسخ الرابط
+                </button>
+                <a href="/live" target="_blank"
+                  className="flex-1 py-2.5 rounded-2xl bg-white/20 text-white text-xs font-black hover:bg-white/30 transition-all text-center"
+                >
+                  🔗 فتح
+                </a>
+              </div>
+            </div>
+          </motion.div>
+
           <motion.div 
             variants={itemVariants}
             className="bg-white/70 backdrop-blur-xl rounded-[2.5rem] p-8 shadow-sm ring-1 ring-slate-200/50"

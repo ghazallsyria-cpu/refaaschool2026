@@ -22,7 +22,7 @@ type Assignment = {
   submission_count?: number;
   graded_count?: number;
 
-  // ✅ التصحيح هنا
+  // ✅ تصحيح العلاقات
   subjects?: { name: string }[];
   sections?: { name: string; classes?: { name: string }[] }[];
   teachers?: { users?: { full_name: string } }[];
@@ -48,11 +48,6 @@ export default function AssignmentsPage() {
   const [assignmentToDelete, setAssignmentToDelete] = useState<string | null>(null);
 
   const [originalFileUrl, setOriginalFileUrl] = useState<string | null>(null);
-
-  const showNotification = (type: 'success' | 'error', message: string) => {
-    setNotification({ type, message });
-    setTimeout(() => setNotification(null), 5000);
-  };
 
   const fetchAssignments = useCallback(async () => {
     setLoading(true);
@@ -83,7 +78,7 @@ export default function AssignmentsPage() {
 
       const { data } = await query;
 
-      // ✅ التصحيح هنا
+      // ✅ التصحيح
       setAssignments((data as unknown as Assignment[]) || []);
     } catch (error: any) {
       console.error(error);
@@ -103,11 +98,12 @@ export default function AssignmentsPage() {
     try {
       const sectionIds = currentAssignment.section_ids || [];
 
+      // ✅ إزالة undefined
       const basePayload = {
-        title: currentAssignment.title,
+        title: currentAssignment.title || '',
         description: currentAssignment.description || null,
-        subject_id: currentAssignment.subject_id,
-        teacher_id: currentAssignment.teacher_id,
+        subject_id: currentAssignment.subject_id || '',
+        teacher_id: currentAssignment.teacher_id || '',
         due_date: new Date(currentAssignment.due_date!).toISOString(),
         total_marks: questions.reduce((sum, q) => sum + (q.points || 0), 0),
       };

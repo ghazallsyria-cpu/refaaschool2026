@@ -52,6 +52,8 @@ export default function SchedulesPage() {
   const [sections, setSections] = useState<Section[]>([]);
   const [periods, setPeriods] = useState<Period[]>([]);
   const [selectedSectionId, setSelectedSectionId] = useState<string>('');
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const [studentSectionName, setStudentSectionName] = useState<string>('');
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [teacherAssignments, setTeacherAssignments] = useState<any[]>([]); // New state
   const [loading, setLoading] = useState(true);
@@ -122,6 +124,8 @@ export default function SchedulesPage() {
   const fetchInitialData = async () => {
     setLoading(true);
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
       const [sectionsRes, subjectsRes, teachersRes, assignmentsRes, periodsRes] = await Promise.all([
         supabase.from('sections').select('id, name, classes(name)').order('name'),
         supabase.from('subjects').select('id, name').order('name'),
@@ -135,7 +139,26 @@ export default function SchedulesPage() {
       if (teachersRes.data) setTeachers((teachersRes.data as unknown) as Teacher[]);
       if (assignmentsRes.data) setTeacherAssignments(assignmentsRes.data);
       if (periodsRes.data) setPeriods(periodsRes.data);
-      
+
+      // إذا كان المستخدم طالباً، نجلب فصله تلقائياً
+      if (user) {
+        const { data: userData } = await supabase
+          .from('users').select('role').eq('id', user.id).single();
+        
+        setUserRole(userData?.role || null);
+        if (userData?.role === 'student') {
+          const { data: studentData } = await supabase
+            .from('students').select('section_id, sections(name, classes(name))').eq('id', user.id).single();
+          if (studentData?.section_id) {
+            setSelectedSectionId(studentData.section_id);
+            const sec = studentData.sections as any;
+            setStudentSectionName(`${sec?.classes?.name} - ${sec?.name}`);
+            return;
+          }
+        }
+      }
+
+      // للمدير والمعلم: أول فصل في القائمة
       if (sectionsRes.data && sectionsRes.data.length > 0) {
         setSelectedSectionId(sectionsRes.data[0].id);
       }
@@ -317,25 +340,36 @@ export default function SchedulesPage() {
 
       <div className="bg-white p-4 rounded-xl shadow-sm ring-1 ring-slate-200">
         <div className="flex flex-col sm:flex-row items-center gap-4">
-          <label className="text-sm font-medium text-slate-700 whitespace-nowrap">
-            اختر الشعبة:
-          </label>
-          <select
-            className="block w-full sm:w-64 rounded-md border-0 py-2 px-3 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
-            value={selectedSectionId}
-            onChange={(e) => setSelectedSectionId(e.target.value)}
-            disabled={loading && sections.length === 0}
-          >
-            {sections.length === 0 ? (
-              <option value="">لا توجد شعب مسجلة</option>
-            ) : (
-              sections.map((section) => (
-                <option key={section.id} value={section.id}>
-                  {section.classes?.name} - {section.name}
-                </option>
-              ))
-            )}
-          </select>
+          {userRole === 'student' ? (
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-medium text-slate-700">فصلك الدراسي:</span>
+              <span className="bg-indigo-50 text-indigo-700 font-black px-4 py-2 rounded-xl text-sm border border-indigo-100">
+                {studentSectionName || 'جاري التحميل...'}
+              </span>
+            </div>
+          ) : (
+            <>
+              <label className="text-sm font-medium text-slate-700 whitespace-nowrap">
+                اختر الشعبة:
+              </label>
+              <select
+                className="block w-full sm:w-64 rounded-md border-0 py-2 px-3 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                value={selectedSectionId}
+                onChange={(e) => setSelectedSectionId(e.target.value)}
+                disabled={loading && sections.length === 0}
+              >
+                {sections.length === 0 ? (
+                  <option value="">لا توجد شعب مسجلة</option>
+                ) : (
+                  sections.map((section) => (
+                    <option key={section.id} value={section.id}>
+                      {section.classes?.name} - {section.name}
+                    </option>
+                  ))
+                )}
+              </select>
+            </>
+          )}
         </div>
       </div>
 

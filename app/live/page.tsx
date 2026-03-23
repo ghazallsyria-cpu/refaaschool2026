@@ -60,6 +60,7 @@ export default function LiveMonitorPage() {
   }, []);
 
   // تحديث الحصة الحالية عند تغير الوقت
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     updateCurrentPeriod();
   }, [now, periods]);

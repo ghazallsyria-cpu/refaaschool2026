@@ -42,6 +42,17 @@ export default function TeachersMonitorPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("all");
+  const [stageFilter, setStageFilter] = useState<"all" | "middle" | "high" | "shared">("all");
+  const [teacherLevels, setTeacherLevels] = useState<Record<string, number[]>>({});
+
+  const getTeacherStage = (levels: number[]): "middle" | "high" | "shared" | "none" => {
+    const hasMiddle = levels.some(l => l >= 6 && l <= 9);
+    const hasHigh   = levels.some(l => l >= 10 && l <= 12);
+    if (hasMiddle && hasHigh) return "shared";
+    if (hasMiddle) return "middle";
+    if (hasHigh)   return "high";
+    return "none";
+  };
   const [sendingAlert, setSendingAlert] = useState<string | null>(null);
   const [notification, setNotification] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -174,6 +185,21 @@ export default function TeachersMonitorPage() {
       );
 
       setTeachers(stats);
+
+      // جلب مستويات الصفوف لكل معلم
+      const { data: tsData } = await supabase
+        .from("teacher_sections")
+        .select("teacher_id, sections(class_id, classes(level))");
+
+      const levelsMap: Record<string, number[]> = {};
+      tsData?.forEach((ts: any) => {
+        const level = ts.sections?.classes?.level;
+        if (level && ts.teacher_id) {
+          if (!levelsMap[ts.teacher_id]) levelsMap[ts.teacher_id] = [];
+          if (!levelsMap[ts.teacher_id].includes(level)) levelsMap[ts.teacher_id].push(level);
+        }
+      });
+      setTeacherLevels(levelsMap);
     } catch (error) {
       console.error("Error:", error);
     } finally {
@@ -223,10 +249,13 @@ export default function TeachersMonitorPage() {
     critical:  { label: "حرج",   color: "bg-red-50 text-red-700 border-red-100",             row: "bg-red-50/20" },
   };
 
-  const filtered = teachers.filter(t =>
-    (t.name.includes(search) || t.specialization.includes(search)) &&
-    (filter === "all" || t.status === filter)
-  );
+  const filtered = teachers.filter(t => {
+    const matchSearch = t.name.includes(search) || t.specialization.includes(search);
+    const matchFilter = filter === "all" || t.status === filter;
+    const teacherStage = getTeacherStage(teacherLevels[t.id] || []);
+    const matchStage = stageFilter === "all" || teacherStage === stageFilter;
+    return matchSearch && matchFilter && matchStage;
+  });
 
   const counts = {
     excellent: teachers.filter(t => t.status === "excellent").length,
@@ -305,6 +334,28 @@ export default function TeachersMonitorPage() {
         ))}
       </div>
 
+      {/* فلتر المرحلة */}
+      <div className="flex flex-wrap gap-3">
+        {([
+          { key: "all",    label: "🏫 الكل",       active: "bg-slate-700" },
+          { key: "middle", label: "📚 المتوسطة",    active: "bg-emerald-600" },
+          { key: "high",   label: "🎓 الثانوية",    active: "bg-amber-500" },
+          { key: "shared", label: "🔄 مشترك",       active: "bg-violet-600" },
+        ] as const).map(s => (
+          <button key={s.key} onClick={() => setStageFilter(s.key)}
+            className={`px-5 py-2.5 rounded-2xl text-xs font-black transition-all ${
+              stageFilter === s.key
+                ? `${s.active} text-white shadow-lg`
+                : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
+            }`}>
+            {s.label}
+            <span className="mr-1 opacity-70">
+              ({teachers.filter(t => s.key === "all" || getTeacherStage(teacherLevels[t.id] || []) === s.key).length})
+            </span>
+          </button>
+        ))}
+      </div>
+
       {/* Search */}
       <div className="glass-card p-5 rounded-3xl flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1">
@@ -323,8 +374,8 @@ export default function TeachersMonitorPage() {
         </select>
       </div>
 
-      {/* Table */}
-      <div className="glass-card rounded-3xl overflow-hidden">
+      {/* Table - Desktop */}
+      <div className="glass-card rounded-3xl overflow-hidden hidden md:block">
         <div className="overflow-x-auto">
           <table className="min-w-full">
             <thead className="bg-slate-50/80">
@@ -452,6 +503,82 @@ export default function TeachersMonitorPage() {
             </tbody>
           </table>
         </div>
+      </div>
+
+      {/* Mobile Card View */}
+      <div className="md:hidden space-y-4">
+        {loading ? (
+          <div className="py-20 text-center">
+            <div className="h-10 w-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+            <p className="text-slate-400 font-bold text-sm">جاري التحليل...</p>
+          </div>
+        ) : filtered.map((teacher, idx) => {
+          const cfg = statusConfig[teacher.status];
+          return (
+            <motion.div key={teacher.id}
+              initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: idx * 0.04 }}
+              className={`glass-card rounded-3xl p-5 ${cfg.row}`}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="h-11 w-11 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white font-black text-sm shadow-lg">
+                    {teacher.name.charAt(0)}
+                  </div>
+                  <div>
+                    <div className="font-black text-slate-900 text-sm">{teacher.name}</div>
+                    <div className="text-[10px] text-slate-400 font-bold">{teacher.specialization}</div>
+                  </div>
+                </div>
+                <span className={`inline-flex px-3 py-1.5 rounded-xl text-[10px] font-black border ${cfg.color}`}>
+                  {cfg.label}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2 mb-4">
+                <div className="bg-slate-50 rounded-2xl p-3 text-center">
+                  <div className={`text-lg font-black ${teacher.weekSchedule.percent >= 90 ? "text-emerald-600" : teacher.weekSchedule.percent >= 75 ? "text-amber-600" : "text-red-600"}`}>
+                    {teacher.weekSchedule.percent}%
+                  </div>
+                  <div className="text-[9px] text-slate-400 font-bold mt-0.5">تسجيل الأسبوع</div>
+                </div>
+                <div className="bg-slate-50 rounded-2xl p-3 text-center">
+                  <div className={`text-lg font-black ${teacher.assignments.thisWeek > 0 ? "text-emerald-600" : "text-red-500"}`}>{teacher.assignments.thisWeek}</div>
+                  <div className="text-[9px] text-slate-400 font-bold mt-0.5">واجبات</div>
+                </div>
+                <div className="bg-slate-50 rounded-2xl p-3 text-center">
+                  <div className={`text-lg font-black ${teacher.exams.thisWeek > 0 ? "text-emerald-600" : "text-amber-500"}`}>{teacher.exams.thisWeek}</div>
+                  <div className="text-[9px] text-slate-400 font-bold mt-0.5">اختبارات</div>
+                </div>
+              </div>
+
+              {teacher.todaySchedule.total > 0 && (
+                <div className="bg-slate-50 rounded-2xl p-3 mb-4 flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-500">حصص اليوم</span>
+                  <div className="flex items-center gap-2 text-sm font-black">
+                    <span className="text-emerald-600">{teacher.todaySchedule.recorded}✓</span>
+                    {teacher.todaySchedule.missing > 0 && (
+                      <span className={teacher.todaySchedule.dayEnded ? "text-red-600" : "text-amber-500"}>
+                        {teacher.todaySchedule.missing}{teacher.todaySchedule.dayEnded ? "✗" : "⏳"}
+                      </span>
+                    )}
+                    <span className="text-slate-400 text-[10px]">من {teacher.todaySchedule.total}</span>
+                  </div>
+                </div>
+              )}
+
+              {teacher.status !== "excellent" && (
+                <button onClick={() => sendAlert(teacher)} disabled={sendingAlert === teacher.id}
+                  className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl bg-red-600 text-white text-xs font-black hover:bg-red-700 transition-all">
+                  {sendingAlert === teacher.id ? (
+                    <div className="h-3 w-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : <Bell className="h-3.5 w-3.5" />}
+                  إرسال إنذار
+                </button>
+              )}
+            </motion.div>
+          );
+        })}
       </div>
     </div>
   );

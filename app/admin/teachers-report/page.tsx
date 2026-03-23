@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { motion } from "motion/react";
 import {
@@ -48,7 +48,7 @@ export default function TeachersReportPage() {
 
   useEffect(() => { fetchData(); }, [reportType]);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       const weekAgo = new Date(now);
@@ -118,7 +118,7 @@ export default function TeachersReportPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [reportType]);
 
   const toggleSelect = (id: string) => {
     setTeachers(prev => prev.map(t => t.id === id ? { ...t, selected: !t.selected } : t));

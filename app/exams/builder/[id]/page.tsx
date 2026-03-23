@@ -352,7 +352,8 @@ export default function QuizBuilder() {
         finalTeacherId = teacher.id;
       }
 
-      const { section_ids, ...examPayload } = exam;
+      // استبعاد الحقول التي ليست في قاعدة البيانات
+      const { section_ids, start_time: _st, end_time: _et, exam_date: _ed, ...examPayload } = exam;
       
       // تعيين section_id لأول قسم تم اختياره (للتوافق مع قاعدة البيانات الحالية)
       if (section_ids && section_ids.length > 0) {
@@ -371,8 +372,9 @@ export default function QuizBuilder() {
             total_marks: exam.max_score || 100, 
             teacher_id: finalTeacherId, 
             status: exam.status,
-            start_time: exam.start_time,
-            end_time: exam.end_time
+            exam_date: exam.exam_date || null,
+            start_time: exam.start_time || null,
+            end_time: exam.end_time || null,
           }])
           .select()
           .single();
@@ -388,8 +390,9 @@ export default function QuizBuilder() {
             total_marks: exam.max_score || 100, 
             teacher_id: finalTeacherId, 
             status: exam.status,
-            start_time: exam.start_time,
-            end_time: exam.end_time
+            exam_date: exam.exam_date || null,
+            start_time: exam.start_time || null,
+            end_time: exam.end_time || null,
           })
           .eq('id', examId);
         if (error) throw error;
@@ -915,14 +918,7 @@ export default function QuizBuilder() {
                           className="w-16 bg-transparent border-none focus:ring-0 text-xl font-black text-slate-900 p-0 text-center tracking-tighter"
                         />
                       </div>
-                      <div className="flex items-center gap-2">
-                        <button className="h-12 w-12 flex items-center justify-center rounded-2xl bg-white border border-slate-100 text-slate-400 hover:text-indigo-600 hover:shadow-lg transition-all active:scale-95">
-                          <ImageIcon className="h-5 w-5" />
-                        </button>
-                        <button className="h-12 w-12 flex items-center justify-center rounded-2xl bg-white border border-slate-100 text-slate-400 hover:text-indigo-600 hover:shadow-lg transition-all active:scale-95">
-                          <Video className="h-5 w-5" />
-                        </button>
-                      </div>
+
                     </div>
                     <div className="flex items-center gap-3">
                       <button 

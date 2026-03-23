@@ -21,9 +21,11 @@ type Assignment = {
   file_url: string;
   submission_count?: number;
   graded_count?: number;
-  subjects?: { name: string };
-  sections?: { name: string; classes?: { name: string } };
-  teachers?: { users?: { full_name: string } };
+
+  // ✅ التصحيح هنا
+  subjects?: { name: string }[];
+  sections?: { name: string; classes?: { name: string }[] }[];
+  teachers?: { users?: { full_name: string } }[];
 };
 
 export default function AssignmentsPage() {
@@ -81,7 +83,8 @@ export default function AssignmentsPage() {
 
       const { data } = await query;
 
-      setAssignments((data as Assignment[]) || []);
+      // ✅ التصحيح هنا
+      setAssignments((data as unknown as Assignment[]) || []);
     } catch (error: any) {
       console.error(error);
     } finally {
@@ -109,7 +112,6 @@ export default function AssignmentsPage() {
         total_marks: questions.reduce((sum, q) => sum + (q.points || 0), 0),
       };
 
-      // ✅ التصحيح هنا
       const payload: {
         title: string;
         description: string | null;

@@ -42,6 +42,7 @@ export default function ExamsDashboard() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [userRole, setUserRole] = useState<string | null>(null);
+  const [examToDelete, setExamToDelete] = useState<string | null>(null);
 
   const fetchExams = useCallback(async () => {
     try {
@@ -107,45 +108,41 @@ export default function ExamsDashboard() {
 
       if (error) throw error;
 
-      // Fetch real stats for each exam and student attempts if role is student
-      const examsWithStats = await Promise.all((data || []).map(async (exam) => {
-        const [questionsRes, attemptsRes] = await Promise.all([
-          supabase.from('questions').select('id', { count: 'exact', head: true }).eq('exam_id', exam.id),
-          supabase.from('exam_attempts').select('score', { count: 'exact' }).eq('exam_id', exam.id)
-        ]);
+      const examIds = (data || []).map(e => e.id);
 
-        let studentAttempt = null;
-        if (role === 'student' && session?.user?.id) {
-          const { data: attemptsData } = await supabase
-            .from('exam_attempts')
-            .select('id, status, score')
-            .eq('exam_id', exam.id)
-            .eq('student_id', session.user.id);
-          
-          // Prioritize completed/graded attempts
-          studentAttempt = attemptsData?.find(a => a.status === 'completed' || a.status === 'graded') || 
-                          attemptsData?.find(a => a.status === 'ongoing') || 
-                          null;
-        }
+      // جلب كل البيانات دفعة واحدة بدلاً من N+1 queries
+      const [questionsCountRes, attemptsRes, studentAttemptsRes] = await Promise.all([
+        supabase.from('questions').select('exam_id', { count: 'exact' }).in('exam_id', examIds),
+        supabase.from('exam_attempts').select('exam_id, score').in('exam_id', examIds),
+        role === 'student' && session?.user?.id
+          ? supabase.from('exam_attempts')
+              .select('exam_id, id, status, score')
+              .in('exam_id', examIds)
+              .eq('student_id', session.user.id)
+          : Promise.resolve({ data: [] })
+      ]);
 
-        const attempts = attemptsRes.data || [];
-        const avgScore = attempts.length > 0 
-          ? Math.round(attempts.reduce((acc, curr) => acc + curr.score, 0) / attempts.length) 
+      const examsWithStats = (data || []).map(exam => {
+        const examAttempts = (attemptsRes.data || []).filter(a => a.exam_id === exam.id);
+        const avgScore = examAttempts.length > 0
+          ? Math.round(examAttempts.reduce((acc, a) => acc + (a.score || 0), 0) / examAttempts.length)
           : 0;
+
+        const studentExamAttempts = (studentAttemptsRes.data || []).filter(a => a.exam_id === exam.id);
+        const studentAttempt = studentExamAttempts.find(a => a.status === 'completed' || a.status === 'graded')
+          || studentExamAttempts.find(a => a.status === 'ongoing')
+          || null;
 
         return {
           ...exam,
           _count: {
-            questions: questionsRes.count || 0,
-            attempts: attemptsRes.count || 0
+            questions: (questionsCountRes.data || []).filter(q => q.exam_id === exam.id).length,
+            attempts: examAttempts.length
           },
-          stats: {
-            avg_score: avgScore,
-            total_students: attemptsRes.count || 0
-          },
+          stats: { avg_score: avgScore, total_students: examAttempts.length },
           studentAttempt
         };
-      }));
+      });
 
       setExams(examsWithStats);
     } catch (err) {
@@ -187,6 +184,8 @@ export default function ExamsDashboard() {
       const { error } = await supabase.from('exams').delete().eq('id', examId);
       if (error) throw error;
       setExams(exams.filter(e => e.id !== examId));
+      // إشعار بسيط للمستخدم بنجاح الحذف
+      console.log('Exam deleted successfully');
     } catch (err) {
       console.error('Error deleting exam:', err);
     }
@@ -420,7 +419,7 @@ export default function ExamsDashboard() {
                               <DropdownMenu.Separator className="h-px bg-slate-100 my-3 mx-3" />
                               <DropdownMenu.Item 
                                 className="flex items-center gap-4 px-5 py-4 text-sm font-black text-red-600 hover:bg-red-50 rounded-2xl outline-none cursor-pointer transition-colors"
-                                onClick={() => handleDelete(exam.id)}
+                                onClick={() => setExamToDelete(exam.id)}
                               >
                                 <Trash2 className="h-5 w-5" />
                                 <span>حذف الاختبار</span>
@@ -558,6 +557,37 @@ export default function ExamsDashboard() {
           )}
         </div>
       </div>
+      {/* Delete Confirmation Dialog */}
+      {examToDelete && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-[2.5rem] p-8 w-full max-w-md shadow-2xl">
+            <div className="h-16 w-16 bg-red-50 rounded-3xl flex items-center justify-center mb-6">
+              <Trash2 className="h-8 w-8 text-red-500" />
+            </div>
+            <h2 className="text-2xl font-black text-slate-900 mb-2">تأكيد حذف الاختبار</h2>
+            <p className="text-slate-500 font-medium mb-8 leading-relaxed">
+              هل أنت متأكد؟ سيتم حذف الاختبار وجميع أسئلته ونتائج الطلاب نهائياً ولا يمكن التراجع.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setExamToDelete(null)}
+                className="flex-1 py-4 rounded-2xl bg-slate-100 text-slate-700 font-black hover:bg-slate-200 transition-all"
+              >
+                إلغاء
+              </button>
+              <button
+                onClick={async () => {
+                  await handleDelete(examToDelete);
+                  setExamToDelete(null);
+                }}
+                className="flex-1 py-4 rounded-2xl bg-red-600 text-white font-black hover:bg-red-700 transition-all shadow-lg shadow-red-200"
+              >
+                تأكيد الحذف
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

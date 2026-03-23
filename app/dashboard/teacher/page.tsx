@@ -1,5 +1,5 @@
 'use client';
-
+ 
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { 
@@ -13,7 +13,7 @@ import Link from 'next/link';
 import { format } from 'date-fns';
 import { arSA } from 'date-fns/locale';
 import AnnouncementsWidget from '@/components/AnnouncementsWidget';
-
+ 
 export default function TeacherDashboard() {
   const [teacherData, setTeacherData] = useState<any>(null);
   const [sections, setSections] = useState<any[]>([]);
@@ -30,13 +30,13 @@ export default function TeacherDashboard() {
   });
   const [assignmentStats, setAssignmentStats] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-
+ 
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-
+ 
       // Fetch teacher profile
       const { data: teacher } = await supabase
         .from('teachers')
@@ -45,7 +45,7 @@ export default function TeacherDashboard() {
         .single();
       
       setTeacherData(teacher);
-
+ 
       if (teacher) {
         // Fetch teacher's sections assigned to this teacher
         const { data: teacherSections } = await supabase
@@ -55,7 +55,7 @@ export default function TeacherDashboard() {
         
         const sectionsData = (teacherSections?.map(ts => ts.section) || []) as any[];
         setSections(sectionsData);
-
+ 
         // Fetch exams for the teacher's sections
         const sectionIds = sectionsData.map((s: any) => s.id);
         
@@ -107,7 +107,7 @@ export default function TeacherDashboard() {
         setRecentAssignments(assignmentsRes.data || []);
         setSchedule(scheduleRes.data || []);
         setMessages(messagesRes.data || []);
-
+ 
         // Calculate assignment stats by class
         const allAssignments = await supabase
           .from('assignments')
@@ -129,7 +129,7 @@ export default function TeacherDashboard() {
           });
           setAssignmentStats(statsByAssignment);
         }
-
+ 
         // Calculate real attendance stats
         const attendanceData = attendanceRes.data || [];
         const presentCount = attendanceData.filter(a => a.status === 'present' || a.status === 'late').length;
@@ -142,7 +142,7 @@ export default function TeacherDashboard() {
         const absenceRate = attendanceData.length > 0
           ? Math.round((absentCount / attendanceData.length) * 100)
           : 0;
-
+ 
         // Calculate stats
         const totalStudents = sectionsData?.reduce((acc, s) => acc + (s.students?.[0]?.count || 0), 0) || 0;
         setStats({
@@ -159,11 +159,11 @@ export default function TeacherDashboard() {
       setLoading(false);
     }
   }, []);
-
+ 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
-
+ 
   if (loading) {
     return (
       <div className="flex h-[80vh] items-center justify-center">
@@ -174,10 +174,13 @@ export default function TeacherDashboard() {
       </div>
     );
   }
-
-  const today = new Date().getDay(); // 0 is Sunday
-  const todaysSchedule = schedule.filter(s => s.day_of_week === today);
-
+ 
+  // تحويل يوم JS (0=أحد) إلى يوم DB (1=أحد)
+  const jsDay = new Date().getDay();
+  const dbDay = jsDay === 0 ? 1 : jsDay === 1 ? 2 : jsDay === 2 ? 3 :
+                jsDay === 3 ? 4 : jsDay === 4 ? 5 : 0;
+  const todaysSchedule = schedule.filter(s => s.day_of_week === dbDay);
+ 
   return (
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
@@ -214,7 +217,7 @@ export default function TeacherDashboard() {
         <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-white/10 blur-3xl"></div>
         <div className="absolute -left-20 -bottom-20 h-64 w-64 rounded-full bg-indigo-500/20 blur-3xl"></div>
       </div>
-
+ 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
         {[
@@ -241,7 +244,7 @@ export default function TeacherDashboard() {
           </motion.div>
         ))}
       </div>
-
+ 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Main Content - Left 2 Columns */}
         <div className="lg:col-span-2 space-y-8">
@@ -293,7 +296,7 @@ export default function TeacherDashboard() {
               )}
             </div>
           </div>
-
+ 
           {/* My Sections Grid */}
           <div className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-sm ring-1 ring-slate-200/50 overflow-hidden hover:shadow-md transition-all">
             <div className="p-6 border-b border-slate-100/50 flex items-center justify-between bg-white/50">
@@ -342,7 +345,7 @@ export default function TeacherDashboard() {
               )}
             </div>
           </div>
-
+ 
           {/* Assignment Statistics by Class */}
           <div className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-sm ring-1 ring-slate-200/50 overflow-hidden hover:shadow-md transition-all">
             <div className="p-6 border-b border-slate-100/50 flex items-center justify-between bg-white/50">
@@ -390,15 +393,15 @@ export default function TeacherDashboard() {
               </div>
             </div>
           </div>
-
+ 
         </div>
-
+ 
         {/* Sidebar Content - Right 1 Column */}
         <div className="space-y-8">
           
           {/* Announcements Widget */}
           <AnnouncementsWidget role="teacher" />
-
+ 
           {/* Recent Assignments */}
           <div className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-sm ring-1 ring-slate-200/50 overflow-hidden hover:shadow-md transition-all">
             <div className="p-6 border-b border-slate-100/50 flex items-center justify-between bg-white/50">
@@ -444,7 +447,7 @@ export default function TeacherDashboard() {
               </Link>
             </div>
           </div>
-
+ 
           {/* Recent Messages */}
           <div className="bg-white/80 backdrop-blur-xl rounded-3xl shadow-sm ring-1 ring-slate-200/50 overflow-hidden hover:shadow-md transition-all">
             <div className="p-6 border-b border-slate-100/50 flex items-center justify-between bg-white/50">
@@ -496,7 +499,7 @@ export default function TeacherDashboard() {
               </Link>
             </div>
           </div>
-
+ 
         </div>
       </div>
     </motion.div>

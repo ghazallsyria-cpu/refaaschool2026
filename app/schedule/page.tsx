@@ -54,6 +54,8 @@ export default function SchedulesPage() {
   const [selectedSectionId, setSelectedSectionId] = useState<string>('');
   const [userRole, setUserRole] = useState<string | null>(null);
   const [studentSectionName, setStudentSectionName] = useState<string>('');
+  const [teacherSchedule, setTeacherSchedule] = useState<any[]>([]);
+  const [isTeacher, setIsTeacher] = useState(false);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [teacherAssignments, setTeacherAssignments] = useState<any[]>([]); // New state
   const [loading, setLoading] = useState(true);
@@ -83,7 +85,7 @@ export default function SchedulesPage() {
     const dbDay = jsDay === 0 ? 1 : jsDay === 1 ? 2 : jsDay === 2 ? 3 :
                   jsDay === 3 ? 4 : jsDay === 4 ? 5 : 0;
     if (dayId !== dbDay) return 'upcoming';
-    const p = periods.find(per => per.period_number === periodNum);
+    const p = periods.find((per: any) => per.period_number === periodNum);
     if (!p || !p.start_time || !p.end_time) return 'upcoming';
     const nowMin = now.getHours() * 60 + now.getMinutes();
     const startMin = timeToMinutes(p.start_time);
@@ -146,6 +148,8 @@ export default function SchedulesPage() {
           .from('users').select('role').eq('id', user.id).single();
         
         setUserRole(userData?.role || null);
+
+        // الطالب → فصله فقط
         if (userData?.role === 'student') {
           const { data: studentData } = await supabase
             .from('students').select('section_id, sections(name, classes(name))').eq('id', user.id).single();
@@ -155,6 +159,18 @@ export default function SchedulesPage() {
             setStudentSectionName(`${sec?.classes?.name} - ${sec?.name}`);
             return;
           }
+        }
+
+        // المعلم → جدوله الشخصي
+        if (userData?.role === 'teacher') {
+          setIsTeacher(true);
+          const { data: tSchedule } = await supabase
+            .from('schedules')
+            .select('id, day_of_week, period, subjects(name), sections(name, classes(name))')
+            .eq('teacher_id', user.id)
+            .order('day_of_week').order('period');
+          setTeacherSchedule(tSchedule || []);
+          return;
         }
       }
 
@@ -338,7 +354,78 @@ export default function SchedulesPage() {
         </div>
       </div>
 
-      <div className="bg-white p-4 rounded-xl shadow-sm ring-1 ring-slate-200">
+      {/* جدول المعلم الشخصي */}
+      {isTeacher && (
+        <div className="bg-white rounded-xl shadow-sm ring-1 ring-slate-200 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-full border-collapse">
+              <thead>
+                <tr className="bg-slate-50">
+                  <th className="py-4 px-4 text-center text-xs font-black text-slate-400 border-b border-l border-slate-200 w-28">اليوم / الحصة</th>
+                  {periods.map(p => (
+                    <th key={p.id} className="py-4 px-3 text-center text-xs font-black text-slate-400 border-b border-l border-slate-200">
+                      <div className="flex flex-col gap-0.5">
+                        <span>الحصة {p.period_number}</span>
+                        <span className="text-[10px] text-slate-300 font-bold">{p.start_time?.slice(0,5)} - {p.end_time?.slice(0,5)}</span>
+                      </div>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {DAYS.map(day => (
+                  <tr key={day.id} className="hover:bg-slate-50/50">
+                    <td className="py-4 px-4 text-sm font-black text-slate-700 border-l border-slate-200 text-center bg-slate-50/50">{day.name}</td>
+                    {periods.map(p => {
+                      const cell = teacherSchedule.find(s => s.day_of_week === day.id && s.period === p.period_number);
+                      const pStatus = getPeriodStatus(day.id, p.period_number);
+                      return (
+                        <td key={p.id} className="p-2 border-l border-slate-200 h-24 align-top">
+                          {cell ? (
+                            <div className={`relative h-full flex flex-col justify-center rounded-xl p-3 border transition-all ${
+                              pStatus === 'current'
+                                ? 'bg-gradient-to-br from-emerald-500 to-emerald-600 border-emerald-400 text-white shadow-lg shadow-emerald-200 scale-[1.03]'
+                                : pStatus === 'next'
+                                ? 'bg-gradient-to-br from-amber-400 to-amber-500 border-amber-300 text-white shadow-md'
+                                : pStatus === 'past'
+                                ? 'bg-slate-100 border-slate-200 opacity-50'
+                                : 'bg-gradient-to-br from-indigo-600 to-violet-700 border-transparent text-white shadow-md shadow-indigo-200'
+                            }`}>
+                              {pStatus === 'current' && (
+                                <>
+                                  <div className="absolute inset-0 rounded-xl bg-emerald-400/20 animate-pulse pointer-events-none" />
+                                  <div className="absolute -top-1.5 -right-1.5 bg-emerald-700 text-white text-[8px] font-black px-1.5 py-0.5 rounded-full border border-white z-10">⚡ الآن</div>
+                                </>
+                              )}
+                              {pStatus === 'next' && (
+                                <div className="absolute -top-1.5 -right-1.5 bg-amber-700 text-white text-[8px] font-black px-1.5 py-0.5 rounded-full border border-white z-10">استعد!</div>
+                              )}
+                              <div className="relative z-10">
+                                <div className={`font-black text-sm leading-tight ${pStatus === 'past' ? 'text-slate-500' : 'text-white'}`}>
+                                  {(cell.subjects as any)?.name}
+                                </div>
+                                <div className={`text-[11px] font-bold mt-1 ${pStatus === 'past' ? 'text-slate-400' : 'text-white/70'}`}>
+                                  {(cell.sections as any)?.classes?.name} - {(cell.sections as any)?.name}
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="h-full flex items-center justify-center">
+                              <div className="h-1 w-4 bg-slate-100 rounded-full" />
+                            </div>
+                          )}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {!isTeacher && <div className="bg-white p-4 rounded-xl shadow-sm ring-1 ring-slate-200">
         <div className="flex flex-col sm:flex-row items-center gap-4">
           {userRole === 'student' ? (
             <div className="flex items-center gap-3">
@@ -371,9 +458,9 @@ export default function SchedulesPage() {
             </>
           )}
         </div>
-      </div>
+      </div>}
 
-      <div className="bg-white rounded-xl shadow-sm ring-1 ring-slate-200 overflow-hidden">
+      {!isTeacher && <div className="bg-white rounded-xl shadow-sm ring-1 ring-slate-200 overflow-hidden">
         {loading ? (
           <div className="flex justify-center items-center py-20">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
@@ -470,7 +557,7 @@ export default function SchedulesPage() {
             </table>
           </div>
         )}
-      </div>
+      </div>}
 
       {/* Add/Edit Schedule Modal */}
       <Dialog.Root open={isModalOpen} onOpenChange={setIsModalOpen}>

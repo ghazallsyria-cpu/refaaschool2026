@@ -6,7 +6,6 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import { NotificationsBell } from '@/components/notifications-bell';
-import { PushNotificationToggle } from '@/components/PushNotificationToggle';
 import Link from 'next/link';
 
 export function Header({ onMenuClick, showMenuButton = true }: { onMenuClick?: () => void, showMenuButton?: boolean }) {
@@ -75,7 +74,7 @@ export function Header({ onMenuClick, showMenuButton = true }: { onMenuClick?: (
   };
 
   return (
-    <header className="flex h-24 shrink-0 items-center justify-between bg-white/70 backdrop-blur-xl border-b border-slate-200/50 px-8 sticky top-0 z-30">
+    <header className="flex h-16 sm:h-24 shrink-0 items-center justify-between bg-white/70 backdrop-blur-xl border-b border-slate-200/50 px-3 sm:px-8 sticky top-0 z-30">
       <div className="flex flex-1 items-center gap-8">
         {onMenuClick && showMenuButton && (
           <button
@@ -117,19 +116,10 @@ export function Header({ onMenuClick, showMenuButton = true }: { onMenuClick?: (
           </div>
         </div>
       </div>
-
-      <div className="flex items-center gap-4 sm:gap-8">
-
-        {/* زر تفعيل إشعارات الجهاز */}
-        {user && (
-          <div className="hidden sm:block">
-            <PushNotificationToggle />
+        <div className="flex items-center gap-4 sm:gap-8">
+          <div>
+            <NotificationsBell />
           </div>
-        )}
-
-        <div className="hidden sm:block">
-          <NotificationsBell />
-        </div>
 
         {/* Profile dropdown */}
         <div className="relative">
@@ -160,16 +150,8 @@ export function Header({ onMenuClick, showMenuButton = true }: { onMenuClick?: (
             >
               <div className="px-4 py-4 border-b border-slate-100 mb-2">
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">تم تسجيل الدخول كـ</p>
-                <p className="text-sm font-black text-slate-900 truncate">{userName || user.email}
-</p>
+                <p className="text-sm font-black text-slate-900 truncate">{userName || user.email}</p>
               </div>
-
-              {/* زر تفعيل الإشعارات داخل القائمة للموبايل */}
-              <div className="px-4 py-3 border-b border-slate-100 mb-2 sm:hidden">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">إشعارات الجهاز</p>
-                <PushNotificationToggle />
-              </div>
-
               <div className="space-y-1">
                 <button
                   onClick={() => router.push('/settings')}

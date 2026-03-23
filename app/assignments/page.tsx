@@ -257,6 +257,12 @@ export default function AssignmentsPage() {
       return;
     }
 
+    // التحقق أن تاريخ التسليم في المستقبل (للواجبات الجديدة فقط)
+    if (!currentAssignment.id && new Date(currentAssignment.due_date) <= new Date()) {
+      showNotification('error', 'تاريخ التسليم يجب أن يكون في المستقبل');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const payload = {
@@ -271,9 +277,9 @@ export default function AssignmentsPage() {
       };
 
       if (currentAssignment.id) {
-        // Check if file_url changed to delete old one from Cloudinary
-        if (currentAssignment.file_url && currentAssignment.file_url !== payload.file_url) {
-          await deleteFromCloudinary(currentAssignment.file_url, 'raw');
+        // حذف الملف القديم من Cloudinary إذا تغيّر الرابط
+        if (originalFileUrl && originalFileUrl !== (payload.file_url || null)) {
+          await deleteFromCloudinary(originalFileUrl, 'raw');
         }
 
         // Update
@@ -282,6 +288,28 @@ export default function AssignmentsPage() {
           .update(payload)
           .eq('id', currentAssignment.id);
         if (error) throw error;
+
+        // إشعار الطلاب عند التعديل
+        try {
+          const { data: students } = await supabase
+            .from('students')
+            .select('id')
+            .eq('section_id', payload.section_id);
+          if (students && students.length > 0) {
+            const subjectName = subjects.find(s => s.id === payload.subject_id)?.name || 'المادة';
+            await supabase.from('notifications').insert(
+              students.map(student => ({
+                user_id: student.id,
+                title: 'تعديل على واجب',
+                content: `تم تعديل واجب ${subjectName}: ${payload.title}`,
+                type: 'assignment',
+                link: `/assignments/${currentAssignment.id}`
+              }))
+            );
+          }
+        } catch (notifErr) {
+          console.error('Error sending update notification:', notifErr);
+        }
 
         // Update Questions
         // First delete old ones (simple approach)
@@ -438,12 +466,17 @@ export default function AssignmentsPage() {
     setIsModalOpen(true);
   };
 
+  const [originalFileUrl, setOriginalFileUrl] = useState<string | null>(null);
+
   const openEditModal = async (assignment: Assignment) => {
     // Format date for datetime-local input
     const dateObj = new Date(assignment.due_date);
     const formattedDate = new Date(dateObj.getTime() - (dateObj.getTimezoneOffset() * 60000))
       .toISOString()
       .slice(0, 16);
+
+    // حفظ الرابط الأصلي للمقارنة لاحقاً
+    setOriginalFileUrl(assignment.file_url || null);
 
     setCurrentAssignment({
       ...assignment,

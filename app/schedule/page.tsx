@@ -358,69 +358,74 @@ export default function SchedulesPage() {
       {isTeacher && (
         <div className="bg-white rounded-xl shadow-sm ring-1 ring-slate-200 overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="min-w-full border-collapse">
-              <thead>
-                <tr className="bg-slate-50">
-                  <th className="py-4 px-4 text-center text-xs font-black text-slate-400 border-b border-l border-slate-200 w-28">اليوم / الحصة</th>
-                  {periods.map(p => (
-                    <th key={p.id} className="py-4 px-3 text-center text-xs font-black text-slate-400 border-b border-l border-slate-200">
-                      <div className="flex flex-col gap-0.5">
-                        <span>الحصة {p.period_number}</span>
-                        <span className="text-[10px] text-slate-300 font-bold">{p.start_time?.slice(0,5)} - {p.end_time?.slice(0,5)}</span>
-                      </div>
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
+            <div className="min-w-[700px] p-4">
+              <div className="grid gap-2" style={{gridTemplateColumns: `120px repeat(${periods.length}, 1fr)`}}>
+                {/* Header */}
+                <div className="h-14 flex items-center justify-center bg-slate-50 rounded-xl border border-slate-100">
+                  <span className="text-xs font-black text-slate-400">اليوم / الحصة</span>
+                </div>
+                {periods.map(p => (
+                  <div key={p.id} className="h-14 flex flex-col items-center justify-center bg-slate-50 rounded-xl border border-slate-100 px-2">
+                    <span className="text-xs font-black text-slate-900">الحصة {p.period_number}</span>
+                    <span className="text-[10px] text-slate-400 font-bold">{p.start_time?.slice(0,5)} - {p.end_time?.slice(0,5)}</span>
+                  </div>
+                ))}
+
+                {/* Rows */}
                 {DAYS.map(day => (
-                  <tr key={day.id} className="hover:bg-slate-50/50">
-                    <td className="py-4 px-4 text-sm font-black text-slate-700 border-l border-slate-200 text-center bg-slate-50/50">{day.name}</td>
+                  <>
+                    <div key={`day-${day.id}`} className="font-bold text-center p-3 bg-slate-50 rounded-xl flex items-center justify-center min-h-[100px]">
+                      {day.name}
+                    </div>
                     {periods.map(p => {
                       const cell = teacherSchedule.find(s => s.day_of_week === day.id && s.period === p.period_number);
                       const pStatus = getPeriodStatus(day.id, p.period_number);
                       return (
-                        <td key={p.id} className="p-2 border-l border-slate-200 h-24 align-top">
+                        <div key={`${day.id}-${p.period_number}`} className="relative min-h-[100px] p-1">
                           {cell ? (
-                            <div className={`relative h-full flex flex-col justify-center rounded-xl p-3 border transition-all ${
+                            <div className={`relative h-full flex flex-col justify-between rounded-2xl p-3 shadow-md border overflow-hidden transition-all ${
                               pStatus === 'current'
-                                ? 'bg-gradient-to-br from-emerald-500 to-emerald-600 border-emerald-400 text-white shadow-lg shadow-emerald-200 scale-[1.03]'
+                                ? 'bg-gradient-to-br from-emerald-500 to-emerald-600 border-emerald-400 shadow-emerald-200/60 scale-[1.03]'
                                 : pStatus === 'next'
-                                ? 'bg-gradient-to-br from-amber-400 to-amber-500 border-amber-300 text-white shadow-md'
+                                ? 'bg-gradient-to-br from-amber-400 to-amber-500 border-amber-300 shadow-amber-200/60'
                                 : pStatus === 'past'
                                 ? 'bg-slate-100 border-slate-200 opacity-50'
-                                : 'bg-gradient-to-br from-indigo-600 to-violet-700 border-transparent text-white shadow-md shadow-indigo-200'
+                                : 'bg-gradient-to-br from-indigo-600 to-violet-700 border-transparent shadow-indigo-200/50'
                             }`}>
+                              <div className="absolute top-0 right-0 w-16 h-16 bg-white/10 rounded-full -mr-8 -mt-8 blur-xl" />
                               {pStatus === 'current' && (
                                 <>
-                                  <div className="absolute inset-0 rounded-xl bg-emerald-400/20 animate-pulse pointer-events-none" />
-                                  <div className="absolute -top-1.5 -right-1.5 bg-emerald-700 text-white text-[8px] font-black px-1.5 py-0.5 rounded-full border border-white z-10">⚡ الآن</div>
+                                  <div className="absolute inset-0 bg-emerald-400/20 animate-pulse pointer-events-none" />
+                                  <div className="absolute -top-1 -right-1 bg-emerald-700 text-white text-[8px] font-black px-1.5 py-0.5 rounded-full border border-white z-10">⚡ الآن</div>
                                 </>
                               )}
                               {pStatus === 'next' && (
-                                <div className="absolute -top-1.5 -right-1.5 bg-amber-700 text-white text-[8px] font-black px-1.5 py-0.5 rounded-full border border-white z-10">استعد!</div>
+                                <div className="absolute -top-1 -right-1 bg-amber-700 text-white text-[8px] font-black px-1.5 py-0.5 rounded-full border border-white z-10">استعد!</div>
                               )}
                               <div className="relative z-10">
                                 <div className={`font-black text-sm leading-tight ${pStatus === 'past' ? 'text-slate-500' : 'text-white'}`}>
                                   {(cell.subjects as any)?.name}
                                 </div>
-                                <div className={`text-[11px] font-bold mt-1 ${pStatus === 'past' ? 'text-slate-400' : 'text-white/70'}`}>
-                                  {(cell.sections as any)?.classes?.name} - {(cell.sections as any)?.name}
+                                <div className={`text-[10px] font-bold mt-1 ${pStatus === 'past' ? 'text-slate-400' : 'text-white/70'}`}>
+                                  {(cell.sections as any)?.classes?.name}
+                                </div>
+                                <div className={`text-[10px] font-bold ${pStatus === 'past' ? 'text-slate-400' : 'text-white/60'}`}>
+                                  {(cell.sections as any)?.name}
                                 </div>
                               </div>
                             </div>
                           ) : (
-                            <div className="h-full flex items-center justify-center">
+                            <div className="h-full min-h-[88px] flex items-center justify-center rounded-2xl border-2 border-dashed border-slate-100">
                               <div className="h-1 w-4 bg-slate-100 rounded-full" />
                             </div>
                           )}
-                        </td>
+                        </div>
                       );
                     })}
-                  </tr>
+                  </>
                 ))}
-              </tbody>
-            </table>
+              </div>
+            </div>
           </div>
         </div>
       )}

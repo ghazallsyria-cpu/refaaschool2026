@@ -215,13 +215,13 @@ export default function AnnouncementsPage() {
       // Get the announcement to find its image_url
       const annToDelete = announcements.find(a => a.id === announcementToDelete);
 
-      const { error } = await supabase.from('announcements').delete().eq('id', announcementToDelete);
-      if (error) throw error;
-
-      // Delete from Cloudinary if it's a Cloudinary URL
+      // حذف من Cloudinary أولاً
       if (annToDelete?.image_url) {
         await deleteFromCloudinary(annToDelete.image_url);
       }
+
+      const { error } = await supabase.from('announcements').delete().eq('id', announcementToDelete);
+      if (error) throw error;
 
       await fetchAnnouncements();
       showNotification('success', 'تم حذف الإعلان بنجاح');

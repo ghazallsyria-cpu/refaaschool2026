@@ -160,7 +160,8 @@ export function Header({ onMenuClick, showMenuButton = true }: { onMenuClick?: (
             >
               <div className="px-4 py-4 border-b border-slate-100 mb-2">
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">تم تسجيل الدخول كـ</p>
-                <p className="text-sm font-black text-slate-900 truncate">{user.email}</p>
+                <p className="text-sm font-black text-slate-900 truncate">{userName || user.email}
+</p>
               </div>
 
               {/* زر تفعيل الإشعارات داخل القائمة للموبايل */}

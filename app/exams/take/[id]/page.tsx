@@ -200,93 +200,38 @@ export default function TakeQuiz() {
     setIsSubmitting(true);
 
     try {
-      // ⚠️ ملاحظة: حساب الدرجة هنا في الـ frontend للأسئلة الموضوعية فقط
-      // الأسئلة المقالية تحتاج تصحيح يدوي من المعلم
-      let totalScore = 0;
-      const studentAnswersPayload = [];
+      if (!attemptId) throw new Error('لم يتم إنشاء المحاولة بعد');
 
-      for (const q of questions) {
-        const studentAnswer = answers[q.id];
-        let isCorrect = false;
-        let pointsEarned = 0;
+      // إرسال الإجابات للـ API ليحسب الدرجة على السيرفر بشكل آمن
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      const res = await fetch('/api/exams/submit', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`,
+        },
+        body: JSON.stringify({
+          attemptId,
+          examId: params.id,
+          answers,
+        }),
+      });
 
-        if (q.type === 'multiple_choice' || q.type === 'true_false') {
-          const correctOpt = q.options.find((o: any) => o.is_correct);
-          isCorrect = studentAnswer === correctOpt?.id;
-          pointsEarned = isCorrect ? q.points : 0;
-        } else if (q.type === 'multi_select') {
-          const correctOpts = q.options.filter((o: any) => o.is_correct).map((o: any) => o.id);
-          const studentOpts = studentAnswer || [];
-          isCorrect = correctOpts.length === studentOpts.length && correctOpts.every((id: any) => studentOpts.includes(id));
-          pointsEarned = isCorrect ? q.points : 0;
-        }
+      const result = await res.json();
 
-        totalScore += pointsEarned;
-
-        studentAnswersPayload.push({
-          attempt_id: attemptId,
-          question_id: q.id,
-          selected_option_id: (q.type === 'multiple_choice' || q.type === 'true_false') ? studentAnswer : null,
-          text_answer: q.type === 'essay' || q.type === 'fill_in_blank' ? studentAnswer : null,
-          is_correct: isCorrect,
-          points_earned: pointsEarned
-        });
-      }
-
-      // 2. Update Attempt
-      if (attemptId) {
-        await supabase
-          .from('exam_attempts')
-          .update({
-            completed_at: new Date().toISOString(),
-            score: totalScore,
-            status: 'completed'
-          })
-          .eq('id', attemptId);
-
-        // 3. Save Answers
-        await supabase.from('student_answers').insert(studentAnswersPayload);
-
-        // 4. Notify Teacher
-        try {
-          const { data: examInfo } = await supabase
-            .from('exams')
-            .select('title, teacher_id')
-            .eq('id', params.id)
-            .single();
-          
-          const { data: userData } = await supabase.auth.getUser();
-          // جلب اسم الطالب من جدول users وليس من metadata
-          const { data: studentUserData } = await supabase
-            .from('users')
-            .select('full_name')
-            .eq('id', userData.user?.id || '')
-            .single();
-          const studentName = studentUserData?.full_name || 'طالب';
-
-          if (examInfo?.teacher_id) {
-            await supabase.from('notifications').insert([{
-              user_id: examInfo.teacher_id,
-              type: 'exam',
-              title: 'تسليم اختبار جديد',
-              content: `قام الطالب ${studentName} بتسليم اختبار: ${examInfo.title}`,
-              link: `/exams/results/${params.id}`,
-              is_read: false
-            }]);
-          }
-        } catch (notifErr) {
-          console.error('Error sending teacher notification:', notifErr);
-        }
+      if (!res.ok) {
+        throw new Error(result.error || 'حدث خطأ أثناء الإرسال');
       }
 
       setIsFinished(true);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error submitting quiz:', err);
-      showNotification('error', 'حدث خطأ أثناء إرسال الاختبار');
+      showNotification('error', err.message || 'حدث خطأ أثناء إرسال الاختبار');
     } finally {
       setIsSubmitting(false);
     }
-  }, [isSubmitting, questions, answers, attemptId, params.id]);
+  }, [isSubmitting, answers, attemptId, params.id]);
 
   useEffect(() => {
     if (timeLeft !== null && timeLeft > 0 && !isFinished) {

@@ -1,17 +1,16 @@
-‘use client’;
+“use client”;
 
-import { Bell, BellOff } from ‘lucide-react’;
-import { usePushNotifications } from ‘@/hooks/usePushNotifications’;
-import { useEffect, useState } from ‘react’;
+import { Bell, BellOff } from “lucide-react”;
+import { usePushNotifications } from “@/hooks/usePushNotifications”;
+import { useEffect, useState } from “react”;
 
 export function PushNotificationToggle() {
 const { permission, subscribed, loading, subscribe, unsubscribe } = usePushNotifications();
 const [supported, setSupported] = useState(true);
 
 useEffect(() => {
-// نتحقق من الدعم بعد التحميل فقط
-if (typeof window !== ‘undefined’) {
-setSupported(‘PushManager’ in window && ‘serviceWorker’ in navigator);
+if (typeof window !== “undefined”) {
+setSupported(“PushManager” in window && “serviceWorker” in navigator);
 }
 }, []);
 
@@ -24,7 +23,7 @@ return (
 );
 }
 
-if (permission === ‘denied’) {
+if (permission === “denied”) {
 return (
 <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-red-50 text-red-500 text-xs font-bold">
 <BellOff className="h-4 w-4" />
@@ -57,7 +56,7 @@ className="flex items-center gap-2 px-3 py-2 rounded-xl bg-indigo-50 text-indigo
 ) : (
 <Bell className="h-4 w-4" />
 )}
-<span>{loading ? ‘جاري التفعيل…’ : ‘تفعيل الإشعارات’}</span>
+<span>{loading ? “جاري التفعيل…” : “تفعيل الإشعارات”}</span>
 </button>
 );
 }

@@ -289,6 +289,11 @@ export default function AssignmentDetailsPage({ params }: { params: Promise<{ id
   }, [fetchData]);
 
   const handleSubmitAnswers = async (answers: Record<string, any>) => {
+    // منع إعادة التسليم إذا تم التقييم
+    if (mySubmission?.grade !== undefined && mySubmission?.grade !== null) {
+      showNotification('error', 'لا يمكن إعادة التسليم بعد التقييم');
+      return;
+    }
     setIsSubmitting(true);
     try {
       // 1. Create or Update Submission
@@ -303,6 +308,12 @@ export default function AssignmentDetailsPage({ params }: { params: Promise<{ id
 
       let submissionId: string;
       if (mySubmission) {
+        // حذف الصورة القديمة من Cloudinary إذا تغيّرت
+        if (mySubmission.file_url && mySubmission.file_url !== fileUrl) {
+          const { deleteFromCloudinary } = await import('@/lib/cloudinary');
+          await deleteFromCloudinary(mySubmission.file_url);
+        }
+
         const { error } = await supabase
           .from('assignment_submissions')
           .update(submissionPayload)
@@ -577,10 +588,12 @@ export default function AssignmentDetailsPage({ params }: { params: Promise<{ id
           <div className="p-8">
             {mySubmission?.grade !== undefined && mySubmission?.grade !== null ? (
               <div className="mb-8 p-6 rounded-3xl bg-emerald-50 border border-emerald-100">
-                <h3 className="text-lg font-bold text-emerald-800 mb-2">تم التقييم</h3>
-                <p className="text-emerald-600 font-medium mb-4">لقد تم تقييم هذا الواجب من قبل المعلم.</p>
+                <div className="flex items-center gap-3 mb-3">
+                  <CheckCircle className="h-6 w-6 text-emerald-600" />
+                  <h3 className="text-lg font-bold text-emerald-800">تم التقييم — لا يمكن إعادة التسليم</h3>
+                </div>
                 <div className="flex items-center gap-4 mb-4">
-                  <div className="px-4 py-2 bg-white rounded-xl shadow-sm border border-emerald-100 font-black text-emerald-700">
+                  <div className="px-4 py-2 bg-white rounded-xl shadow-sm border border-emerald-100 font-black text-emerald-700 text-lg">
                     الدرجة: {mySubmission.grade}
                   </div>
                 </div>

@@ -21,7 +21,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   
   const isLoginPage = pathname === '/login';
   const isResetPasswordPage = pathname === '/reset-password';
-  const isPublicPage = isLoginPage || isResetPasswordPage;
+  const isLivePage = pathname === '/live' || pathname.startsWith('/live/');
+  const isPublicPage = isLoginPage || isResetPasswordPage || isLivePage;
 
   useEffect(() => {
     const checkAuth = async () => {

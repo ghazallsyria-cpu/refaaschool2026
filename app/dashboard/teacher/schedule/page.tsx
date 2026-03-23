@@ -1,51 +1,111 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
-import { Calendar, Clock } from 'lucide-react';
+import { useState, useEffect } from "react";
+import { supabase } from "@/lib/supabase";
+import { Calendar, Clock, Zap } from "lucide-react";
+import { motion } from "motion/react";
 
 const DAYS = [
-  { id: 1, name: 'الأحد' },
-  { id: 2, name: 'الإثنين' },
-  { id: 3, name: 'الثلاثاء' },
-  { id: 4, name: 'الأربعاء' },
-  { id: 5, name: 'الخميس' },
+  { id: 1, name: "الأحد" },
+  { id: 2, name: "الاثنين" },
+  { id: 3, name: "الثلاثاء" },
+  { id: 4, name: "الأربعاء" },
+  { id: 5, name: "الخميس" },
 ];
 
 const PERIODS = [1, 2, 3, 4, 5];
 
+function timeToMinutes(time: string): number {
+  if (!time) return 0;
+  const [h, m] = time.split(":").map(Number);
+  return h * 60 + m;
+}
+
+type PeriodStatus = "past" | "current" | "next" | "upcoming" | "empty";
+
 export default function TeacherSchedulePage() {
   const [schedule, setSchedule] = useState<any[]>([]);
+  const [periods, setPeriods] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [now, setNow] = useState(new Date());
 
   useEffect(() => {
-    fetchTeacherSchedule();
+    const timer = setInterval(() => setNow(new Date()), 60000);
+    return () => clearInterval(timer);
   }, []);
 
-  const fetchTeacherSchedule = async () => {
+  useEffect(() => { fetchData(); }, []);
+
+  const fetchData = async () => {
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data, error } = await supabase
-        .from('schedules')
-        .select('*, subjects(name), sections(name, classes(name))')
-        .eq('teacher_id', user.id)
-        .order('day_of_week')
-        .order('period');
+      const [scheduleRes, periodsRes] = await Promise.all([
+        supabase.from("schedules")
+          .select("*, subjects(name), sections(name, classes(name))")
+          .eq("teacher_id", user.id)
+          .order("day_of_week").order("period"),
+        supabase.from("class_periods")
+          .select("period_number, start_time, end_time")
+          .order("period_number"),
+      ]);
 
-      if (error) throw error;
-      setSchedule(data || []);
-    } catch (error) {
-      console.error('Error fetching teacher schedule:', error);
+      setSchedule(scheduleRes.data || []);
+      setPeriods(periodsRes.data || []);
+    } catch (e) {
+      console.error(e);
     } finally {
       setLoading(false);
     }
   };
 
-  const getCellData = (day: number, period: number) => {
-    return schedule.find(s => s.day_of_week === day && s.period === period);
+  const getCellData = (day: number, period: number) =>
+    schedule.find(s => s.day_of_week === day && s.period === period);
+
+  const getPeriodTimes = (periodNum: number) =>
+    periods.find(p => p.period_number === periodNum);
+
+  const getTimeLabel = (period: number) => {
+    const p = getPeriodTimes(period);
+    if (!p) return "";
+    return `${p.start_time?.slice(0,5)} - ${p.end_time?.slice(0,5)}`;
+  };
+
+  const getPeriodStatus = (day: number, period: number): PeriodStatus => {
+    const todayDay = now.getDay();
+    const todayId = todayDay === 0 ? 1 : todayDay === 1 ? 2 : todayDay === 2 ? 3 :
+                    todayDay === 3 ? 4 : todayDay === 4 ? 5 : 0;
+
+    if (day !== todayId) return "upcoming";
+
+    const p = getPeriodTimes(period);
+    if (!p) return "upcoming";
+
+    const nowMin = now.getHours() * 60 + now.getMinutes();
+    const startMin = timeToMinutes(p.start_time);
+    const endMin = timeToMinutes(p.end_time);
+
+    if (nowMin >= startMin && nowMin < endMin) return "current";
+    if (nowMin < startMin && startMin - nowMin <= 15) return "next";
+    if (nowMin >= endMin) return "past";
+    return "upcoming";
+  };
+
+  const getCountdown = (period: number, status: PeriodStatus): string => {
+    const p = getPeriodTimes(period);
+    if (!p) return "";
+    const nowMin = now.getHours() * 60 + now.getMinutes();
+    if (status === "current") {
+      const rem = timeToMinutes(p.end_time) - nowMin;
+      return `${rem} دقيقة متبقية`;
+    }
+    if (status === "next") {
+      const diff = timeToMinutes(p.start_time) - nowMin;
+      return `تبدأ خلال ${diff} دقيقة`;
+    }
+    return "";
   };
 
   return (
@@ -55,24 +115,33 @@ export default function TeacherSchedulePage() {
           <h1 className="text-4xl font-black text-slate-900 tracking-tight">جدولي الدراسي</h1>
           <p className="text-slate-500 mt-2 font-medium">عرض كامل للحصص الدراسية المسندة إليك خلال الأسبوع</p>
         </div>
-        <div className="flex items-center gap-3 bg-white/50 backdrop-blur-md p-2 rounded-2xl border border-white/20 shadow-sm">
-          <div className="h-10 w-10 rounded-xl bg-indigo-500 flex items-center justify-center text-white shadow-lg shadow-indigo-200">
-            <Calendar className="h-5 w-5" />
-          </div>
-          <div className="pr-2 pl-4">
-            <div className="text-[10px] text-slate-400 font-black uppercase tracking-widest">العام الدراسي</div>
-            <div className="text-sm font-bold text-slate-700">2025 - 2026</div>
-          </div>
+        <div className="flex items-center gap-3 bg-indigo-600 text-white px-5 py-3 rounded-2xl shadow-lg shadow-indigo-200">
+          <Clock className="h-5 w-5" />
+          <span className="font-black text-lg">
+            {now.toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" })}
+          </span>
         </div>
+      </div>
+
+      {/* مفتاح الألوان */}
+      <div className="flex flex-wrap gap-3">
+        {[
+          { label: "حصتك الحالية", color: "bg-emerald-500", pulse: true },
+          { label: "تبدأ خلال 15 دقيقة", color: "bg-amber-400", pulse: false },
+          { label: "قادمة", color: "bg-indigo-400", pulse: false },
+          { label: "منتهية", color: "bg-slate-300", pulse: false },
+        ].map(item => (
+          <div key={item.label} className="flex items-center gap-2 bg-white px-4 py-2 rounded-xl border border-slate-100 shadow-sm">
+            <div className={`h-3 w-3 rounded-full ${item.color} ${item.pulse ? "animate-pulse" : ""}`} />
+            <span className="text-xs font-bold text-slate-600">{item.label}</span>
+          </div>
+        ))}
       </div>
 
       <div className="glass-card rounded-[2.5rem] shadow-2xl border-white/40 overflow-hidden">
         {loading ? (
           <div className="flex flex-col justify-center items-center py-32 gap-4">
-            <div className="relative h-16 w-16">
-              <div className="absolute inset-0 border-4 border-indigo-600/10 rounded-full"></div>
-              <div className="absolute inset-0 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
-            </div>
+            <div className="h-16 w-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
             <p className="text-slate-400 font-bold animate-pulse">جاري تحميل جدولك الدراسي...</p>
           </div>
         ) : (
@@ -80,32 +149,93 @@ export default function TeacherSchedulePage() {
             <table className="min-w-full border-collapse table-fixed">
               <thead>
                 <tr className="bg-slate-50/50 backdrop-blur-md">
-                  <th className="py-6 px-6 text-center text-xs font-black text-slate-400 uppercase tracking-[0.2em] border-b border-l border-slate-100/50 w-32 bg-slate-100/30">اليوم / الحصة</th>
+                  <th className="py-6 px-6 text-center text-xs font-black text-slate-400 uppercase tracking-[0.2em] border-b border-l border-slate-100/50 w-32 bg-slate-100/30">
+                    اليوم / الحصة
+                  </th>
                   {PERIODS.map(period => (
-                    <th key={period} className="py-6 px-4 text-center text-xs font-black text-slate-400 uppercase tracking-[0.2em] border-b border-l border-slate-100/50">الحصة {period}</th>
+                    <th key={period} className="py-6 px-4 text-center text-xs font-black text-slate-400 uppercase tracking-[0.2em] border-b border-l border-slate-100/50">
+                      <div className="flex flex-col gap-1">
+                        <span>الحصة {period}</span>
+                        <span className="text-[10px] font-bold text-slate-300 normal-case">{getTimeLabel(period)}</span>
+                      </div>
+                    </th>
                   ))}
                 </tr>
               </thead>
               <tbody className="bg-white/30 backdrop-blur-sm">
-                {DAYS.map((day) => (
+                {DAYS.map(day => (
                   <tr key={day.id} className="group hover:bg-white/50 transition-colors duration-300">
-                    <td className="py-8 px-6 text-base font-black text-slate-700 border-l border-b border-slate-100/50 text-center bg-slate-50/30 group-hover:text-indigo-600 transition-colors">{day.name}</td>
+                    <td className="py-8 px-6 text-base font-black text-slate-700 border-l border-b border-slate-100/50 text-center bg-slate-50/30 group-hover:text-indigo-600 transition-colors">
+                      {day.name}
+                    </td>
                     {PERIODS.map(period => {
                       const cellData = getCellData(day.id, period);
+                      const status = cellData ? getPeriodStatus(day.id, period) : "empty";
+                      const countdown = getCountdown(period, status);
+
                       return (
-                        <td key={`${day.id}-${period}`} className="p-3 border-l border-b border-slate-100/50 h-32 min-w-[160px] align-top">
+                        <td key={`${day.id}-${period}`} className="p-3 border-l border-b border-slate-100/50 h-36 min-w-[160px] align-top">
                           {cellData ? (
-                            <div className="h-full flex flex-col justify-between bg-gradient-to-br from-indigo-600 to-violet-700 rounded-3xl p-5 shadow-xl shadow-indigo-200/50 transform group-hover:scale-[1.02] transition-all duration-300 border border-white/20 relative overflow-hidden">
-                              <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -mr-12 -mt-12 blur-2xl" />
-                              <div className="relative z-10">
-                                <div className="font-black text-white text-base leading-tight mb-1">{cellData.subjects?.name}</div>
-                                <div className="text-[11px] text-indigo-100 font-bold uppercase tracking-widest opacity-90">{cellData.sections?.classes?.name}</div>
-                              </div>
-                              <div className="relative z-10 flex items-center justify-between mt-2 pt-3 border-t border-white/20">
-                                <span className="text-[11px] font-black text-white bg-white/20 px-3 py-1 rounded-xl backdrop-blur-sm">{cellData.sections?.name}</span>
-                                <div className="flex items-center gap-1 text-white/60">
-                                  <Clock className="h-3.5 w-3.5" />
-                                  <span className="text-[10px] font-bold">الحصة {period}</span>
+                            <div className="relative h-full">
+                              {/* النبض */}
+                              {status === "current" && (
+                                <motion.div
+                                  className="absolute inset-0 rounded-3xl bg-emerald-400/20"
+                                  animate={{ scale: [1, 1.06, 1], opacity: [0.4, 1, 0.4] }}
+                                  transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
+                                />
+                              )}
+
+                              <div className={`relative h-full flex flex-col justify-between rounded-3xl p-5 shadow-xl transform group-hover:scale-[1.02] transition-all duration-300 border relative overflow-hidden ${
+                                status === "current"
+                                  ? "bg-gradient-to-br from-emerald-500 to-emerald-600 border-emerald-400 shadow-emerald-200/60 text-white"
+                                  : status === "next"
+                                  ? "bg-gradient-to-br from-amber-400 to-amber-500 border-amber-300 shadow-amber-200/60 text-white"
+                                  : status === "past"
+                                  ? "bg-slate-100/50 border-slate-200/50 opacity-50"
+                                  : "bg-gradient-to-br from-indigo-600 to-violet-700 border-white/20 shadow-indigo-200/50 text-white"
+                              }`}>
+                                <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -mr-12 -mt-12 blur-2xl" />
+
+                                {/* بادج */}
+                                {status === "current" && (
+                                  <div className="absolute -top-2 -right-2 flex items-center gap-1 bg-emerald-700 text-white text-[9px] font-black px-2 py-0.5 rounded-full shadow-lg border-2 border-white">
+                                    <Zap className="h-2.5 w-2.5" />
+                                    حصتك الآن
+                                  </div>
+                                )}
+                                {status === "next" && (
+                                  <div className="absolute -top-2 -right-2 bg-amber-700 text-white text-[9px] font-black px-2 py-0.5 rounded-full shadow-lg border-2 border-white">
+                                    استعد!
+                                  </div>
+                                )}
+
+                                <div className="relative z-10">
+                                  <div className={`font-black text-base leading-tight mb-1 ${status === "past" ? "text-slate-500" : "text-white"}`}>
+                                    {cellData.subjects?.name}
+                                  </div>
+                                  <div className={`text-[11px] font-bold uppercase tracking-widest ${
+                                    status === "past" ? "text-slate-400" : "text-white/70"
+                                  }`}>
+                                    {cellData.sections?.classes?.name}
+                                  </div>
+                                </div>
+
+                                <div className="relative z-10 mt-2 pt-3 border-t border-white/20 flex items-center justify-between">
+                                  <span className={`text-[11px] font-black px-3 py-1 rounded-xl backdrop-blur-sm ${
+                                    status === "past" ? "bg-slate-200 text-slate-500" : "bg-white/20 text-white"
+                                  }`}>
+                                    {cellData.sections?.name}
+                                  </span>
+                                  <div className="flex flex-col items-end">
+                                    <div className={`flex items-center gap-1 ${status === "past" ? "text-slate-400" : "text-white/60"}`}>
+                                      <Clock className="h-3.5 w-3.5" />
+                                      <span className="text-[10px] font-bold">الحصة {period}</span>
+                                    </div>
+                                    {countdown && (
+                                      <span className="text-[9px] font-black text-white/80 mt-0.5">{countdown}</span>
+                                    )}
+                                  </div>
                                 </div>
                               </div>
                             </div>

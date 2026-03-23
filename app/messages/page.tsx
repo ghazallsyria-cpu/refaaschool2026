@@ -204,28 +204,40 @@ export default function MessagesPage() {
       markAsRead(unreadIds);
     }
   };
-  const handleDeleteMessage = async (messageIds: string[]) => {
-    if (!confirm('هل أنت متأكد من حذف هذه الرسائل؟ ستُحذف من عندك فقط.')) return;
+  const handleDeleteMessage = async (messageIds: string[], forEveryone = false) => {
+    const confirmMsg = forEveryone
+      ? 'هل تريد حذف هذه الرسالة الجماعية من عند جميع الطلاب؟'
+      : 'هل أنت متأكد من حذف هذه الرسائل؟ ستُحذف من عندك فقط.';
+    if (!confirm(confirmMsg)) return;
     
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Soft delete — يحذف من عند المستخدم فقط بدون مسح الرسالة للطرف الآخر
-      const { data: msgs } = await supabase
-        .from('messages')
-        .select('id, sender_id, receiver_id')
-        .in('id', messageIds);
+      if (forEveryone) {
+        // حذف للجميع — يستخدمها المعلم للرسائل الجماعية
+        const { error } = await supabase
+          .from('messages')
+          .update({ deleted_for_all: true })
+          .in('id', messageIds);
+        if (error) throw error;
+      } else {
+        // Soft delete — يحذف من عند المستخدم فقط
+        const { data: msgs } = await supabase
+          .from('messages')
+          .select('id, sender_id, receiver_id')
+          .in('id', messageIds);
 
-      for (const msg of (msgs || [])) {
-        if (msg.sender_id === user.id) {
-          await supabase.from('messages').update({ deleted_by_sender: true }).eq('id', msg.id);
-        } else {
-          await supabase.from('messages').update({ deleted_by_receiver: true }).eq('id', msg.id);
+        for (const msg of (msgs || [])) {
+          if (msg.sender_id === user.id) {
+            await supabase.from('messages').update({ deleted_by_sender: true }).eq('id', msg.id);
+          } else {
+            await supabase.from('messages').update({ deleted_by_receiver: true }).eq('id', msg.id);
+          }
         }
       }
       
-      showNotification('success', 'تم حذف الرسائل بنجاح');
+      showNotification('success', forEveryone ? 'تم حذف الرسالة من عند الجميع' : 'تم حذف الرسائل بنجاح');
       if (activeThread && messageIds.some(id => activeThread.allIds.includes(id))) {
         setActiveThread(null);
       }
@@ -865,14 +877,21 @@ export default function MessagesPage() {
                       </div>
                       <div className="flex-shrink-0 self-center flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteMessage(message.allIds);
-                          }}
+                          onClick={(e) => { e.stopPropagation(); handleDeleteMessage(message.allIds); }}
                           className="h-10 w-10 rounded-xl bg-white shadow-sm border border-slate-100 flex items-center justify-center text-slate-400 hover:text-red-600 hover:border-red-100 transition-all cursor-pointer"
+                          title="حذف من عندي"
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>
+                        {(currentUser?.role === 'teacher' || currentUser?.role === 'admin') && message.section_id && (
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); handleDeleteMessage(message.allIds, true); }}
+                            className="h-10 w-10 rounded-xl bg-red-50 shadow-sm border border-red-100 flex items-center justify-center text-red-400 hover:text-red-600 transition-all cursor-pointer"
+                            title="حذف من عند الجميع"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        )}
                       </div>
                     </div>
                   </motion.div>
@@ -1033,25 +1052,33 @@ export default function MessagesPage() {
                               <p className="text-sm leading-relaxed">{msg.content}</p>
                             )}
                             
-                            {isMe && !editingMessage && (
-                              <div className={`absolute top-0 ${isMe ? '-right-12' : '-left-12'} flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity`}>
-                                <button 
-                                  onClick={() => {
-                                    setEditingMessage(msg);
-                                    setEditContent(msg.content);
-                                  }}
-                                  className="p-1.5 bg-white shadow-sm border border-slate-100 rounded-lg text-slate-400 hover:text-indigo-600"
-                                  title="تعديل"
-                                >
-                                  <Plus className="h-3 w-3 rotate-45" />
-                                </button>
+                            {(isMe || currentUser?.role === 'teacher' || currentUser?.role === 'admin') && !editingMessage && (
+                              <div className={`absolute top-0 ${isMe ? '-right-14' : '-left-14'} flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity`}>
+                                {isMe && (
+                                  <button 
+                                    onClick={() => { setEditingMessage(msg); setEditContent(msg.content); }}
+                                    className="p-1.5 bg-white shadow-sm border border-slate-100 rounded-lg text-slate-400 hover:text-indigo-600"
+                                    title="تعديل"
+                                  >
+                                    <Plus className="h-3 w-3 rotate-45" />
+                                  </button>
+                                )}
                                 <button 
                                   onClick={() => handleDeleteMessage([msg.id])}
                                   className="p-1.5 bg-white shadow-sm border border-slate-100 rounded-lg text-slate-400 hover:text-red-600"
-                                  title="حذف"
+                                  title="حذف من عندي"
                                 >
                                   <Trash2 className="h-3 w-3" />
                                 </button>
+                                {(currentUser?.role === 'teacher' || currentUser?.role === 'admin') && msg.section_id && (
+                                  <button 
+                                    onClick={() => handleDeleteMessage([msg.id], true)}
+                                    className="p-1.5 bg-red-50 shadow-sm border border-red-100 rounded-lg text-red-400 hover:text-red-600"
+                                    title="حذف من عند الجميع"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </button>
+                                )}
                               </div>
                             )}
                           </div>

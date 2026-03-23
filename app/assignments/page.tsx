@@ -14,6 +14,7 @@ type Assignment = {
   description: string;
   subject_id: string;
   section_id: string;
+  section_ids?: string[];
   teacher_id: string;
   due_date: string;
   created_at: string;
@@ -265,16 +266,26 @@ export default function AssignmentsPage() {
 
     setIsSubmitting(true);
     try {
-      const payload = {
+      const sectionIds = currentAssignment.section_ids && currentAssignment.section_ids.length > 0
+        ? currentAssignment.section_ids
+        : currentAssignment.section_id ? [currentAssignment.section_id] : [];
+
+      if (sectionIds.length === 0) {
+        showNotification('error', 'يرجى اختيار شعبة واحدة على الأقل');
+        setIsSubmitting(false);
+        return;
+      }
+
+      const basePayload = {
         title: currentAssignment.title,
         description: currentAssignment.description || null,
         subject_id: currentAssignment.subject_id,
-        section_id: currentAssignment.section_id,
         teacher_id: currentAssignment.teacher_id,
         due_date: new Date(currentAssignment.due_date).toISOString(),
-        file_url: currentAssignment.file_url || null,
         total_marks: questions.reduce((sum, q) => sum + (q.points || 0), 0),
       };
+      // للتوافق مع الكود القديم - section_id = أول شعبة
+      const payload = { ...basePayload, section_id: sectionIds[0], section_ids: sectionIds };
 
       if (currentAssignment.id) {
         // حذف الملف القديم من Cloudinary إذا تغيّر الرابط
@@ -329,36 +340,38 @@ export default function AssignmentsPage() {
           if (qError) throw qError;
         }
       } else {
-        // Insert
-        const { data: newAssignment, error } = await supabase
-          .from('assignments')
-          .insert([payload])
-          .select()
-          .single();
-        if (error) throw error;
-        if (!newAssignment) throw new Error('فشل في إنشاء الواجب');
+        // Insert — واجب لكل شعبة
+        for (const sectionId of sectionIds) {
+          const sectionPayload = { ...basePayload, section_id: sectionId };
+          const { data: newAssignment, error } = await supabase
+            .from('assignments')
+            .insert([sectionPayload])
+            .select()
+            .single();
+          if (error) throw error;
+          if (!newAssignment) continue;
 
-        // Save Questions
-        if (questions.length > 0) {
-          const questionsPayload = questions.map((q, index) => ({
-            assignment_id: newAssignment.id,
-            question_text: q.text,
-            question_type: q.type,
-            options: q.options || null,
-            points: q.points || 0,
-            is_required: q.isRequired || false,
-            order: index
-          }));
-          const { error: qError } = await supabase.from('assignment_questions').insert(questionsPayload);
-          if (qError) throw qError;
+          // Save Questions لكل شعبة
+          if (questions.length > 0) {
+            const questionsPayload = questions.map((q, index) => ({
+              assignment_id: newAssignment.id,
+              question_text: q.text,
+              question_type: q.type,
+              options: q.options || null,
+              points: q.points || 0,
+              is_required: q.isRequired || false,
+              order: index
+            }));
+            await supabase.from('assignment_questions').insert(questionsPayload);
+          }
         }
 
-        // إرسال إشعارات داخلية + Push للطلاب عند إضافة واجب جديد
+        // إرسال إشعارات للطلاب في كل الشعب
         try {
           const { data: students } = await supabase
             .from('students')
             .select('id')
-            .eq('section_id', payload.section_id);
+            .in('section_id', sectionIds);
 
           if (students && students.length > 0) {
             const subjectName = subjects.find(s => s.id === payload.subject_id)?.name || 'المادة';
@@ -385,8 +398,8 @@ export default function AssignmentsPage() {
               body: JSON.stringify({
                 userIds: studentIds,
                 title: '📝 واجب جديد — مدرسة الرفعة',
-                body: `واجب جديد في مادة ${subjectName}: ${payload.title}`,
-                url: `/assignments/${newAssignment.id}`,
+                body: `واجب جديد في مادة ${subjectName}: ${basePayload.title}`,
+                url: `/assignments`,
               }),
             });
           }
@@ -640,17 +653,7 @@ export default function AssignmentsPage() {
                         >
                           <Eye className="h-5 w-5" />
                         </Link>
-                        <button 
-                          onClick={() => {
-                            const url = `${window.location.origin}/assignments/${assignment.id}`;
-                            navigator.clipboard.writeText(url);
-                            setNotification({ type: 'success', message: 'تم نسخ رابط الواجب' });
-                          }}
-                          className="h-10 w-10 flex items-center justify-center text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100"
-                          title="نسخ الرابط"
-                        >
-                          <Share2 className="h-5 w-5" />
-                        </button>
+
                         <button 
                           onClick={() => openEditModal(assignment)}
                           className="h-10 w-10 flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all shadow-sm bg-white border border-slate-100"
@@ -826,22 +829,29 @@ export default function AssignmentsPage() {
                     </div>
                   </div>
                   <div>
-                    <label className="block text-sm font-black text-slate-700 mb-2 mr-1">الشعبة <span className="text-red-500">*</span></label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none text-slate-400">
-                        <Users className="h-5 w-5" />
-                      </div>
-                      <select 
-                        required
-                        className="block w-full rounded-2xl border-0 py-4 pr-12 pl-4 text-slate-900 bg-slate-50 ring-1 ring-inset ring-slate-100 focus:ring-2 focus:ring-indigo-600 sm:text-sm transition-all font-bold appearance-none"
-                        value={currentAssignment.section_id || ''}
-                        onChange={(e) => setCurrentAssignment({...currentAssignment, section_id: e.target.value})}
-                      >
-                        <option value="">اختر الشعبة</option>
-                        {sections.map(s => (
-                          <option key={s.id} value={s.id}>{s.classes?.name} - {s.name}</option>
-                        ))}
-                      </select>
+                    <label className="block text-sm font-black text-slate-700 mb-2 mr-1">
+                      الشعبة <span className="text-red-500">*</span>
+                      <span className="text-xs text-slate-400 font-bold mr-2">(يمكن اختيار أكثر من شعبة)</span>
+                    </label>
+                    <div className="space-y-2 max-h-44 overflow-y-auto bg-slate-50 rounded-2xl ring-1 ring-slate-100 p-3">
+                      {sections.map(s => {
+                        const selected = (currentAssignment.section_ids || (currentAssignment.section_id ? [currentAssignment.section_id] : [])).includes(s.id);
+                        return (
+                          <label key={s.id} className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all ${selected ? 'bg-indigo-50 ring-1 ring-indigo-200' : 'hover:bg-white'}`}>
+                            <input
+                              type="checkbox"
+                              checked={selected}
+                              onChange={(e) => {
+                                const prev = currentAssignment.section_ids || (currentAssignment.section_id ? [currentAssignment.section_id] : []);
+                                const next = e.target.checked ? [...prev, s.id] : prev.filter(id => id !== s.id);
+                                setCurrentAssignment({...currentAssignment, section_ids: next, section_id: next[0] || ''});
+                              }}
+                              className="h-4 w-4 rounded text-indigo-600"
+                            />
+                            <span className={`text-sm font-bold ${selected ? 'text-indigo-700' : 'text-slate-700'}`}>{s.classes?.name} - {s.name}</span>
+                          </label>
+                        );
+                      })}
                     </div>
                   </div>
                   <div>
@@ -881,22 +891,7 @@ export default function AssignmentsPage() {
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-black text-slate-700 mb-2 mr-1">رابط الملف المرفق (اختياري)</label>
-                  <div className="relative group">
-                    <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-slate-400 group-focus-within:text-indigo-600 transition-colors">
-                      <LinkIcon className="h-5 w-5" />
-                    </div>
-                    <input
-                      type="url"
-                      className="block w-full rounded-2xl border-0 py-4 pl-12 pr-4 text-slate-900 bg-slate-50 ring-1 ring-inset ring-slate-100 placeholder:text-slate-400 focus:ring-2 focus:ring-indigo-600 sm:text-sm transition-all font-bold text-left"
-                      dir="ltr"
-                      placeholder="https://..."
-                      value={currentAssignment.file_url || ''}
-                      onChange={(e) => setCurrentAssignment({...currentAssignment, file_url: e.target.value})}
-                    />
-                  </div>
-                </div>
+
 
                 <div className="pt-8 border-t border-slate-100">
                   <AssignmentBuilder questions={questions} onChange={setQuestions} />

@@ -2,15 +2,8 @@
 
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabase";
-import { motion, AnimatePresence } from "motion/react";
-import {
-  Clock,
-  BookOpen,
-  Users,
-  GraduationCap,
-  School,
-  Zap
-} from "lucide-react";
+import { motion } from "motion/react";
+import { School } from "lucide-react";
 
 const DAY_MAP: Record<number, string> = {
   0: "الأحد", 1: "الاثنين", 2: "الثلاثاء",
@@ -52,7 +45,6 @@ export default function LiveMonitorPage() {
   const [currentPeriod, setCurrentPeriod] = useState<Period | null>(null);
   const [nextPeriod, setNextPeriod] = useState<Period | null>(null);
   const [liveClasses, setLiveClasses] = useState<LiveClass[]>([]);
-  const [loading, setLoading] = useState(true);
   const [countdown, setCountdown] = useState("");
 
   const cache = useRef<Record<number, LiveClass[]>>({});
@@ -60,7 +52,9 @@ export default function LiveMonitorPage() {
 
   // الساعة فقط
   useEffect(() => {
-    const timer = setInterval(() => setNow(new Date()), 1000);
+    const timer = setInterval(() => {
+      setNow(new Date());
+    }, 1000);
     return () => clearInterval(timer);
   }, []);
 
@@ -69,7 +63,7 @@ export default function LiveMonitorPage() {
     fetchPeriods();
   }, []);
 
-  // حساب الحصة فقط (بدون API)
+  // حساب الوقت فقط
   useEffect(() => {
     if (periods.length === 0) return;
 
@@ -87,97 +81,88 @@ export default function LiveMonitorPage() {
     setCurrentPeriod(current);
     setNextPeriod(next);
 
-    // العد التنازلي
     if (current) {
       const endMin = timeToMinutes(current.end_time);
       const rem = endMin - nowMin;
       const secs = 60 - now.getSeconds();
+
       setCountdown(`${Math.max(rem - 1, 0)}:${secs.toString().padStart(2, "0")}`);
     } else if (next) {
       const startMin = timeToMinutes(next.start_time);
       const rem = startMin - nowMin;
       const secs = 60 - now.getSeconds();
+
       setCountdown(`${Math.max(rem - 1, 0)}:${secs.toString().padStart(2, "0")}`);
-    }
-
-    // جلب البيانات فقط عند تغير الحصة
-    if (current && lastFetchedPeriod.current !== current.period_number) {
-      lastFetchedPeriod.current = current.period_number;
-      fetchLiveClasses(current.period_number);
-    }
-
-    if (!current) {
-      setLiveClasses([]);
     }
   }, [now, periods]);
 
-  const fetchPeriods = async () => {
-    try {
-      const { data } = await supabase
-        .from("class_periods")
-        .select("*")
-        .order("period_number");
+  // جلب البيانات فقط عند تغيير الحصة
+  useEffect(() => {
+    if (!currentPeriod) return;
 
-      setPeriods(data || []);
-    } finally {
-      setLoading(false);
-    }
+    if (lastFetchedPeriod.current === currentPeriod.period_number) return;
+
+    lastFetchedPeriod.current = currentPeriod.period_number;
+    fetchLiveClasses(currentPeriod.period_number);
+
+  }, [currentPeriod]);
+
+  const fetchPeriods = async () => {
+    const { data } = await supabase
+      .from("class_periods")
+      .select("*")
+      .order("period_number");
+
+    setPeriods(data || []);
   };
 
   const fetchLiveClasses = async (periodNum: number) => {
-    try {
-      // cache
-      if (cache.current[periodNum]) {
-        setLiveClasses(cache.current[periodNum]);
-        return;
-      }
-
-      const jsDay = new Date().getDay();
-      const dbDay = jsDay === 0 ? 1 : jsDay === 1 ? 2 : jsDay === 2 ? 3 :
-                    jsDay === 3 ? 4 : jsDay === 4 ? 5 : 0;
-
-      const { data } = await supabase
-        .from("schedules")
-        .select(`
-          id,
-          teachers(users(full_name), zoom_link),
-          sections(name, classes(name)),
-          subjects(name)
-        `)
-        .eq("day_of_week", dbDay)
-        .eq("period", periodNum);
-
-      const classes: LiveClass[] = (data || []).map((s: any) => ({
-        id: s.id,
-        teacherName: s.teachers?.users?.full_name || "غير محدد",
-        sectionName: s.sections?.name || "غير محدد",
-        className: s.sections?.classes?.name || "غير محدد",
-        subjectName: s.subjects?.name || "غير محدد",
-        periodNumber: periodNum,
-        zoomLink: s.teachers?.zoom_link || null,
-      }));
-
-      cache.current[periodNum] = classes;
-      setLiveClasses(classes);
-    } catch (e) {
-      console.error(e);
+    if (cache.current[periodNum]) {
+      setLiveClasses(cache.current[periodNum]);
+      return;
     }
+
+    const jsDay = new Date().getDay();
+    const dbDay = jsDay === 0 ? 1 : jsDay === 1 ? 2 : jsDay === 2 ? 3 :
+                  jsDay === 3 ? 4 : jsDay === 4 ? 5 : 0;
+
+    const { data } = await supabase
+      .from("schedules")
+      .select(`
+        id,
+        teachers(users(full_name), zoom_link),
+        sections(name, classes(name)),
+        subjects(name)
+      `)
+      .eq("day_of_week", dbDay)
+      .eq("period", periodNum);
+
+    const classes: LiveClass[] = (data || []).map((s: any) => ({
+      id: s.id,
+      teacherName: s.teachers?.users?.full_name || "غير محدد",
+      sectionName: s.sections?.name || "",
+      className: s.sections?.classes?.name || "",
+      subjectName: s.subjects?.name || "",
+      periodNumber: periodNum,
+      zoomLink: s.teachers?.zoom_link || null,
+    }));
+
+    cache.current[periodNum] = classes;
+    setLiveClasses(classes);
   };
 
-  const nowMin = now.getHours() * 60 + now.getMinutes();
-  const dayName = DAY_MAP[now.getDay()];
-  const dateStr = `${now.getDate()} ${MONTH_MAP[now.getMonth()]} ${now.getFullYear()}`;
-  const timeStr = now.toLocaleTimeString("ar-EG", {
+  const nowStr = now.toLocaleTimeString("ar-EG", {
     hour: "2-digit",
     minute: "2-digit",
     second: "2-digit"
   });
 
-  const isWorkDay = now.getDay() >= 0 && now.getDay() <= 4;
+  const dayName = DAY_MAP[now.getDay()];
+  const dateStr = `${now.getDate()} ${MONTH_MAP[now.getMonth()]} ${now.getFullYear()}`;
 
   return (
     <div className="min-h-screen bg-slate-900 text-white" dir="rtl">
-      {/* Header */}
+      
       <div className="p-4 border-b border-white/10 flex justify-between">
         <div className="flex items-center gap-3">
           <School />
@@ -188,14 +173,13 @@ export default function LiveMonitorPage() {
         </div>
 
         <div className="text-center">
-          <div>{timeStr}</div>
+          <div>{nowStr}</div>
           <div className="text-xs text-indigo-300">{dayName} — {dateStr}</div>
         </div>
       </div>
 
       <div className="p-6 space-y-6">
 
-        {/* الحالة */}
         <div className="p-4 rounded-2xl bg-white/10">
           {currentPeriod ? (
             <div>
@@ -207,7 +191,6 @@ export default function LiveMonitorPage() {
           )}
         </div>
 
-        {/* الحصص */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {liveClasses.map(cls => (
             <div key={cls.id} className="p-4 bg-white/10 rounded-2xl">

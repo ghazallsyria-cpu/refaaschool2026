@@ -247,6 +247,7 @@ export default function AttendancePage() {
             const student = students.find(s => s.id === record.student_id);
             if (student) {
               const statusText = record.status === 'absent' ? 'غائب' : 'متأخر';
+              // إشعار الطالب بحالة حضوره
               notificationPayloads.push({
                 user_id: student.id,
                 title: 'تنبيه حضور',
@@ -254,6 +255,16 @@ export default function AttendancePage() {
                 type: 'attendance',
                 link: '/attendance'
               });
+              // إشعار ولي الأمر أيضاً
+              if (student.parent_id) {
+                notificationPayloads.push({
+                  user_id: student.parent_id,
+                  title: `غياب: ${student.full_name || 'الطالب'}`,
+                  content: `تم تسجيل ${statusText} للطالب ${student.full_name || ''} بتاريخ ${record.date}`,
+                  type: 'attendance',
+                  link: '/attendance'
+                });
+              }
             }
           }
 

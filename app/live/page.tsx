@@ -43,6 +43,7 @@ export default function LiveMonitorPage() {
   const [liveClasses, setLiveClasses] = useState<LiveClass[]>([]);
   const [error, setError] = useState<string | null>(null);
 
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const cache = useRef<Record<string, LiveClass[]>>({});
   const lastKey = useRef<string | null>(null);
   const requestIdRef = useRef(0);
@@ -67,14 +68,7 @@ export default function LiveMonitorPage() {
     load();
   }, []);
 
-  /* ================= Clock ================= */
-
-  useEffect(() => {
-    const timer = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  /* ================= Derived ================= */
+  /* ================= Compute ================= */
 
   const nowMin = now.getHours() * 60 + now.getMinutes();
   const jsDay = now.getDay();
@@ -108,6 +102,30 @@ export default function LiveMonitorPage() {
   const cacheKey = currentPeriod
     ? `${dbDay}-${currentPeriod.period_number}`
     : null;
+
+  /* ================= Smart Timer (بدل كل ثانية) ================= */
+
+  useEffect(() => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+
+    if (!currentPeriod) return;
+
+    const nowMs = Date.now();
+    const endMs =
+      timeToMinutes(currentPeriod.end_time) * 60 * 1000;
+
+    const delay = endMs - nowMs;
+
+    if (delay <= 0) return;
+
+    timeoutRef.current = setTimeout(() => {
+      setNow(new Date());
+    }, delay);
+
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, [currentPeriod]);
 
   /* ================= Fetch Data ================= */
 
@@ -173,12 +191,11 @@ export default function LiveMonitorPage() {
           {now.toLocaleTimeString("ar-KW", {
             hour: "2-digit",
             minute: "2-digit",
-            second: "2-digit",
           })}
         </div>
       </div>
 
-      {/* حالة الوقت */}
+      {/* الحالة الزمنية */}
       <div className="mb-6 p-4 bg-white/10 rounded-xl">
         {currentPeriod && `الحصة ${currentPeriod.period_number} جارية`}
         {!currentPeriod && isBreak && "استراحة"}

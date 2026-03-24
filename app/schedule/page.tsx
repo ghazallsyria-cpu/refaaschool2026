@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Calendar, Clock, Plus, Trash2, X, Edit2, AlertCircle, Search } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
@@ -30,7 +30,7 @@ type Schedule = {
   day_of_week: number;
   period: number;
   subjects?: { name: string };
-  teachers?: { users?: { full_name: string } };
+  teachers?: { zoom_link?: string, users?: { full_name: string } };
 };
 
 type Period = {
@@ -57,10 +57,9 @@ export default function SchedulesPage() {
   const [teacherSchedule, setTeacherSchedule] = useState<any[]>([]);
   const [isTeacher, setIsTeacher] = useState(false);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
-  const [teacherAssignments, setTeacherAssignments] = useState<any[]>([]); // New state
+  const [teacherAssignments, setTeacherAssignments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // Modal Data
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -102,7 +101,6 @@ export default function SchedulesPage() {
     setTimeout(() => setNotification(null), 5000);
   };
 
-  // Current Cell State
   const [currentCell, setCurrentCell] = useState<{
     day: number;
     period: number;
@@ -111,81 +109,7 @@ export default function SchedulesPage() {
     teacherId?: string;
   }>({ day: 0, period: 1 });
 
-  useEffect(() => {
-    fetchInitialData();
-  }, []);
-
-  useEffect(() => {
-    if (selectedSectionId) {
-      fetchSchedules(selectedSectionId);
-    } else {
-      setSchedules([]);
-    }
-  }, [selectedSectionId]);
-
-  const fetchInitialData = async () => {
-    setLoading(true);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      const [sectionsRes, subjectsRes, teachersRes, assignmentsRes, periodsRes] = await Promise.all([
-        supabase.from('sections').select('id, name, classes(name)').order('name'),
-        supabase.from('subjects').select('id, name').order('name'),
-        supabase.from('teachers').select('id, users(full_name)'),
-        supabase.from('teacher_sections').select('teacher_id, section_id, subject_id'),
-        supabase.from('class_periods').select('*').order('period_number')
-      ]);
-
-      if (sectionsRes.data) setSections((sectionsRes.data as unknown) as Section[]);
-      if (subjectsRes.data) setSubjects((subjectsRes.data as unknown) as Subject[]);
-      if (teachersRes.data) setTeachers((teachersRes.data as unknown) as Teacher[]);
-      if (assignmentsRes.data) setTeacherAssignments(assignmentsRes.data);
-      if (periodsRes.data) setPeriods(periodsRes.data);
-
-      // إذا كان المستخدم طالباً، نجلب فصله تلقائياً
-      if (user) {
-        const { data: userData } = await supabase
-          .from('users').select('role').eq('id', user.id).single();
-        
-        setUserRole(userData?.role || null);
-
-        // الطالب → فصله فقط
-        if (userData?.role === 'student') {
-          const { data: studentData } = await supabase
-            .from('students').select('section_id, sections(name, classes(name))').eq('id', user.id).single();
-          if (studentData?.section_id) {
-            setSelectedSectionId(studentData.section_id);
-            const sec = studentData.sections as any;
-            setStudentSectionName(`${sec?.classes?.name} - ${sec?.name}`);
-            return;
-          }
-        }
-
-        // المعلم → جدوله الشخصي
-        if (userData?.role === 'teacher') {
-          setIsTeacher(true);
-          const { data: tSchedule } = await supabase
-            .from('schedules')
-            .select('id, day_of_week, period, subjects(name), sections(name, classes(name))')
-            .eq('teacher_id', user.id)
-            .order('day_of_week').order('period');
-          setTeacherSchedule(tSchedule || []);
-          return;
-        }
-      }
-
-      // للمدير والمعلم: أول فصل في القائمة
-      if (sectionsRes.data && sectionsRes.data.length > 0) {
-        setSelectedSectionId(sectionsRes.data[0].id);
-      }
-    } catch (error) {
-      console.error('Error fetching initial data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchSchedules = async (sectionId: string) => {
+  const fetchSchedules = useCallback(async (sectionId: string) => {
     setLoading(true);
     try {
       const { data, error } = await supabase
@@ -198,7 +122,7 @@ export default function SchedulesPage() {
           day_of_week,
           period,
           subjects (name),
-          teachers (users (full_name))
+          teachers (zoom_link, users (full_name))
         `)
         .eq('section_id', sectionId);
 
@@ -209,9 +133,81 @@ export default function SchedulesPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    const fetchInitialData = async () => {
+      setLoading(true);
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        const [sectionsRes, subjectsRes, teachersRes, assignmentsRes, periodsRes] = await Promise.all([
+          supabase.from('sections').select('id, name, classes(name)').order('name'),
+          supabase.from('subjects').select('id, name').order('name'),
+          supabase.from('teachers').select('id, users(full_name)'),
+          supabase.from('teacher_sections').select('teacher_id, section_id, subject_id'),
+          supabase.from('class_periods').select('*').order('period_number')
+        ]);
+
+        if (sectionsRes.data) setSections((sectionsRes.data as unknown) as Section[]);
+        if (subjectsRes.data) setSubjects((subjectsRes.data as unknown) as Subject[]);
+        if (teachersRes.data) setTeachers((teachersRes.data as unknown) as Teacher[]);
+        if (assignmentsRes.data) setTeacherAssignments(assignmentsRes.data);
+        if (periodsRes.data) setPeriods(periodsRes.data);
+
+        if (user) {
+          const { data: userData } = await supabase
+            .from('users').select('role').eq('id', user.id).single();
+          
+          setUserRole(userData?.role || null);
+
+          if (userData?.role === 'student') {
+            const { data: studentData } = await supabase
+              .from('students').select('section_id, sections(name, classes(name))').eq('id', user.id).single();
+            if (studentData?.section_id) {
+              setSelectedSectionId(studentData.section_id);
+              const sec = studentData.sections as any;
+              setStudentSectionName(`${sec?.classes?.name} - ${sec?.name}`);
+              return;
+            }
+          }
+
+          if (userData?.role === 'teacher') {
+            setIsTeacher(true);
+            const { data: tSchedule } = await supabase
+              .from('schedules')
+              .select('id, day_of_week, period, subjects(name), sections(name, classes(name))')
+              .eq('teacher_id', user.id)
+              .order('day_of_week').order('period');
+            setTeacherSchedule(tSchedule || []);
+            return;
+          }
+        }
+
+        if (sectionsRes.data && sectionsRes.data.length > 0) {
+          setSelectedSectionId(sectionsRes.data[0].id);
+        }
+      } catch (error) {
+        console.error('Error fetching initial data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchInitialData();
+  }, []);
+
+  useEffect(() => {
+    if (selectedSectionId) {
+      fetchSchedules(selectedSectionId);
+    } else {
+      setSchedules([]);
+    }
+  }, [selectedSectionId, fetchSchedules]);
 
   const openCellModal = (day: number, period: number, existingSchedule?: Schedule) => {
+    if (userRole === 'student') return; // منع الطلاب تماماً
+    
     if (!selectedSectionId) {
       showNotification('error', 'الرجاء اختيار الشعبة أولاً');
       return;
@@ -229,6 +225,8 @@ export default function SchedulesPage() {
 
   const handleSaveSchedule = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (userRole === 'student') return;
+
     if (!currentCell.subjectId || !currentCell.teacherId) {
       showNotification('error', 'الرجاء اختيار المادة والمعلم');
       return;
@@ -245,26 +243,24 @@ export default function SchedulesPage() {
       };
 
       if (currentCell.scheduleId) {
-        // Update
         const { error } = await supabase
           .from('schedules')
           .update(payload)
           .eq('id', currentCell.scheduleId);
           
         if (error) {
-          if (error.code === '23505') { // Unique violation
+          if (error.code === '23505') {
             throw new Error('المعلم لديه حصة أخرى في نفس الوقت');
           }
           throw error;
         }
       } else {
-        // Insert
         const { error } = await supabase
           .from('schedules')
           .insert([payload]);
           
         if (error) {
-          if (error.code === '23505') { // Unique violation
+          if (error.code === '23505') {
             throw new Error('المعلم لديه حصة أخرى في نفس الوقت');
           }
           throw error;
@@ -283,7 +279,7 @@ export default function SchedulesPage() {
   };
 
   const confirmDelete = async () => {
-    if (!scheduleToDelete) return;
+    if (userRole === 'student' || !scheduleToDelete) return;
     
     try {
       const { error } = await supabase.from('schedules').delete().eq('id', scheduleToDelete);
@@ -302,357 +298,162 @@ export default function SchedulesPage() {
     return schedules.find(s => s.day_of_week === day && s.period === period);
   };
 
+  const isAdmin = userRole === 'admin' || userRole === 'management';
+
   return (
     <div className="space-y-6 relative">
-      {/* Notification Toast */}
       {notification && (
         <div className={`fixed top-4 left-1/2 transform -translate-x-1/2 z-50 px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 transition-all ${
           notification.type === 'success' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-red-50 text-red-800 border border-red-200'
         }`}>
-          <div className="font-medium">{notification.message}</div>
-          <button onClick={() => setNotification(null)} className="text-slate-400 hover:text-slate-600">
-            <X className="h-4 w-4" />
-          </button>
+          {notification.type === 'success' ? <Plus className="h-5 w-5" /> : <AlertCircle className="h-5 w-5" />}
+          <p className="font-bold text-sm">{notification.message}</p>
         </div>
       )}
 
-      {/* Delete Confirmation Modal */}
-      <Dialog.Root open={!!scheduleToDelete} onOpenChange={(open) => !open && setScheduleToDelete(null)}>
-        <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-40" />
-          <Dialog.Content className="fixed left-[50%] top-[50%] z-50 w-full max-w-md translate-x-[-50%] translate-y-[-50%] rounded-xl bg-white p-6 shadow-lg focus:outline-none" dir="rtl">
-            <div className="flex items-center justify-between mb-5">
-              <Dialog.Title className="text-lg font-semibold text-slate-900">
-                تأكيد الحذف
-              </Dialog.Title>
-              <Dialog.Close className="text-slate-400 hover:text-slate-500">
-                <X className="h-5 w-5" />
-              </Dialog.Close>
+      {scheduleToDelete && isAdmin && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl" dir="rtl">
+            <h3 className="text-lg font-bold text-slate-900 mb-2">تأكيد الحذف</h3>
+            <p className="text-slate-500 text-sm mb-6">هل أنت متأكد من حذف هذه الحصة؟</p>
+            <div className="flex gap-3">
+              <button onClick={() => setScheduleToDelete(null)} className="flex-1 px-4 py-2 rounded-xl bg-slate-100 text-slate-700 font-bold text-sm">إلغاء</button>
+              <button onClick={confirmDelete} className="flex-1 px-4 py-2 rounded-xl bg-red-600 text-white font-bold text-sm">حذف</button>
             </div>
-            <p className="text-slate-600 mb-6">هل أنت متأكد من حذف هذه الحصة؟ لا يمكن التراجع عن هذا الإجراء.</p>
-            <div className="flex justify-end gap-3">
-              <Dialog.Close asChild>
-                <button className="rounded-md bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-inset ring-slate-300 hover:bg-slate-50">
-                  إلغاء
-                </button>
-              </Dialog.Close>
-              <button
-                onClick={confirmDelete}
-                className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
-              >
-                تأكيد الحذف
-              </button>
-            </div>
-          </Dialog.Content>
-        </Dialog.Portal>
-      </Dialog.Root>
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">الجدول الدراسي</h1>
-          <p className="text-slate-500">إدارة الجداول الدراسية للفصول والشعب</p>
+          <h1 className="text-2xl font-bold text-slate-900">
+            {userRole === 'student' ? 'جدولي الدراسي' : 'الجدول الدراسي'}
+          </h1>
+          {!userRole === 'student' && <p className="text-slate-500">إدارة الجداول الدراسية للفصول والشعب</p>}
         </div>
       </div>
 
-      {/* جدول المعلم الشخصي */}
-      {isTeacher && (
-        <div className="bg-white rounded-xl shadow-sm ring-1 ring-slate-200 overflow-hidden">
-          <div className="overflow-x-auto">
-            <div className="min-w-[700px] p-4">
-              <div className="grid gap-2" style={{gridTemplateColumns: `120px repeat(${periods.length}, 1fr)`}}>
-                {/* Header */}
-                <div className="h-14 flex items-center justify-center bg-slate-50 rounded-xl border border-slate-100">
-                  <span className="text-xs font-black text-slate-400">اليوم / الحصة</span>
-                </div>
-                {periods.map(p => (
-                  <div key={p.id} className="h-14 flex flex-col items-center justify-center bg-slate-50 rounded-xl border border-slate-100 px-2">
-                    <span className="text-xs font-black text-slate-900">الحصة {p.period_number}</span>
-                    <span className="text-[10px] text-slate-400 font-bold">{p.start_time?.slice(0,5)} - {p.end_time?.slice(0,5)}</span>
-                  </div>
-                ))}
-
-                {/* Rows */}
-                {DAYS.map(day => (
-                  <>
-                    <div key={`day-${day.id}`} className="font-bold text-center p-3 bg-slate-50 rounded-xl flex items-center justify-center min-h-[100px]">
-                      {day.name}
-                    </div>
-                    {periods.map(p => {
-                      const cell = teacherSchedule.find(s => s.day_of_week === day.id && s.period === p.period_number);
-                      const pStatus = getPeriodStatus(day.id, p.period_number);
-                      return (
-                        <div key={`${day.id}-${p.period_number}`} className="relative min-h-[100px] p-1">
-                          {cell ? (
-                            <div className={`relative h-full flex flex-col justify-between rounded-2xl p-3 shadow-md border overflow-hidden transition-all ${
-                              pStatus === 'current'
-                                ? 'bg-gradient-to-br from-emerald-500 to-emerald-600 border-emerald-400 shadow-emerald-200/60 scale-[1.03]'
-                                : pStatus === 'next'
-                                ? 'bg-gradient-to-br from-amber-400 to-amber-500 border-amber-300 shadow-amber-200/60'
-                                : pStatus === 'past'
-                                ? 'bg-slate-100 border-slate-200 opacity-50'
-                                : 'bg-gradient-to-br from-indigo-600 to-violet-700 border-transparent shadow-indigo-200/50'
-                            }`}>
-                              <div className="absolute top-0 right-0 w-16 h-16 bg-white/10 rounded-full -mr-8 -mt-8 blur-xl" />
-                              {pStatus === 'current' && (
-                                <>
-                                  <div className="absolute inset-0 bg-emerald-400/20 animate-pulse pointer-events-none" />
-                                  <div className="absolute -top-1 -right-1 bg-emerald-700 text-white text-[8px] font-black px-1.5 py-0.5 rounded-full border border-white z-10">⚡ الآن</div>
-                                </>
-                              )}
-                              {pStatus === 'next' && (
-                                <div className="absolute -top-1 -right-1 bg-amber-700 text-white text-[8px] font-black px-1.5 py-0.5 rounded-full border border-white z-10">استعد!</div>
-                              )}
-                              <div className="relative z-10">
-                                <div className={`font-black text-sm leading-tight ${pStatus === 'past' ? 'text-slate-500' : 'text-white'}`}>
-                                  {(cell.subjects as any)?.name}
-                                </div>
-                                <div className={`text-[10px] font-bold mt-1 ${pStatus === 'past' ? 'text-slate-400' : 'text-white/70'}`}>
-                                  {(cell.sections as any)?.classes?.name}
-                                </div>
-                                <div className={`text-[10px] font-bold ${pStatus === 'past' ? 'text-slate-400' : 'text-white/60'}`}>
-                                  {(cell.sections as any)?.name}
-                                </div>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="h-full min-h-[88px] flex items-center justify-center rounded-2xl border-2 border-dashed border-slate-100">
-                              <div className="h-1 w-4 bg-slate-100 rounded-full" />
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {!isTeacher && <div className="bg-white p-4 rounded-xl shadow-sm ring-1 ring-slate-200">
-        <div className="flex flex-col sm:flex-row items-center gap-4">
-          {userRole === 'student' ? (
-            <div className="flex items-center gap-3">
-              <span className="text-sm font-medium text-slate-700">فصلك الدراسي:</span>
-              <span className="bg-indigo-50 text-indigo-700 font-black px-4 py-2 rounded-xl text-sm border border-indigo-100">
-                {studentSectionName || 'جاري التحميل...'}
-              </span>
-            </div>
-          ) : (
-            <>
-              <label className="text-sm font-medium text-slate-700 whitespace-nowrap">
-                اختر الشعبة:
-              </label>
-              <select
-                className="block w-full sm:w-64 rounded-md border-0 py-2 px-3 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
-                value={selectedSectionId}
-                onChange={(e) => setSelectedSectionId(e.target.value)}
-                disabled={loading && sections.length === 0}
-              >
-                {sections.length === 0 ? (
-                  <option value="">لا توجد شعب مسجلة</option>
-                ) : (
-                  sections.map((section) => (
-                    <option key={section.id} value={section.id}>
-                      {section.classes?.name} - {section.name}
-                    </option>
-                  ))
-                )}
-              </select>
-            </>
-          )}
-        </div>
-      </div>}
-
-      {!isTeacher && <div className="bg-white rounded-xl shadow-sm ring-1 ring-slate-200 overflow-hidden">
-        {loading ? (
-          <div className="flex justify-center items-center py-20">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-          </div>
-        ) : !selectedSectionId ? (
-          <div className="text-center py-20">
-            <Calendar className="mx-auto h-12 w-12 text-slate-300 mb-3" />
-            <p className="text-slate-500">الرجاء اختيار الشعبة لعرض الجدول الدراسي</p>
+      <div className="bg-white p-4 rounded-xl shadow-sm ring-1 ring-slate-200">
+        {userRole === 'student' ? (
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-medium text-slate-700">فصلك الدراسي:</span>
+            <span className="bg-indigo-50 text-indigo-700 font-black px-4 py-2 rounded-xl text-sm border border-indigo-100">
+              {studentSectionName || 'جاري التحميل...'}
+            </span>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-slate-200 border-collapse table-fixed">
-              <thead className="bg-slate-50">
-                <tr>
-                  <th scope="col" className="py-3.5 px-4 text-center text-sm font-semibold text-slate-900 border-l border-slate-200 w-32 bg-slate-100">
-                    اليوم / الحصة
-                  </th>
-                  {periods.map(period => (
-                    <th key={period.id} scope="col" className="py-3.5 px-4 text-center text-sm font-semibold text-slate-900 border-l border-slate-200 min-w-[140px]">
-                      الحصة {period.period_number}<br/>
-                      <span className="text-xs font-normal text-slate-500">{period.start_time.slice(0,5)} - {period.end_time.slice(0,5)}</span>
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200 bg-white">
-                {DAYS.map((day) => (
-                  <tr key={day.id} className="hover:bg-slate-50/50">
-                    <td className="whitespace-nowrap py-4 px-4 text-sm font-bold text-slate-900 border-l border-slate-200 text-center bg-slate-50">
-                      {day.name}
-                    </td>
-                    {periods.map(period => {
-                      const cellData = getCellData(day.id, period.period_number);
-                      const pStatus = getPeriodStatus(day.id, period.period_number);
-                      return (
-                        <td 
-                          key={`${day.id}-${period.period_number}`} 
-                          className="relative p-2 border-l border-slate-200 h-24 align-top group cursor-pointer hover:bg-indigo-50/50 transition-colors"
-                          onClick={() => openCellModal(day.id, period.period_number, cellData)}
-                        >
-                          {cellData ? (
-                            <div className={`relative h-full flex flex-col justify-between rounded-md p-2 border transition-all ${
-                              pStatus === 'current'
-                                ? 'bg-gradient-to-br from-emerald-500 to-emerald-600 border-emerald-400 text-white shadow-lg shadow-emerald-200 scale-[1.03]'
-                                : pStatus === 'next'
-                                ? 'bg-gradient-to-br from-amber-400 to-amber-500 border-amber-300 text-white shadow-md shadow-amber-200'
-                                : pStatus === 'past'
-                                ? 'bg-slate-100 border-slate-200 opacity-50'
-                                : 'bg-indigo-50 border-indigo-100'
-                            }`}>
-                              {pStatus === 'current' && (
-                                <>
-                                  <div className="absolute inset-0 rounded-md bg-emerald-400/20 animate-pulse pointer-events-none" />
-                                  <div className="absolute -top-1.5 -right-1.5 bg-emerald-700 text-white text-[8px] font-black px-1.5 py-0.5 rounded-full border border-white z-10">⚡ الآن</div>
-                                </>
-                              )}
-                              {pStatus === 'next' && (
-                                <div className="absolute -top-1.5 -right-1.5 bg-amber-700 text-white text-[8px] font-black px-1.5 py-0.5 rounded-full border border-white z-10">استعد!</div>
-                              )}
-                              <div className="relative z-10">
-                                <div className={`font-bold text-sm truncate ${pStatus === 'current' || pStatus === 'next' ? 'text-white' : pStatus === 'past' ? 'text-slate-400' : 'text-indigo-900'}`} title={cellData.subjects?.name}>
-                                  {cellData.subjects?.name}
-                                </div>
-                                <div className={`text-xs mt-1 truncate ${pStatus === 'current' || pStatus === 'next' ? 'text-white/80' : pStatus === 'past' ? 'text-slate-400' : 'text-indigo-600'}`} title={cellData.teachers?.users?.full_name}>
-                                  أ. {cellData.teachers?.users?.full_name}
-                                </div>
-                              </div>
-                              <div className="flex justify-end opacity-0 group-hover:opacity-100 transition-opacity mt-2 relative z-10">
-                                <button 
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setScheduleToDelete(cellData.id);
-                                  }}
-                                  className={`p-1 rounded ${pStatus === 'current' || pStatus === 'next' ? 'text-white/70 hover:text-white hover:bg-white/20' : 'text-red-500 hover:text-red-700 hover:bg-red-50'}`}
-                                  title="حذف الحصة"
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                </button>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="h-full w-full flex items-center justify-center bg-slate-50/50 rounded-xl border border-dashed border-slate-200 transition-all group-hover:bg-indigo-50/50 group-hover:border-indigo-200">
-                              <div className="flex items-center gap-1 text-[10px] font-black text-slate-400 uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">
-                                <Plus className="h-3 w-3" /> إضافة
-                              </div>
-                            </div>
-                          )}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="flex flex-col sm:flex-row items-center gap-4">
+            <label className="text-sm font-medium text-slate-700">اختر الشعبة:</label>
+            <select
+              className="block w-full sm:w-64 rounded-md border-0 py-2 px-3 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-indigo-600 sm:text-sm"
+              value={selectedSectionId}
+              onChange={(e) => setSelectedSectionId(e.target.value)}
+            >
+              {sections.map((section) => (
+                <option key={section.id} value={section.id}>
+                  {section.classes?.name} - {section.name}
+                </option>
+              ))}
+            </select>
           </div>
         )}
-      </div>}
+      </div>
 
-      {/* Add/Edit Schedule Modal */}
-      <Dialog.Root open={isModalOpen} onOpenChange={setIsModalOpen}>
+      <div className="bg-white rounded-xl shadow-sm ring-1 ring-slate-200 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-slate-200 border-collapse table-fixed">
+            <thead className="bg-slate-50">
+              <tr>
+                <th className="py-3.5 px-4 text-center text-sm font-semibold text-slate-900 border-l border-slate-200 w-32 bg-slate-100">اليوم / الحصة</th>
+                {periods.map(period => (
+                  <th key={period.id} className="py-3.5 px-4 text-center text-sm font-semibold text-slate-900 border-l border-slate-200 min-w-[140px]">
+                    الحصة {period.period_number}<br/>
+                    <span className="text-xs font-normal text-slate-500">{period.start_time.slice(0,5)} - {period.end_time.slice(0,5)}</span>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-200 bg-white">
+              {DAYS.map((day) => (
+                <tr key={day.id} className="hover:bg-slate-50/50">
+                  <td className="whitespace-nowrap py-4 px-4 text-sm font-bold text-slate-900 border-l border-slate-200 text-center bg-slate-50">{day.name}</td>
+                  {periods.map(period => {
+                    const cellData = getCellData(day.id, period.period_number);
+                    const pStatus = getPeriodStatus(day.id, period.period_number);
+                    return (
+                      <td 
+                        key={`${day.id}-${period.period_number}`} 
+                        className={`relative p-2 border-l border-slate-200 h-24 align-top group transition-colors ${
+                          isAdmin ? 'cursor-pointer hover:bg-indigo-50/50' : 
+                          userRole === 'student' && cellData?.teachers?.zoom_link ? 'cursor-pointer hover:bg-emerald-50/30' : 'cursor-default'
+                        }`}
+                        onClick={() => {
+                          if (isAdmin) openCellModal(day.id, period.period_number, cellData);
+                          else if (userRole === 'student' && cellData?.teachers?.zoom_link) window.open(cellData.teachers.zoom_link, '_blank');
+                        }}
+                      >
+                        {cellData ? (
+                          <div className={`relative h-full flex flex-col justify-between rounded-md p-2 border transition-all ${
+                            pStatus === 'current' ? 'bg-emerald-500 border-emerald-400 text-white shadow-lg' :
+                            pStatus === 'next' ? 'bg-amber-400 border-amber-300 text-white' :
+                            pStatus === 'past' ? 'bg-slate-100 border-slate-200 opacity-50' : 'bg-indigo-50 border-indigo-100'
+                          }`}>
+                            <div className="relative z-10">
+                              <div className="font-bold text-sm truncate">{cellData.subjects?.name}</div>
+                              <div className="text-xs mt-1 truncate">أ. {cellData.teachers?.users?.full_name}</div>
+                            </div>
+                            {userRole === 'student' && cellData.teachers?.zoom_link && (
+                              <div className="mt-1 flex items-center justify-center gap-1 bg-white/20 text-white text-[9px] font-black py-0.5 rounded-lg">🎥 Zoom</div>
+                            )}
+                            {isAdmin && (
+                              <div className="flex justify-end opacity-0 group-hover:opacity-100 transition-opacity mt-2">
+                                <button onClick={(e) => { e.stopPropagation(); setScheduleToDelete(cellData.id); }} className="p-1 text-red-500 hover:bg-red-50 rounded"><Trash2 className="h-3.5 w-3.5" /></button>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="h-full w-full flex items-center justify-center bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
+                            {isAdmin && <div className="text-[10px] font-black text-slate-400 opacity-0 group-hover:opacity-100">+ إضافة</div>}
+                          </div>
+                        )}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {isAdmin && <Dialog.Root open={isModalOpen} onOpenChange={setIsModalOpen}>
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-40" />
-          <Dialog.Content className="fixed left-[50%] top-[50%] z-50 w-full max-w-md translate-x-[-50%] translate-y-[-50%] rounded-xl bg-white p-6 shadow-lg focus:outline-none" dir="rtl">
-            <div className="flex items-center justify-between mb-5">
-              <Dialog.Title className="text-lg font-semibold text-slate-900">
-                {currentCell.scheduleId ? 'تعديل الحصة' : 'إضافة حصة جديدة'}
-              </Dialog.Title>
-              <Dialog.Close className="text-slate-400 hover:text-slate-500">
-                <X className="h-5 w-5" />
-              </Dialog.Close>
-            </div>
-            
-            <div className="mb-6 bg-slate-50 p-3 rounded-lg border border-slate-200 flex items-center gap-3 text-sm text-slate-700">
-              <Clock className="h-5 w-5 text-indigo-500" />
-              <div>
-                <span className="font-semibold">{DAYS.find(d => d.id === currentCell.day)?.name}</span>
-                <span className="mx-2">-</span>
-                <span>الحصة {currentCell.period}</span>
-              </div>
-            </div>
-
+          <Dialog.Content className="fixed left-[50%] top-[50%] z-50 w-full max-w-md translate-x-[-50%] translate-y-[-50%] rounded-xl bg-white p-6 shadow-lg" dir="rtl">
+            <Dialog.Title className="text-lg font-semibold mb-4">{currentCell.scheduleId ? 'تعديل الحصة' : 'إضافة حصة جديدة'}</Dialog.Title>
             <form onSubmit={handleSaveSchedule} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium leading-6 text-slate-900">المادة الدراسية</label>
-                <select 
-                  required
-                  className="mt-2 block w-full rounded-md border-0 py-2 px-3 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
-                  value={currentCell.subjectId || ''}
-                  onChange={(e) => setCurrentCell({...currentCell, subjectId: e.target.value})}
-                >
+                <label className="block text-sm font-medium">المادة</label>
+                <select required className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" value={currentCell.subjectId} onChange={(e) => setCurrentCell({...currentCell, subjectId: e.target.value})}>
                   <option value="">اختر المادة</option>
-                  {subjects
-                    .filter(s => {
-                      if (currentCell.teacherId) {
-                        return teacherAssignments.some(a => a.subject_id === s.id && a.teacher_id === currentCell.teacherId && a.section_id === selectedSectionId);
-                      }
-                      return teacherAssignments.some(a => a.subject_id === s.id && a.section_id === selectedSectionId);
-                    })
-                    .map(s => (
-                    <option key={s.id} value={s.id}>{s.name}</option>
-                  ))}
+                  {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
               </div>
-              
               <div>
-                <label className="block text-sm font-medium leading-6 text-slate-900">المعلم</label>
-                <select 
-                  required
-                  className="mt-2 block w-full rounded-md border-0 py-2 px-3 text-slate-900 ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
-                  value={currentCell.teacherId || ''}
-                  onChange={(e) => setCurrentCell({...currentCell, teacherId: e.target.value})}
-                >
+                <label className="block text-sm font-medium">المعلم</label>
+                <select required className="mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" value={currentCell.teacherId} onChange={(e) => setCurrentCell({...currentCell, teacherId: e.target.value})}>
                   <option value="">اختر المعلم</option>
-                  {teachers
-                    .filter(t => {
-                      if (currentCell.subjectId) {
-                        return teacherAssignments.some(a => a.teacher_id === t.id && a.subject_id === currentCell.subjectId && a.section_id === selectedSectionId);
-                      }
-                      return teacherAssignments.some(a => a.teacher_id === t.id && a.section_id === selectedSectionId);
-                    })
-                    .map(t => (
-                    <option key={t.id} value={t.id}>{t.users?.full_name}</option>
-                  ))}
+                  {teachers.map(t => <option key={t.id} value={t.id}>{t.users.full_name}</option>)}
                 </select>
               </div>
-              
-              <div className="mt-6 flex justify-end gap-3">
-                <Dialog.Close asChild>
-                  <button
-                    type="button"
-                    className="rounded-md bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-inset ring-slate-300 hover:bg-slate-50"
-                  >
-                    إلغاء
-                  </button>
-                </Dialog.Close>
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50"
-                >
-                  {isSubmitting ? 'جاري الحفظ...' : 'حفظ الحصة'}
-                </button>
+              <div className="mt-6 flex gap-3">
+                <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 rounded-xl bg-slate-100 py-2.5 font-bold text-slate-700">إلغاء</button>
+                <button type="submit" disabled={isSubmitting} className="flex-1 rounded-xl bg-indigo-600 py-2.5 font-bold text-white disabled:opacity-50">{isSubmitting ? 'جاري الحفظ...' : 'حفظ'}</button>
               </div>
             </form>
           </Dialog.Content>
         </Dialog.Portal>
-      </Dialog.Root>
+      </Dialog.Root>}
     </div>
   );
 }

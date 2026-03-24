@@ -194,9 +194,36 @@ export default function SchedulesPage() {
   };
 
   const fetchSchedules = async (sectionId: string) => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
+  setLoading(true);
+  try {
+    let data: any[] = [];
+
+    if (userRole === 'student') {
+      const { data: studentData } = await supabase
+        .from('students')
+        .select('section_id')
+        .eq('id', (await supabase.auth.getUser()).data.user?.id)
+        .single();
+
+      if (studentData?.section_id) {
+        const res = await supabase
+          .from('schedules')
+          .select(`
+            id,
+            section_id,
+            subject_id,
+            teacher_id,
+            day_of_week,
+            period,
+            subjects (name),
+            teachers (zoom_link, users (full_name))
+          `)
+          .eq('section_id', studentData.section_id);
+
+        data = res.data || [];
+      }
+    } else {
+      const res = await supabase
         .from('schedules')
         .select(`
           id,
@@ -210,14 +237,16 @@ export default function SchedulesPage() {
         `)
         .eq('section_id', sectionId);
 
-      if (error) throw error;
-      setSchedules((data as unknown) as Schedule[] || []);
-    } catch (error) {
-      console.error('Error fetching schedules:', error);
-    } finally {
-      setLoading(false);
+      data = res.data || [];
     }
-  };
+
+    setSchedules((data as unknown) as Schedule[]);
+  } catch (error) {
+    console.error('Error fetching schedules:', error);
+  } finally {
+    setLoading(false);
+  }
+};
 
   const openCellModal = (day: number, period: number, existingSchedule?: Schedule) => {
     if (!selectedSectionId) {

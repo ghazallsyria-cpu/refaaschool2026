@@ -12,13 +12,9 @@ function timeToMinutes(time: string): number {
   return h * 60 + m;
 }
 
-// توحيد اليوم بين JS و DB (قابل للتعديل حسب نظامك)
 function getDbDay(jsDay: number): number {
-  // 0 = Sunday
-  // هنا نفترض:
-  // الأحد=1 ... الخميس=5 | الجمعة/السبت = null (لا دوام)
   if (jsDay >= 0 && jsDay <= 4) return jsDay + 1;
-  return -1; // يوم غير دراسي
+  return -1;
 }
 
 /* ================= Types ================= */
@@ -47,11 +43,8 @@ export default function LiveMonitorPage() {
   const [liveClasses, setLiveClasses] = useState<LiveClass[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  // cache مرتبط (يوم + رقم حصة)
   const cache = useRef<Record<string, LiveClass[]>>({});
   const lastKey = useRef<string | null>(null);
-
-  // للتحكم بالـ race condition
   const requestIdRef = useRef(0);
 
   /* ================= Load Periods ================= */
@@ -81,7 +74,7 @@ export default function LiveMonitorPage() {
     return () => clearInterval(timer);
   }, []);
 
-  /* ================= Derived State ================= */
+  /* ================= Derived ================= */
 
   const nowMin = now.getHours() * 60 + now.getMinutes();
   const jsDay = now.getDay();
@@ -97,26 +90,29 @@ export default function LiveMonitorPage() {
     );
   }, [nowMin, periods]);
 
-  // مفتاح الكاش
   const cacheKey = currentPeriod
     ? `${dbDay}-${currentPeriod.period_number}`
     : null;
 
+  /* ================= تنظيف الحالة (مفصول لتجنب الخطأ) ================= */
+
+  useEffect(() => {
+    if (!currentPeriod || dbDay === -1) {
+      if (liveClasses.length !== 0) {
+        setLiveClasses([]);
+      }
+      lastKey.current = null;
+    }
+  }, [currentPeriod, dbDay]);
+
   /* ================= Data Fetch ================= */
 
   useEffect(() => {
-    // لا يوجد حصة أو يوم غير دراسي
-    if (!currentPeriod || dbDay === -1) {
-      setLiveClasses([]); // تنظيف الحالة
-      lastKey.current = null;
-      return;
-    }
+    if (!currentPeriod || dbDay === -1) return;
 
-    // منع إعادة الطلب لنفس الحالة
     if (lastKey.current === cacheKey) return;
     lastKey.current = cacheKey;
 
-    // cache hit
     if (cache.current[cacheKey!]) {
       setLiveClasses(cache.current[cacheKey!]);
       return;
@@ -136,7 +132,6 @@ export default function LiveMonitorPage() {
         .eq("day_of_week", dbDay)
         .eq("period", currentPeriod.period_number);
 
-      // تجاهل أي response قديم
       if (requestId !== requestIdRef.current) return;
 
       if (error) {
@@ -147,14 +142,10 @@ export default function LiveMonitorPage() {
 
       const classes: LiveClass[] = (data || []).map((s: any) => ({
         id: s.id,
-        teacherName:
-          s.teachers?.users?.full_name ?? "غير محدد",
-        sectionName:
-          s.sections?.name ?? "غير محدد",
-        className:
-          s.sections?.classes?.name ?? "غير محدد",
-        subjectName:
-          s.subjects?.name ?? "غير محدد",
+        teacherName: s.teachers?.users?.full_name ?? "غير محدد",
+        sectionName: s.sections?.name ?? "غير محدد",
+        className: s.sections?.classes?.name ?? "غير محدد",
+        subjectName: s.subjects?.name ?? "غير محدد",
         periodNumber: currentPeriod.period_number,
       }));
 

@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabase";
-import { motion } from "motion/react";
 import { School } from "lucide-react";
 
 const DAY_MAP: Record<number, string> = {
@@ -63,7 +62,7 @@ export default function LiveMonitorPage() {
     fetchPeriods();
   }, []);
 
-  // حساب الوقت فقط
+  // حساب الحصة
   useEffect(() => {
     if (periods.length === 0) return;
 
@@ -94,9 +93,10 @@ export default function LiveMonitorPage() {
 
       setCountdown(`${Math.max(rem - 1, 0)}:${secs.toString().padStart(2, "0")}`);
     }
+
   }, [now, periods]);
 
-  // جلب البيانات فقط عند تغيير الحصة
+  // جلب عند تغيير الحصة
   useEffect(() => {
     if (!currentPeriod) return;
 
@@ -106,6 +106,8 @@ export default function LiveMonitorPage() {
     fetchLiveClasses(currentPeriod.period_number);
 
   }, [currentPeriod]);
+
+  // ===== الدوال (مهم: فوق الاستدعاء) =====
 
   const fetchPeriods = async () => {
     const { data } = await supabase

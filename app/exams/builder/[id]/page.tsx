@@ -56,6 +56,7 @@ type ExamData = {
     shuffle_options: boolean;
     show_result_immediately: boolean;
     allow_backtracking: boolean;
+    allow_review_answers: boolean;
   };
 };
 
@@ -83,7 +84,8 @@ export default function QuizBuilder() {
       shuffle_questions: false,
       shuffle_options: false,
       show_result_immediately: true,
-      allow_backtracking: true
+      allow_backtracking: true,
+      allow_review_answers: true
     }
   });
 
@@ -210,7 +212,25 @@ export default function QuizBuilder() {
           .single();
 
         if (examError) throw examError;
-        setExam(examData);
+        // عند التعديل: حوّل section_id إلى section_ids إذا كانت فارغة
+        const loadedExam = {
+          ...examData,
+          section_ids: examData.section_ids?.length > 0
+            ? examData.section_ids
+            : examData.section_id
+            ? [examData.section_id]
+            : [],
+          // تأكد من وجود allow_review_answers في الإعدادات
+          settings: {
+            shuffle_questions: false,
+            shuffle_options: false,
+            show_result_immediately: true,
+            allow_backtracking: true,
+            allow_review_answers: true,
+            ...examData.settings,
+          }
+        };
+        setExam(loadedExam);
 
         const { data: questionsData, error: questionsError } = await supabase
           .from('questions')
@@ -561,7 +581,7 @@ export default function QuizBuilder() {
             </div>
 
             <button 
-              onClick={() => router.push(`/exams/take/${params.id}`)}
+              onClick={() => router.push(`/exams/take/${params.id}?preview=1`)}
               className="hidden md:flex items-center gap-3 px-6 py-3 text-sm font-black text-slate-600 hover:bg-white hover:shadow-lg rounded-2xl transition-all active:scale-95 border border-transparent hover:border-slate-100"
             >
               <Eye className="h-5 w-5" />
@@ -594,6 +614,7 @@ export default function QuizBuilder() {
                           { label: 'ترتيب الأسئلة عشوائياً', desc: 'تغيير ترتيب الأسئلة لكل طالب', key: 'shuffle_questions' },
                           { label: 'ترتيب الخيارات عشوائياً', desc: 'تغيير ترتيب خيارات الإجابة', key: 'shuffle_options' },
                           { label: 'إظهار النتيجة فوراً', desc: 'عرض الدرجة للطالب بعد الإرسال', key: 'show_result_immediately' },
+                          { label: 'السماح بمراجعة الإجابات', desc: 'يمكن الطالب مراجعة إجاباته بعد الإرسال', key: 'allow_review_answers' },
                         ].map((setting) => (
                           <div key={setting.key} className="flex items-center justify-between p-4 rounded-3xl bg-slate-50/50 border border-slate-100">
                             <div>

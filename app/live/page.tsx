@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { supabase } from "@/lib/supabase";
 import { motion, AnimatePresence } from "motion/react";
 import { Clock, BookOpen, Users, GraduationCap, School, Zap, ChevronLeft, ChevronRight } from "lucide-react";
 
@@ -66,10 +67,11 @@ export default function LiveMonitorPage() {
 
   const fetchData = async () => {
     try {
-      // API route يستخدم service role — لا يحتاج تسجيل دخول
-      const res = await fetch('/api/live');
-      const data = await res.json();
-      setPeriods(data.periods || []);
+      const { data: periodsData } = await supabase
+        .from("class_periods")
+        .select("*")
+        .order("period_number");
+      setPeriods(periodsData || []);
     } catch (e) {
       console.error(e);
     } finally {
@@ -113,22 +115,30 @@ export default function LiveMonitorPage() {
 
   const fetchLiveClasses = async (periodNum: number) => {
     try {
-      // API route يستخدم service role — يعمل بدون تسجيل دخول
-      const res = await fetch('/api/live');
-      const data = await res.json();
-      const schedules = data.schedules || [];
+      const jsDay = new Date().getDay();
+      const dbDay = jsDay === 0 ? 1 : jsDay === 1 ? 2 : jsDay === 2 ? 3 :
+                    jsDay === 3 ? 4 : jsDay === 4 ? 5 : 0;
 
-      const classes: LiveClass[] = schedules
-        .filter((s: any) => s.period === periodNum)
-        .map((s: any) => ({
-          id: s.id,
-          teacherName: s.teachers?.users?.full_name || "غير محدد",
-          sectionName: s.sections?.name || "غير محدد",
-          className: s.sections?.classes?.name || "غير محدد",
-          subjectName: s.subjects?.name || "غير محدد",
-          periodNumber: periodNum,
-          zoomLink: s.teachers?.zoom_link || null,
-        }));
+      const { data } = await supabase
+        .from("schedules")
+        .select(`
+          id,
+          teachers(users(full_name), zoom_link),
+          sections(name, classes(name)),
+          subjects(name)
+        `)
+        .eq("day_of_week", dbDay)
+        .eq("period", periodNum);
+
+      const classes: LiveClass[] = (data || []).map((s: any) => ({
+        id: s.id,
+        teacherName: s.teachers?.users?.full_name || "غير محدد",
+        sectionName: s.sections?.name || "غير محدد",
+        className: s.sections?.classes?.name || "غير محدد",
+        subjectName: s.subjects?.name || "غير محدد",
+        periodNumber: periodNum,
+        zoomLink: s.teachers?.zoom_link || null,
+      }));
 
       setLiveClasses(classes);
     } catch (e) {

@@ -1,5 +1,5 @@
 'use client';
-
+ 
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
@@ -18,7 +18,7 @@ import {
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-
+ 
 type Attempt = {
   id: string;
   student: { full_name: string, email: string, section_name: string };
@@ -27,7 +27,7 @@ type Attempt = {
   score: number;
   status: string;
 };
-
+ 
 type ExamStats = {
   avg_score: number;
   max_score: number;
@@ -35,7 +35,7 @@ type ExamStats = {
   pass_rate: number;
   total_attempts: number;
 };
-
+ 
 export default function ExamResults() {
   const params = useParams();
   const router = useRouter();
@@ -51,7 +51,7 @@ export default function ExamResults() {
   const [questionsData, setQuestionsData] = useState<any[]>([]);
   const [answersData, setAnswersData] = useState<any[]>([]);
   const [allStudents, setAllStudents] = useState<any[]>([]);
-
+ 
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
@@ -61,14 +61,14 @@ export default function ExamResults() {
         .eq('id', params.id)
         .single();
       setExam(examData);
-
+ 
       // Fetch all students in the assigned sections
       let currentAllStudents: any[] = [];
       // section_ids or fall back to section_id
       const sectionIdsList = examData?.section_ids?.length > 0
         ? examData.section_ids
         : examData?.section_id ? [examData.section_id] : [];
-
+ 
       if (sectionIdsList.length > 0) {
         const { data: studentsData } = await supabase
           .from('students')
@@ -93,7 +93,7 @@ export default function ExamResults() {
         });
         setAllStudents(currentAllStudents);
       }
-
+ 
       const { data: attemptsData } = await supabase
         .from('exam_attempts')
         .select(`
@@ -106,13 +106,13 @@ export default function ExamResults() {
         `)
         .eq('exam_id', params.id)
         .order('completed_at', { ascending: false });
-
+ 
       const formattedAttempts = (attemptsData || []).map(a => {
         const studentData = a.student as any;
         const sectionData = studentData?.section;
         const className = Array.isArray(sectionData?.classes) ? sectionData?.classes[0]?.name : sectionData?.classes?.name;
         const sectionName = sectionData?.name ? `${className ? className + ' - ' : ''}${sectionData.name}` : 'غير محدد';
-
+ 
         return {
           ...a,
           student: {
@@ -122,11 +122,11 @@ export default function ExamResults() {
           }
         };
       });
-
+ 
       // Merge with all students to include those who didn't attempt
       const mergedAttempts = [...formattedAttempts];
       const attemptedStudentIds = new Set(formattedAttempts.map(a => a.student.id));
-
+ 
       currentAllStudents.forEach(student => {
         if (!attemptedStudentIds.has(student.id)) {
           mergedAttempts.push({
@@ -143,13 +143,13 @@ export default function ExamResults() {
           } as any);
         }
       });
-
+ 
       setAttempts(mergedAttempts);
-
+ 
       // Extract unique sections for the filter
       const sections = Array.from(new Set(mergedAttempts.map(a => a.student.section_name))).filter(Boolean);
       setAvailableSections(sections);
-
+ 
       // Fetch Questions and Answers for real analytics
       const { data: qData } = await supabase
         .from('questions')
@@ -158,40 +158,40 @@ export default function ExamResults() {
         .order('order_index');
       
       setQuestionsData(qData || []);
-
+ 
       const { data: aData } = await supabase
         .from('student_answers')
         .select('*')
         .in('attempt_id', formattedAttempts.map(a => a.id));
         
       setAnswersData(aData || []);
-
+ 
     } catch (err) {
       console.error('Error fetching results:', err);
     } finally {
       setLoading(false);
     }
   }, [params.id]);
-
+ 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
-
+ 
   // Calculate stats whenever attempts or selected section changes
   useEffect(() => {
     if (!exam) return;
-
+ 
     let filteredAttempts = attempts;
     if (selectedSection !== 'all') {
       filteredAttempts = attempts.filter(a => a.student.section_name === selectedSection);
     }
-
+ 
     if (searchQuery) {
       filteredAttempts = filteredAttempts.filter(a => 
         a.student.full_name.includes(searchQuery)
       );
     }
-
+ 
     if (filteredAttempts.length > 0) {
       const scores = filteredAttempts.map(a => a.score);
       const maxPossibleScore = exam.max_score || 100;
@@ -205,13 +205,13 @@ export default function ExamResults() {
         pass_rate: Math.round((percentageScores.filter(s => s >= 50).length / percentageScores.length) * 100),
         total_attempts: scores.length
       });
-
+ 
       // Calculate Question Analytics
       if (questionsData.length > 0 && answersData.length > 0) {
         // Filter answers to only include those from the filtered attempts
         const validAttemptIds = new Set(filteredAttempts.map(a => a.id));
         const filteredAnswers = answersData.filter(a => validAttemptIds.has(a.attempt_id));
-
+ 
         const analytics = questionsData.map((q, idx) => {
           const qAnswers = filteredAnswers.filter(a => a.question_id === q.id);
           const correctCount = qAnswers.filter(a => a.is_correct).length;
@@ -225,7 +225,7 @@ export default function ExamResults() {
         });
         setQuestionAnalytics(analytics);
       }
-
+ 
       // Calculate Score Distribution for Pie Chart
       const distribution = [
         { name: 'ممتاز', value: percentageScores.filter(s => s >= 90).length },
@@ -236,7 +236,7 @@ export default function ExamResults() {
       ].filter(d => d.value > 0);
       
       setScoreDistribution(distribution.length > 0 ? distribution : [{ name: 'لا توجد بيانات', value: 1 }]);
-
+ 
     } else {
       setStats({
         avg_score: 0,
@@ -249,16 +249,16 @@ export default function ExamResults() {
       setScoreDistribution([]);
     }
   }, [attempts, selectedSection, searchQuery, exam, questionsData, answersData]);
-
+ 
   const COLORS = ['#4f46e5', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
-
+ 
   const filteredAttempts = attempts.filter(a => {
     const matchesSection = selectedSection === 'all' || a.student.section_name === selectedSection;
     const matchesSearch = !searchQuery || 
       a.student.full_name.includes(searchQuery);
     return matchesSection && matchesSearch;
   });
-
+ 
   const exportToExcel = () => {
     const data = filteredAttempts.map(a => ({
       'الطالب': a.student.full_name,
@@ -267,22 +267,22 @@ export default function ExamResults() {
       'الدرجة (%)': a.score,
       'الحالة': a.score >= (exam?.passing_score || 50) ? 'ناجح' : 'راسب'
     }));
-
+ 
     const ws = XLSX.utils.json_to_sheet(data);
     
     // Add RTL support to the worksheet
     if (!ws['!cols']) ws['!cols'] = [];
     ws['!dir'] = 'rtl';
-
+ 
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'النتائج');
     XLSX.writeFile(wb, `${exam?.title || 'نتائج_الاختبار'}.xlsx`);
   };
-
+ 
   const exportToPDF = () => {
     window.print();
   };
-
+ 
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -290,7 +290,7 @@ export default function ExamResults() {
       </div>
     );
   }
-
+ 
   return (
     <div className="max-w-7xl mx-auto p-4 sm:p-8 space-y-10 pb-24 print:m-0 print:p-0">
       <style jsx global>{`
@@ -344,7 +344,7 @@ export default function ExamResults() {
             <p className="text-xl font-black text-amber-600">{stats?.total_attempts}</p>
           </div>
         </div>
-
+ 
         <h2 className="text-xl font-black text-slate-900 mb-4 mt-8">نتائج الطلاب التفصيلية</h2>
         <table className="w-full text-right border-collapse">
           <thead>
@@ -377,7 +377,7 @@ export default function ExamResults() {
           </tbody>
         </table>
       </div>
-
+ 
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 print:hidden">
         <div className="flex items-center gap-6">
@@ -415,7 +415,7 @@ export default function ExamResults() {
           </button>
         </div>
       </div>
-
+ 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 print:hidden">
         {[
@@ -442,7 +442,7 @@ export default function ExamResults() {
           </motion.div>
         ))}
       </div>
-
+ 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-10 print:hidden">
         {/* Main Chart */}
         <div className="lg:col-span-2 glass-card p-8 rounded-4xl border border-white/60 shadow-2xl shadow-slate-200/50 space-y-8">
@@ -503,7 +503,7 @@ export default function ExamResults() {
             </div>
           )}
         </div>
-
+ 
         {/* Score Distribution */}
         <div className="glass-card p-8 rounded-4xl border border-white/60 shadow-2xl shadow-slate-200/50 space-y-8">
           <div>
@@ -549,7 +549,7 @@ export default function ExamResults() {
           </div>
         </div>
       </div>
-
+ 
       {/* Student Results Tables */}
       <div className="space-y-8 print:hidden">
         {Object.entries(

@@ -111,14 +111,15 @@ export default function StudentPerformancePage() {
 
       // Calculate stats
       const gradedExams = attempts?.filter(a => a.status === 'graded' || a.status === 'completed') || [];
-      const avgExam = gradedExams.length > 0 
-        ? gradedExams.reduce((acc, curr) => acc + (curr.score || 0), 0) / gradedExams.length 
-        : 0;
+      // حساب المتوسط كنسبة مئوية صحيحة: مجموع النقاط / مجموع الدرجات العظمى
+      const totalExamScore = gradedExams.reduce((acc, curr) => acc + (curr.score || 0), 0);
+      const totalExamMax = gradedExams.reduce((acc, curr) => acc + (curr.exams?.max_score || curr.exams?.total_marks || 100), 0);
+      const avgExam = totalExamMax > 0 ? (totalExamScore / totalExamMax) * 100 : 0;
 
       const gradedAssignments = submissions?.filter(s => s.status === 'graded') || [];
-      const avgAssignment = gradedAssignments.length > 0
-        ? gradedAssignments.reduce((acc, curr) => acc + (curr.grade || 0), 0) / gradedAssignments.length
-        : 0;
+      const totalAssignScore = gradedAssignments.reduce((acc, curr) => acc + (curr.grade || 0), 0);
+      const totalAssignMax = gradedAssignments.reduce((acc, curr) => acc + (curr.assignments?.total_marks || 100), 0);
+      const avgAssignment = totalAssignMax > 0 ? (totalAssignScore / totalAssignMax) * 100 : 0;
 
       setStats({
         avgExamScore: Math.round(avgExam),
@@ -280,7 +281,9 @@ export default function StudentPerformancePage() {
                     </div>
                     <div className="text-left">
                       <div className="text-lg font-black text-indigo-600">
-                        {attempt.score !== null ? `${attempt.score} / ${attempt.exams?.total_marks || attempt.exams?.max_score || 100}` : 'قيد التصحيح'}
+                        {attempt.score !== null
+                          ? `${attempt.score} / ${attempt.exams?.max_score || attempt.exams?.total_marks || 100} (${Math.round((attempt.score / (attempt.exams?.max_score || attempt.exams?.total_marks || 100)) * 100)}%)`
+                          : 'قيد التصحيح'}
                       </div>
                       <div className={`text-[10px] font-bold uppercase tracking-widest mt-1 ${
                         attempt.status === 'graded' ? 'text-emerald-500' : 'text-amber-500'
@@ -340,7 +343,9 @@ export default function StudentPerformancePage() {
                     </div>
                     <div className="text-left">
                       <div className="text-lg font-black text-indigo-600">
-                        {submission.grade !== null ? `${submission.grade} / ${submission.assignments?.total_marks || 100}` : 'لم يتم التقييم'}
+                        {submission.grade !== null
+                          ? `${submission.grade} / ${submission.assignments?.total_marks || 100}`
+                          : 'لم يتم التقييم'}
                       </div>
                       <div className={`text-[10px] font-bold uppercase tracking-widest mt-1 ${
                         submission.status === 'graded' ? 'text-emerald-500' : 'text-amber-500'

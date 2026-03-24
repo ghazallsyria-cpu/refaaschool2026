@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import { Clock, BookOpen, Users, GraduationCap, School } from "lucide-react";
 
@@ -29,96 +29,91 @@ interface Period {
 export default function LiveMonitorPage() {
   const [now, setNow] = useState(new Date());
   const [periods, setPeriods] = useState<Period[]>([]);
-  const [currentPeriod, setCurrentPeriod] = useState<Period | null>(null);
   const [liveClasses, setLiveClasses] = useState<LiveClass[]>([]);
 
   const cache = useRef<Record<number, LiveClass[]>>({});
   const lastFetched = useRef<number | null>(null);
 
-  // ===== الدوال =====
+  // ===== جلب الحصص (مرة واحدة فقط) =====
+  useEffect(() => {
+    const load = async () => {
+      const { data } = await supabase
+        .from("class_periods")
+        .select("*")
+        .order("period_number");
 
-  const fetchPeriods = useCallback(async () => {
-    const { data } = await supabase
-      .from("class_periods")
-      .select("*")
-      .order("period_number");
+      setPeriods(data || []);
+    };
 
-    setPeriods(data || []);
+    load();
   }, []);
 
-  const fetchLiveClasses = useCallback(async (periodNum: number) => {
-    if (cache.current[periodNum]) {
-      setLiveClasses(cache.current[periodNum]);
-      return;
-    }
-
-    const jsDay = new Date().getDay();
-    const dbDay =
-      jsDay === 0 ? 1 :
-      jsDay === 1 ? 2 :
-      jsDay === 2 ? 3 :
-      jsDay === 3 ? 4 :
-      jsDay === 4 ? 5 : 0;
-
-    const { data } = await supabase
-      .from("schedules")
-      .select(`
-        id,
-        teachers(users(full_name)),
-        sections(name, classes(name)),
-        subjects(name)
-      `)
-      .eq("day_of_week", dbDay)
-      .eq("period", periodNum);
-
-    const classes: LiveClass[] = (data || []).map((s: any) => ({
-      id: s.id,
-      teacherName: s.teachers?.users?.full_name || "غير محدد",
-      sectionName: s.sections?.name || "غير محدد",
-      className: s.sections?.classes?.name || "غير محدد",
-      subjectName: s.subjects?.name || "غير محدد",
-      periodNumber: periodNum,
-    }));
-
-    cache.current[periodNum] = classes;
-    setLiveClasses(classes);
-  }, []);
-
-  const calculateCurrentPeriod = useCallback(() => {
-    if (periods.length === 0) return;
-
-    const nowMin = now.getHours() * 60 + now.getMinutes();
-
-    const current =
-      periods.find(p =>
-        nowMin >= timeToMinutes(p.start_time) &&
-        nowMin < timeToMinutes(p.end_time)
-      ) || null;
-
-    setCurrentPeriod(current);
-
-    if (current && lastFetched.current !== current.period_number) {
-      lastFetched.current = current.period_number;
-      fetchLiveClasses(current.period_number);
-    }
-
-    if (!current) setLiveClasses([]);
-  }, [now, periods, fetchLiveClasses]);
-
-  // ===== Effects =====
-
+  // ===== تحديث الوقت =====
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
 
-  useEffect(() => {
-    fetchPeriods();
-  }, [fetchPeriods]);
+  // ===== تحديد الحصة الحالية (بدون setState داخل effect) =====
+  const nowMin = now.getHours() * 60 + now.getMinutes();
 
+  const currentPeriod =
+    periods.find(p =>
+      nowMin >= timeToMinutes(p.start_time) &&
+      nowMin < timeToMinutes(p.end_time)
+    ) || null;
+
+  // ===== جلب الحصص عند تغير الحصة فقط =====
   useEffect(() => {
-    calculateCurrentPeriod();
-  }, [calculateCurrentPeriod]);
+    if (!currentPeriod) {
+      setLiveClasses([]);
+      return;
+    }
+
+    if (lastFetched.current === currentPeriod.period_number) return;
+
+    lastFetched.current = currentPeriod.period_number;
+
+    const load = async () => {
+      if (cache.current[currentPeriod.period_number]) {
+        setLiveClasses(cache.current[currentPeriod.period_number]);
+        return;
+      }
+
+      const jsDay = new Date().getDay();
+      const dbDay =
+        jsDay === 0 ? 1 :
+        jsDay === 1 ? 2 :
+        jsDay === 2 ? 3 :
+        jsDay === 3 ? 4 :
+        jsDay === 4 ? 5 : 0;
+
+      const { data } = await supabase
+        .from("schedules")
+        .select(`
+          id,
+          teachers(users(full_name)),
+          sections(name, classes(name)),
+          subjects(name)
+        `)
+        .eq("day_of_week", dbDay)
+        .eq("period", currentPeriod.period_number);
+
+      const classes: LiveClass[] = (data || []).map((s: any) => ({
+        id: s.id,
+        teacherName: s.teachers?.users?.full_name || "غير محدد",
+        sectionName: s.sections?.name || "غير محدد",
+        className: s.sections?.classes?.name || "غير محدد",
+        subjectName: s.subjects?.name || "غير محدد",
+        periodNumber: currentPeriod.period_number,
+      }));
+
+      cache.current[currentPeriod.period_number] = classes;
+      setLiveClasses(classes);
+    };
+
+    load();
+  }, [currentPeriod]);
 
   // ===== UI =====
 

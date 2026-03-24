@@ -18,7 +18,7 @@ import { motion, AnimatePresence } from "motion/react";
 
 const DAY_MAP: Record<number, string> = {
   0: "الأحد", 1: "الاثنين", 2: "الثلاثاء",
-  3: "الأربعاء", 4: "الخميس", 5: "يونيو", 6: "السبت"
+  3: "الأربعاء", 4: "الخميس", 5: "الجمعة", 6: "السبت"
 };
 
 const MONTH_MAP: Record<number, string> = {
@@ -27,22 +27,37 @@ const MONTH_MAP: Record<number, string> = {
   8: "سبتمبر", 9: "أكتوبر", 10: "نوفمبر", 11: "ديسمبر"
 };
 
+// Helper function to convert time string to minutes
+const timeToMinutes = (time: string): number => {
+  if (!time) return 0;
+  const [h, m] = time.split(":").map(Number);
+  return h * 60 + m;
+};
+
 export default function LiveClassesPage() {
   const [liveClasses, setLiveClasses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [now, setNow] = useState(new Date());
   const [studentInfo, setStudentInfo] = useState<any>(null);
+  const [periods, setPeriods] = useState<any[]>([]);
 
+  // Update `now` state every second for accurate countdown
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
 
-  const fetchLiveClasses = useCallback(async () => {
+  // Fetch initial data once on component mount
+  const fetchInitialData = useCallback(async () => {
+    setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) {
+        setLoading(false);
+        return;
+      }
 
+      // 1. Fetch student's section_id
       const { data: student } = await supabase
         .from("students")
         .select("section_id, sections(name, classes(name))")
@@ -51,17 +66,23 @@ export default function LiveClassesPage() {
 
       setStudentInfo(student);
 
-      if (!student?.section_id) return;
+      if (!student?.section_id) {
+        setLoading(false);
+        return;
+      }
 
+      // 2. Determine current day (1=Sun ... 5=Thu)
       const jsDay = now.getDay();
       const dbDay = jsDay === 0 ? 1 : jsDay === 1 ? 2 : jsDay === 2 ? 3 :
                     jsDay === 3 ? 4 : jsDay === 4 ? 5 : 0;
 
-      if (dbDay === 0) {
+      if (dbDay === 0) { // No classes on weekends (assuming Sat/Sun are 6/0)
         setLiveClasses([]);
+        setLoading(false);
         return;
       }
 
+      // 3. Fetch all schedules for today for this student's section
       const { data: scheduleData } = await supabase
         .from("schedules")
         .select(`
@@ -74,6 +95,7 @@ export default function LiveClassesPage() {
         .eq("section_id", student.section_id)
         .eq("day_of_week", dbDay);
 
+      // 4. Fetch class periods (start/end times)
       const { data: periodsData } = await supabase
         .from("class_periods")
         .select("period_number, start_time, end_time")
@@ -81,19 +103,21 @@ export default function LiveClassesPage() {
 
       if (!scheduleData || !periodsData) {
         setLiveClasses([]);
+        setPeriods([]);
+        setLoading(false);
         return;
       }
+      setPeriods(periodsData);
 
+      // 5. Combine data and determine class status (live, upcoming, past)
       const nowMinutes = now.getHours() * 60 + now.getMinutes();
 
       const processedClasses = scheduleData.map(item => {
         const periodInfo = periodsData.find(p => p.period_number === item.period);
         if (!periodInfo) return null;
 
-        const [startH, startM] = periodInfo.start_time.split(":").map(Number);
-        const [endH, endM] = periodInfo.end_time.split(":").map(Number);
-        const startTotal = startH * 60 + startM;
-        const endTotal = endH * 60 + endM;
+        const startTotal = timeToMinutes(periodInfo.start_time);
+        const endTotal = timeToMinutes(periodInfo.end_time);
 
         let status: 'live' | 'upcoming' | 'past' = 'past';
         if (nowMinutes >= startTotal && nowMinutes < endTotal) status = 'live';
@@ -117,18 +141,24 @@ export default function LiveClassesPage() {
     } finally {
       setLoading(false);
     }
-  }, [now]);
+  }, [now]); // Re-run if `now` changes significantly (e.g., new day)
 
   useEffect(() => {
-    fetchLiveClasses();
-  }, [fetchLiveClasses]);
+    fetchInitialData();
+  }, [fetchInitialData]);
 
+  // Calculate countdown for live classes
   const getCountdown = (endTotal: number) => {
-    const nowMinutes = now.getHours() * 60 + now.getMinutes();
-    const diff = endTotal - nowMinutes;
-    if (diff <= 0) return "انتهت";
-    const secs = 60 - now.getSeconds();
-    return `${diff - 1}:${secs.toString().padStart(2, "0")}`;
+    const nowTotalSeconds = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+    const endTotalSeconds = endTotal * 60;
+    const diffSeconds = endTotalSeconds - nowTotalSeconds;
+
+    if (diffSeconds <= 0) return "انتهت";
+
+    const minutes = Math.floor(diffSeconds / 60);
+    const seconds = diffSeconds % 60;
+
+    return `${minutes}:${seconds.toString().padStart(2, "0")}`;
   };
 
   if (loading) {

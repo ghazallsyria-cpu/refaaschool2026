@@ -1,28 +1,52 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
+import { Clock, BookOpen, Users, GraduationCap, School } from "lucide-react";
 
-export default function LivePage() {
-  const [periods, setPeriods] = useState<any[]>([]);
-  const [currentPeriod, setCurrentPeriod] = useState<any>(null);
-  const [liveClasses, setLiveClasses] = useState<any[]>([]);
+function timeToMinutes(time: string): number {
+  if (!time) return 0;
+  const [h, m] = time.split(":").map(Number);
+  return h * 60 + m;
+}
 
-  const cache = useRef<any>({});
-  const lastFetchedPeriod = useRef<number | null>(null);
+interface LiveClass {
+  id: string;
+  teacherName: string;
+  sectionName: string;
+  className: string;
+  subjectName: string;
+  periodNumber: number;
+}
+
+interface Period {
+  id: string;
+  period_number: number;
+  start_time: string;
+  end_time: string;
+}
+
+export default function LiveMonitorPage() {
+  const [now, setNow] = useState(new Date());
+  const [periods, setPeriods] = useState<Period[]>([]);
+  const [currentPeriod, setCurrentPeriod] = useState<Period | null>(null);
+  const [liveClasses, setLiveClasses] = useState<LiveClass[]>([]);
+
+  const cache = useRef<Record<number, LiveClass[]>>({});
+  const lastFetched = useRef<number | null>(null);
 
   // ===== الدوال =====
 
-  async function fetchPeriods() {
+  const fetchPeriods = useCallback(async () => {
     const { data } = await supabase
       .from("class_periods")
       .select("*")
       .order("period_number");
 
     setPeriods(data || []);
-  }
+  }, []);
 
-  async function fetchLiveClasses(periodNum: number) {
+  const fetchLiveClasses = useCallback(async (periodNum: number) => {
     if (cache.current[periodNum]) {
       setLiveClasses(cache.current[periodNum]);
       return;
@@ -40,89 +64,91 @@ export default function LivePage() {
       .from("schedules")
       .select(`
         id,
-        teachers(users(full_name), zoom_link),
+        teachers(users(full_name)),
         sections(name, classes(name)),
         subjects(name)
       `)
       .eq("day_of_week", dbDay)
       .eq("period", periodNum);
 
-    const classes = (data || []).map((s: any) => ({
+    const classes: LiveClass[] = (data || []).map((s: any) => ({
       id: s.id,
-      teacherName: s.teachers?.users?.full_name || "",
-      sectionName: s.sections?.name || "",
-      className: s.sections?.classes?.name || "",
-      subjectName: s.subjects?.name || "",
+      teacherName: s.teachers?.users?.full_name || "غير محدد",
+      sectionName: s.sections?.name || "غير محدد",
+      className: s.sections?.classes?.name || "غير محدد",
+      subjectName: s.subjects?.name || "غير محدد",
       periodNumber: periodNum,
-      zoomLink: s.teachers?.zoom_link || null,
     }));
 
     cache.current[periodNum] = classes;
     setLiveClasses(classes);
-  }
+  }, []);
 
-  // ===== تحديد الحصة الحالية =====
+  const calculateCurrentPeriod = useCallback(() => {
+    if (periods.length === 0) return;
 
-  function calculateCurrentPeriod() {
-    const now = new Date();
-    const minutes = now.getHours() * 60 + now.getMinutes();
+    const nowMin = now.getHours() * 60 + now.getMinutes();
 
-    return periods.find((p) => {
-      const start = p.start_minutes;
-      const end = p.end_minutes;
-      return minutes >= start && minutes < end;
-    });
-  }
+    const current =
+      periods.find(p =>
+        nowMin >= timeToMinutes(p.start_time) &&
+        nowMin < timeToMinutes(p.end_time)
+      ) || null;
 
-  // ===== effects =====
+    setCurrentPeriod(current);
+
+    if (current && lastFetched.current !== current.period_number) {
+      lastFetched.current = current.period_number;
+      fetchLiveClasses(current.period_number);
+    }
+
+    if (!current) setLiveClasses([]);
+  }, [now, periods, fetchLiveClasses]);
+
+  // ===== Effects =====
 
   useEffect(() => {
-    fetchPeriods();
+    const timer = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(timer);
   }, []);
 
   useEffect(() => {
-    if (periods.length === 0) return;
+    fetchPeriods();
+  }, [fetchPeriods]);
 
-    const interval = setInterval(() => {
-      const current = calculateCurrentPeriod();
-
-      if (!current) return;
-
-      if (
-        lastFetchedPeriod.current === current.period_number
-      ) return;
-
-      lastFetchedPeriod.current = current.period_number;
-      setCurrentPeriod(current);
-
-      fetchLiveClasses(current.period_number);
-    }, 30000); // تحديث كل 30 ثانية
-
-    return () => clearInterval(interval);
-  }, [periods]);
+  useEffect(() => {
+    calculateCurrentPeriod();
+  }, [calculateCurrentPeriod]);
 
   // ===== UI =====
 
   return (
-    <div style={{ padding: 20 }}>
-      <h1>Live Classes</h1>
+    <div className="min-h-screen bg-slate-900 text-white p-6" dir="rtl">
 
-      {!currentPeriod && <p>لا توجد حصة حالياً</p>}
-
-      {liveClasses.map((cls) => (
-        <div key={cls.id} style={{ marginBottom: 10 }}>
-          <div><strong>{cls.subjectName}</strong></div>
-          <div>{cls.teacherName}</div>
-          <div>{cls.sectionName}</div>
-          <div>{cls.className}</div>
-
-          {cls.zoomLink && (
-            <a href={cls.zoomLink} target="_blank">
-              دخول
-            </a>
-          )}
+      <div className="flex justify-between mb-6">
+        <div className="flex gap-2 items-center">
+          <School />
+          <span>مدرسة الرفعة</span>
         </div>
-      ))}
+        <div>{now.toLocaleTimeString()}</div>
+      </div>
+
+      <div className="mb-6 p-4 bg-white/10 rounded-xl">
+        {currentPeriod
+          ? `الحصة ${currentPeriod.period_number} جارية`
+          : "لا توجد حصة الآن"}
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {liveClasses.map(c => (
+          <div key={c.id} className="p-4 bg-white/10 rounded-xl">
+            <div className="font-bold">{c.subjectName}</div>
+            <div className="text-sm">{c.teacherName}</div>
+            <div className="text-sm">{c.className}</div>
+          </div>
+        ))}
+      </div>
+
     </div>
   );
 }

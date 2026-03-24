@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { Calendar, Clock, BookOpen, User, Zap } from "lucide-react";
-import { motion } from "motion/react";
+import { motion, AnimatePresence } from "motion/react";
 
 const DAYS = [
   { id: 1, name: "الأحد" },
@@ -37,7 +37,9 @@ export default function StudentSchedulePage() {
     return () => clearInterval(timer);
   }, []);
 
-  const fetchData = useCallback(async () => {
+  useEffect(() => { fetchData(); }, []);
+
+  const fetchData = async () => {
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -68,9 +70,7 @@ export default function StudentSchedulePage() {
     } finally {
       setLoading(false);
     }
-  }, []);
-
-  useEffect(() => { fetchData(); }, [fetchData]);
+  };
 
   const getCellData = (day: number, period: number) =>
     schedule.find(s => s.day_of_week === day && s.period === period);
@@ -80,6 +80,9 @@ export default function StudentSchedulePage() {
 
   const getPeriodStatus = (day: number, period: number): PeriodStatus => {
     const todayDay = now.getDay(); // 0=Sunday
+    // DAYS uses id 1=Sunday...5=Thursday
+    // day_of_week in schedules: need to check mapping
+    // In the DB, day_of_week seems to map: 1=Sunday based on DAYS array
     const todayId = todayDay === 0 ? 1 : todayDay === 1 ? 2 : todayDay === 2 ? 3 :
                     todayDay === 3 ? 4 : todayDay === 4 ? 5 : 0;
 
@@ -92,8 +95,11 @@ export default function StudentSchedulePage() {
     const startMin = timeToMinutes(periodData.start_time);
     const endMin = timeToMinutes(periodData.end_time);
 
+    // الحصة الحالية
     if (nowMinutes >= startMin && nowMinutes < endMin) return "current";
+    // الحصة التالية (الحصة التي ستبدأ خلال 15 دقيقة)
     if (nowMinutes < startMin && startMin - nowMinutes <= 15) return "next";
+    // حصة انتهت
     if (nowMinutes >= endMin) return "past";
 
     return "upcoming";
@@ -153,6 +159,7 @@ export default function StudentSchedulePage() {
             صفك: <span className="text-indigo-600 font-bold">{studentInfo?.sections?.classes?.name} - {studentInfo?.sections?.name}</span>
           </p>
         </div>
+        {/* الوقت الحالي */}
         <div className="flex items-center gap-3 bg-indigo-600 text-white px-5 py-3 rounded-2xl shadow-lg shadow-indigo-200">
           <Clock className="h-5 w-5" />
           <span className="font-black text-lg">
@@ -210,6 +217,7 @@ export default function StudentSchedulePage() {
                       <td key={`${day.id}-${period}`} className="p-3 border-l border-slate-200 h-36 align-top min-w-[150px]">
                         {cellData ? (
                           <div className="relative h-full">
+                            {/* النبض للحصة الحالية */}
                             {status === "current" && (
                               <motion.div
                                 className="absolute inset-0 rounded-2xl bg-emerald-400/20"
@@ -230,6 +238,7 @@ export default function StudentSchedulePage() {
                                   : "bg-gradient-to-br from-indigo-50 to-white border-indigo-100"
                               }`}
                             >
+                              {/* بادج الحالة */}
                               {status === "current" && (
                                 <div className="absolute -top-2 -right-2 flex items-center gap-1 bg-emerald-600 text-white text-[9px] font-black px-2 py-0.5 rounded-full shadow-lg border border-white">
                                   <Zap className="h-2.5 w-2.5" />
@@ -268,6 +277,7 @@ export default function StudentSchedulePage() {
                                   </span>
                                 </div>
 
+                                {/* الوقت المتبقي */}
                                 {status === "current" && (
                                   <div className="text-[10px] font-black text-emerald-100">
                                     ⏱ {getCurrentPeriodCountdown(period)}

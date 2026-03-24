@@ -18,7 +18,7 @@ import { motion, AnimatePresence } from "motion/react";
 
 const DAY_MAP: Record<number, string> = {
   0: "الأحد", 1: "الاثنين", 2: "الثلاثاء",
-  3: "الأربعاء", 4: "الخميس", 5: "الجمعة", 6: "السبت"
+  3: "الأربعاء", 4: "الخميس", 5: "يونيو", 6: "السبت"
 };
 
 const MONTH_MAP: Record<number, string> = {
@@ -33,7 +33,6 @@ export default function LiveClassesPage() {
   const [now, setNow] = useState(new Date());
   const [studentInfo, setStudentInfo] = useState<any>(null);
 
-  // تحديث الوقت كل ثانية لضمان دقة العداد
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(timer);

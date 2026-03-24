@@ -2,87 +2,76 @@ import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
 export async function middleware(request: NextRequest) {
-  let response = NextResponse.next({
-    request: {
-      headers: request.headers,
-    },
-  });
+  let response = NextResponse.next();
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet: { name: string; value: string; options: any }[]) {
-          cookiesToSet.forEach(({ name, value }) =>
-            request.cookies.set(name, value)
-          );
-          response = NextResponse.next({
-            request,
+        getAll: () => request.cookies.getAll(),
+        setAll: (cookies) => {
+          cookies.forEach(({ name, value, options }) => {
+            response.cookies.set(name, value, options);
           });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options)
-          );
         },
       },
     }
   );
 
+  // خفيف وسريع — بدون ضرب السيرفر
   const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  const user = session?.user;
+  const role = user?.app_metadata?.role;
+  const mustReset = user?.app_metadata?.must_reset_password;
 
   const path = request.nextUrl.pathname;
 
-  // Public routes
-  if (!user && !path.startsWith('/login') && !path.startsWith('/reset-password') && !path.startsWith('/live')) {
+  // ===== Public routes =====
+  if (
+    !user &&
+    !path.startsWith('/login') &&
+    !path.startsWith('/reset-password') &&
+    !path.startsWith('/live')
+  ) {
     return NextResponse.redirect(new URL('/login', request.url));
   }
 
   if (user) {
-    const { data: userData } = await supabase
-      .from('users')
-      .select('role, must_reset_password')
-      .eq('id', user.id)
-      .single();
-
-    // Redirect to login if user not found
-    if (!userData) {
-      await supabase.auth.signOut();
-      return NextResponse.redirect(new URL('/login', request.url));
-    }
-
-    // Force password reset
-    if (userData.must_reset_password && !path.startsWith('/reset-password')) {
+    // ===== Force password reset =====
+    if (mustReset && !path.startsWith('/reset-password')) {
       return NextResponse.redirect(new URL('/reset-password', request.url));
     }
 
-    // Redirect authenticated users away from login/reset-password
-    if (path.startsWith('/login') || (path.startsWith('/reset-password') && !userData.must_reset_password)) {
-      if (userData.role === 'admin') return NextResponse.redirect(new URL('/dashboard', request.url));
-      if (userData.role === 'management') return NextResponse.redirect(new URL('/dashboard/management', request.url));
-      if (userData.role === 'teacher') return NextResponse.redirect(new URL('/dashboard/teacher', request.url));
-      if (userData.role === 'student') return NextResponse.redirect(new URL('/dashboard/student', request.url));
-      if (userData.role === 'parent') return NextResponse.redirect(new URL('/dashboard/parent', request.url));
+    // ===== Redirect authenticated user away from auth pages =====
+    if (
+      path.startsWith('/login') ||
+      (path.startsWith('/reset-password') && !mustReset)
+    ) {
+      if (role === 'admin') return NextResponse.redirect(new URL('/dashboard', request.url));
+      if (role === 'management') return NextResponse.redirect(new URL('/dashboard/management', request.url));
+      if (role === 'teacher') return NextResponse.redirect(new URL('/dashboard/teacher', request.url));
+      if (role === 'student') return NextResponse.redirect(new URL('/dashboard/student', request.url));
+      if (role === 'parent') return NextResponse.redirect(new URL('/dashboard/parent', request.url));
     }
 
-    // Role-based access control
+    // ===== Role حماية الداشبورد =====
     if (path.startsWith('/dashboard')) {
-      if (userData.role === 'admin' && path === '/dashboard') return response;
-      if (userData.role === 'management' && path.startsWith('/dashboard/management')) return response;
-      if (userData.role === 'teacher' && path.startsWith('/dashboard/teacher')) return response;
-      if (userData.role === 'student' && path.startsWith('/dashboard/student')) return response;
-      if (userData.role === 'parent' && path.startsWith('/dashboard/parent')) return response;
-      
-      // Redirect unauthorized dashboard access
-      if (userData.role === 'admin') return NextResponse.redirect(new URL('/dashboard', request.url));
-      if (userData.role === 'management') return NextResponse.redirect(new URL('/dashboard/management', request.url));
-      if (userData.role === 'teacher') return NextResponse.redirect(new URL('/dashboard/teacher', request.url));
-      if (userData.role === 'student') return NextResponse.redirect(new URL('/dashboard/student', request.url));
-      if (userData.role === 'parent') return NextResponse.redirect(new URL('/dashboard/parent', request.url));
+      if (role === 'admin' && path === '/dashboard') return response;
+      if (role === 'management' && path.startsWith('/dashboard/management')) return response;
+      if (role === 'teacher' && path.startsWith('/dashboard/teacher')) return response;
+      if (role === 'student' && path.startsWith('/dashboard/student')) return response;
+      if (role === 'parent' && path.startsWith('/dashboard/parent')) return response;
+
+      // إعادة توجيه حسب الدور
+      if (role === 'admin') return NextResponse.redirect(new URL('/dashboard', request.url));
+      if (role === 'management') return NextResponse.redirect(new URL('/dashboard/management', request.url));
+      if (role === 'teacher') return NextResponse.redirect(new URL('/dashboard/teacher', request.url));
+      if (role === 'student') return NextResponse.redirect(new URL('/dashboard/student', request.url));
+      if (role === 'parent') return NextResponse.redirect(new URL('/dashboard/parent', request.url));
     }
   }
 

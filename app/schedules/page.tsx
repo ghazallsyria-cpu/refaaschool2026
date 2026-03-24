@@ -196,32 +196,54 @@ export default function SchedulesPage() {
   const fetchSchedules = async (sectionId: string) => {
   setLoading(true);
   try {
+    const { data: { user } } = await supabase.auth.getUser();
+
+    const { data: userData } = await supabase
+      .from('users')
+      .select('role')
+      .eq('id', user?.id)
+      .single();
+
     let data: any[] = [];
 
-    if (userRole === 'student') {
+    if (userData?.role === 'student') {
       const { data: studentData } = await supabase
         .from('students')
         .select('section_id')
-        .eq('id', (await supabase.auth.getUser()).data.user?.id)
+        .eq('id', user?.id)
         .single();
 
-      if (studentData?.section_id) {
-        const res = await supabase
-          .from('schedules')
-          .select(`
-            id,
-            section_id,
-            subject_id,
-            teacher_id,
-            day_of_week,
-            period,
-            subjects (name),
-            teachers (zoom_link, users (full_name))
-          `)
-          .eq('section_id', studentData.section_id);
+      const res = await supabase
+        .from('schedules')
+        .select(`
+          id,
+          section_id,
+          subject_id,
+          teacher_id,
+          day_of_week,
+          period,
+          subjects (name),
+          teachers (zoom_link, users (full_name))
+        `)
+        .eq('section_id', studentData?.section_id);
 
-        data = res.data || [];
-      }
+      data = res.data || [];
+    } else if (userData?.role === 'teacher') {
+      const res = await supabase
+        .from('schedules')
+        .select(`
+          id,
+          section_id,
+          subject_id,
+          teacher_id,
+          day_of_week,
+          period,
+          subjects (name),
+          teachers (zoom_link, users (full_name))
+        `)
+        .eq('teacher_id', user?.id);
+
+      data = res.data || [];
     } else {
       const res = await supabase
         .from('schedules')

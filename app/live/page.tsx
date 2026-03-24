@@ -3,6 +3,9 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
 import { School } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 
 /* ================= Helpers ================= */
 
@@ -22,10 +25,8 @@ function getDbDay(jsDay: number): number {
 interface LiveClass {
   id: string;
   teacherName: string;
-  sectionName: string;
   className: string;
   subjectName: string;
-  periodNumber: number;
 }
 
 interface Period {
@@ -40,13 +41,10 @@ interface Period {
 export default function LiveMonitorPage() {
   const [now, setNow] = useState(new Date());
   const [periods, setPeriods] = useState<Period[]>([]);
-  const [liveClasses, setLiveClasses] = useState<LiveClass[]>([]);
+  const [classes, setClasses] = useState<LiveClass[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const cache = useRef<Record<string, LiveClass[]>>({});
   const lastKey = useRef<string | null>(null);
-  const requestIdRef = useRef(0);
 
   /* ================= Load Periods ================= */
 
@@ -71,8 +69,7 @@ export default function LiveMonitorPage() {
   /* ================= Time ================= */
 
   const nowMin = now.getHours() * 60 + now.getMinutes();
-  const jsDay = now.getDay();
-  const dbDay = getDbDay(jsDay);
+  const dbDay = getDbDay(now.getDay());
 
   const currentPeriod = useMemo(() => {
     return (
@@ -84,12 +81,6 @@ export default function LiveMonitorPage() {
     );
   }, [nowMin, periods]);
 
-  const nextPeriod = useMemo(() => {
-    return periods.find(
-      (p) => timeToMinutes(p.start_time) > nowMin
-    ) || null;
-  }, [nowMin, periods]);
-
   const isWorkingHours =
     periods.length > 0 &&
     nowMin >= timeToMinutes(periods[0].start_time) &&
@@ -97,197 +88,138 @@ export default function LiveMonitorPage() {
 
   const isBreak = !currentPeriod && isWorkingHours;
 
-  const cacheKey = currentPeriod
-    ? `${dbDay}-${currentPeriod.period_number}`
-    : null;
-
-  /* ================= Smart Timer ================= */
-
-  useEffect(() => {
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
-
-    if (!currentPeriod) return;
-
-    const nowMs = Date.now();
-    const endMs =
-      timeToMinutes(currentPeriod.end_time) * 60 * 1000;
-
-    const delay = endMs - nowMs;
-
-    if (delay <= 0) return;
-
-    timeoutRef.current = setTimeout(() => {
-      setNow(new Date());
-    }, delay);
-
-    return () => {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    };
-  }, [currentPeriod]);
-
-  /* ================= Fetch ================= */
-
-  useEffect(() => {
-    if (!currentPeriod || dbDay === -1) return;
-
-    if (lastKey.current === cacheKey) return;
-    lastKey.current = cacheKey;
-
-    if (cache.current[cacheKey!]) {
-      setLiveClasses(cache.current[cacheKey!]);
-      return;
-    }
-
-    const load = async () => {
-      const requestId = ++requestIdRef.current;
-
-      const { data, error } = await supabase
-        .from("schedules")
-        .select(`
-          id,
-          teachers:teachers(users:users(full_name)),
-          sections:sections(name, classes:classes(name)),
-          subjects:subjects(name)
-        `)
-        .eq("day_of_week", dbDay)
-        .eq("period", currentPeriod.period_number);
-
-      if (requestId !== requestIdRef.current) return;
-
-      if (error) {
-        setError("فشل تحميل الحصص");
-        return;
-      }
-
-      const classes: LiveClass[] = (data || []).map((s: any) => ({
-        id: s.id,
-        teacherName: s.teachers?.users?.full_name ?? "غير محدد",
-        sectionName: s.sections?.name ?? "غير محدد",
-        className: s.sections?.classes?.name ?? "غير محدد",
-        subjectName: s.subjects?.name ?? "غير محدد",
-        periodNumber: currentPeriod.period_number,
-      }));
-
-      cache.current[cacheKey!] = classes;
-      setLiveClasses(classes);
-    };
-
-    load();
-  }, [cacheKey, currentPeriod, dbDay]);
-
-  /* ================= Progress ================= */
-
   const progress = currentPeriod
     ? (nowMin - timeToMinutes(currentPeriod.start_time)) /
       (timeToMinutes(currentPeriod.end_time) -
         timeToMinutes(currentPeriod.start_time))
     : 0;
 
+  /* ================= Fetch ================= */
+
+  useEffect(() => {
+    if (!currentPeriod || dbDay === -1) return;
+
+    const key = `${dbDay}-${currentPeriod.period_number}`;
+    if (lastKey.current === key) return;
+
+    lastKey.current = key;
+
+    const load = async () => {
+      const { data, error } = await supabase
+        .from("schedules")
+        .select(`
+          id,
+          teachers(users(full_name)),
+          sections(name),
+          subjects(name)
+        `)
+        .eq("day_of_week", dbDay)
+        .eq("period", currentPeriod.period_number);
+
+      if (error) {
+        setError("فشل تحميل البيانات");
+        return;
+      }
+
+      const mapped: LiveClass[] = (data || []).map((s: any) => ({
+        id: s.id,
+        teacherName: s.teachers?.users?.full_name || "—",
+        className: s.sections?.name || "—",
+        subjectName: s.subjects?.name || "—",
+      }));
+
+      setClasses(mapped);
+    };
+
+    load();
+  }, [currentPeriod, dbDay]);
+
+  /* ================= Timer ================= */
+
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 30000);
+    return () => clearInterval(t);
+  }, []);
+
   /* ================= UI ================= */
 
   return (
     <div className="min-h-screen bg-slate-900 text-white p-6" dir="rtl">
+
       {/* Header */}
-      <div className="flex justify-between mb-6">
-        <div className="flex gap-2 items-center">
+      <div className="flex justify-between items-center mb-6">
+        <div className="flex items-center gap-2">
           <School />
-          <span>مدرسة الرفعة</span>
+          <span className="font-bold">مدرسة الرفعة</span>
         </div>
 
-        <div>
-          {now.toLocaleTimeString("ar-KW", {
-            hour: "2-digit",
-            minute: "2-digit",
-          })}
+        <div className="text-sm opacity-80">
+          {now.toLocaleTimeString("ar")}
         </div>
       </div>
 
       {/* Status Card */}
-      <div className="mb-6 p-6 rounded-2xl bg-white/5 border border-white/10 text-center">
+      <Card className="mb-6">
+        <CardContent className="p-6 text-center">
 
-        {currentPeriod && (
-          <>
-            <div className="text-2xl font-bold mb-2">
-              الحصة {currentPeriod.period_number}
-            </div>
-            <div className="text-sm text-white/70">جارية الآن</div>
-            <div className="mt-2">
-              {currentPeriod.start_time} → {currentPeriod.end_time}
-            </div>
+          {currentPeriod && (
+            <>
+              <Badge className="mb-2">
+                الحصة {currentPeriod.period_number}
+              </Badge>
 
-            <div className="w-full h-2 bg-white/10 rounded mt-4 overflow-hidden">
-              <div
-                className="h-full bg-green-400"
-                style={{
-                  width: `${Math.min(progress * 100, 100)}%`,
-                }}
-              />
-            </div>
-          </>
-        )}
-
-        {!currentPeriod && isBreak && (
-          <>
-            <div className="text-2xl font-bold text-yellow-400 mb-2">
-              استراحة
-            </div>
-            <div className="text-sm text-white/70">
-              الانتظار للحصة القادمة
-            </div>
-            {nextPeriod && (
-              <div className="mt-2">
-                تبدأ عند: {nextPeriod.start_time}
+              <div className="text-lg font-bold">
+                {currentPeriod.start_time} → {currentPeriod.end_time}
               </div>
-            )}
-          </>
-        )}
 
-        {!currentPeriod && !isBreak && (
-          <>
-            <div className="text-2xl font-bold text-red-400 mb-2">
-              انتهى الدوام
-            </div>
-            <div className="text-sm text-white/70">
-              لا توجد حصص حالياً
-            </div>
-          </>
-        )}
+              <Progress value={progress * 100} className="mt-4" />
+            </>
+          )}
 
-      </div>
+          {!currentPeriod && isBreak && (
+            <>
+              <Badge variant="secondary" className="mb-2">
+                استراحة
+              </Badge>
+            </>
+          )}
+
+          {!currentPeriod && !isBreak && (
+            <>
+              <Badge variant="destructive" className="mb-2">
+                انتهى الدوام
+              </Badge>
+            </>
+          )}
+
+        </CardContent>
+      </Card>
 
       {/* Classes */}
-      {currentPeriod && dbDay !== -1 && (
-        <>
-          {liveClasses.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {liveClasses.map((c) => (
-                <div
-                  key={c.id}
-                  className="p-4 bg-white/10 rounded-xl border border-white/10"
-                >
-                  <div className="font-bold">{c.subjectName}</div>
-                  <div className="text-sm text-white/70">
-                    {c.teacherName}
-                  </div>
-                  <div className="text-sm text-white/70">
-                    {c.className}
-                  </div>
+      {currentPeriod && (
+        <div className="grid md:grid-cols-3 gap-4">
+          {classes.map((c) => (
+            <Card key={c.id}>
+              <CardContent className="p-4 space-y-1">
+                <div className="font-bold">{c.subjectName}</div>
+                <div className="text-sm opacity-70">
+                  {c.teacherName}
                 </div>
-              ))}
-            </div>
-          ) : (
-            <div className="p-4 bg-white/10 rounded-xl">
-              لا توجد حصص في هذه الفترة
-            </div>
-          )}
-        </>
+                <div className="text-sm opacity-70">
+                  {c.className}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       )}
 
       {error && (
-        <div className="mt-4 p-3 bg-red-500/20 rounded">
+        <div className="mt-4 text-red-400 text-sm">
           {error}
         </div>
       )}
+
     </div>
   );
 }

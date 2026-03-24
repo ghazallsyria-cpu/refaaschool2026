@@ -90,6 +90,21 @@ export default function LiveMonitorPage() {
     );
   }, [nowMin, periods]);
 
+  const nextPeriod = useMemo(() => {
+    return (
+      periods.find(
+        (p) => timeToMinutes(p.start_time) > nowMin
+      ) || null
+    );
+  }, [nowMin, periods]);
+
+  const isWorkingHours =
+    periods.length > 0 &&
+    nowMin >= timeToMinutes(periods[0].start_time) &&
+    nowMin < timeToMinutes(periods[periods.length - 1].end_time);
+
+  const isBreak = !currentPeriod && isWorkingHours;
+
   const cacheKey = currentPeriod
     ? `${dbDay}-${currentPeriod.period_number}`
     : null;
@@ -163,10 +178,11 @@ export default function LiveMonitorPage() {
         </div>
       </div>
 
+      {/* حالة الوقت */}
       <div className="mb-6 p-4 bg-white/10 rounded-xl">
-        {currentPeriod
-          ? `الحصة ${currentPeriod.period_number} جارية`
-          : "لا توجد حصة الآن"}
+        {currentPeriod && `الحصة ${currentPeriod.period_number} جارية`}
+        {!currentPeriod && isBreak && "استراحة"}
+        {!currentPeriod && !isBreak && "انتهى الدوام"}
       </div>
 
       {error && (
@@ -175,22 +191,25 @@ export default function LiveMonitorPage() {
         </div>
       )}
 
-      {currentPeriod && dbDay !== -1 && liveClasses.length === 0 && (
-        <div className="p-4 bg-white/10 rounded-xl">
-          لا توجد حصص مسجلة لهذه الفترة
-        </div>
-      )}
-
-      {currentPeriod && dbDay !== -1 && liveClasses.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {liveClasses.map((c) => (
-            <div key={c.id} className="p-4 bg-white/10 rounded-xl">
-              <div className="font-bold">{c.subjectName}</div>
-              <div className="text-sm">{c.teacherName}</div>
-              <div className="text-sm">{c.className}</div>
+      {/* عرض الحصص */}
+      {currentPeriod && dbDay !== -1 && (
+        <>
+          {liveClasses.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {liveClasses.map((c) => (
+                <div key={c.id} className="p-4 bg-white/10 rounded-xl">
+                  <div className="font-bold">{c.subjectName}</div>
+                  <div className="text-sm">{c.teacherName}</div>
+                  <div className="text-sm">{c.className}</div>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          ) : (
+            <div className="p-4 bg-white/10 rounded-xl">
+              لا توجد حصص في هذه الفترة
+            </div>
+          )}
+        </>
       )}
     </div>
   );

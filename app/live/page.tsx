@@ -68,7 +68,7 @@ export default function LiveMonitorPage() {
     load();
   }, []);
 
-  /* ================= Time Calculation ================= */
+  /* ================= Time ================= */
 
   const nowMin = now.getHours() * 60 + now.getMinutes();
   const jsDay = now.getDay();
@@ -85,11 +85,9 @@ export default function LiveMonitorPage() {
   }, [nowMin, periods]);
 
   const nextPeriod = useMemo(() => {
-    return (
-      periods.find(
-        (p) => timeToMinutes(p.start_time) > nowMin
-      ) || null
-    );
+    return periods.find(
+      (p) => timeToMinutes(p.start_time) > nowMin
+    ) || null;
   }, [nowMin, periods]);
 
   const isWorkingHours =
@@ -127,7 +125,7 @@ export default function LiveMonitorPage() {
     };
   }, [currentPeriod]);
 
-  /* ================= Data Fetch ================= */
+  /* ================= Fetch ================= */
 
   useEffect(() => {
     if (!currentPeriod || dbDay === -1) return;
@@ -157,7 +155,7 @@ export default function LiveMonitorPage() {
       if (requestId !== requestIdRef.current) return;
 
       if (error) {
-        setError("فشل تحميل الحصص المباشرة");
+        setError("فشل تحميل الحصص");
         return;
       }
 
@@ -177,10 +175,19 @@ export default function LiveMonitorPage() {
     load();
   }, [cacheKey, currentPeriod, dbDay]);
 
+  /* ================= Progress ================= */
+
+  const progress = currentPeriod
+    ? (nowMin - timeToMinutes(currentPeriod.start_time)) /
+      (timeToMinutes(currentPeriod.end_time) -
+        timeToMinutes(currentPeriod.start_time))
+    : 0;
+
   /* ================= UI ================= */
 
   return (
     <div className="min-h-screen bg-slate-900 text-white p-6" dir="rtl">
+      {/* Header */}
       <div className="flex justify-between mb-6">
         <div className="flex gap-2 items-center">
           <School />
@@ -195,29 +202,76 @@ export default function LiveMonitorPage() {
         </div>
       </div>
 
-      {/* الحالة */}
-      <div className="mb-6 p-4 bg-white/10 rounded-xl">
-        {currentPeriod && `الحصة ${currentPeriod.period_number} جارية`}
-        {!currentPeriod && isBreak && "استراحة"}
-        {!currentPeriod && !isBreak && "انتهى الدوام"}
+      {/* Status Card */}
+      <div className="mb-6 p-6 rounded-2xl bg-white/5 border border-white/10 text-center">
+
+        {currentPeriod && (
+          <>
+            <div className="text-2xl font-bold mb-2">
+              الحصة {currentPeriod.period_number}
+            </div>
+            <div className="text-sm text-white/70">جارية الآن</div>
+            <div className="mt-2">
+              {currentPeriod.start_time} → {currentPeriod.end_time}
+            </div>
+
+            <div className="w-full h-2 bg-white/10 rounded mt-4 overflow-hidden">
+              <div
+                className="h-full bg-green-400"
+                style={{
+                  width: `${Math.min(progress * 100, 100)}%`,
+                }}
+              />
+            </div>
+          </>
+        )}
+
+        {!currentPeriod && isBreak && (
+          <>
+            <div className="text-2xl font-bold text-yellow-400 mb-2">
+              استراحة
+            </div>
+            <div className="text-sm text-white/70">
+              الانتظار للحصة القادمة
+            </div>
+            {nextPeriod && (
+              <div className="mt-2">
+                تبدأ عند: {nextPeriod.start_time}
+              </div>
+            )}
+          </>
+        )}
+
+        {!currentPeriod && !isBreak && (
+          <>
+            <div className="text-2xl font-bold text-red-400 mb-2">
+              انتهى الدوام
+            </div>
+            <div className="text-sm text-white/70">
+              لا توجد حصص حالياً
+            </div>
+          </>
+        )}
+
       </div>
 
-      {error && (
-        <div className="mb-4 p-3 bg-red-500/20 rounded">
-          {error}
-        </div>
-      )}
-
-      {/* عرض الحصص */}
+      {/* Classes */}
       {currentPeriod && dbDay !== -1 && (
         <>
           {liveClasses.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {liveClasses.map((c) => (
-                <div key={c.id} className="p-4 bg-white/10 rounded-xl">
+                <div
+                  key={c.id}
+                  className="p-4 bg-white/10 rounded-xl border border-white/10"
+                >
                   <div className="font-bold">{c.subjectName}</div>
-                  <div className="text-sm">{c.teacherName}</div>
-                  <div className="text-sm">{c.className}</div>
+                  <div className="text-sm text-white/70">
+                    {c.teacherName}
+                  </div>
+                  <div className="text-sm text-white/70">
+                    {c.className}
+                  </div>
                 </div>
               ))}
             </div>
@@ -227,6 +281,12 @@ export default function LiveMonitorPage() {
             </div>
           )}
         </>
+      )}
+
+      {error && (
+        <div className="mt-4 p-3 bg-red-500/20 rounded">
+          {error}
+        </div>
       )}
     </div>
   );

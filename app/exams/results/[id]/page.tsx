@@ -64,7 +64,12 @@ export default function ExamResults() {
 
       // Fetch all students in the assigned sections
       let currentAllStudents: any[] = [];
-      if (examData?.section_ids && examData.section_ids.length > 0) {
+      // section_ids or fall back to section_id
+      const sectionIdsList = examData?.section_ids?.length > 0
+        ? examData.section_ids
+        : examData?.section_id ? [examData.section_id] : [];
+
+      if (sectionIdsList.length > 0) {
         const { data: studentsData } = await supabase
           .from('students')
           .select(`
@@ -72,7 +77,7 @@ export default function ExamResults() {
             users(full_name, email),
             section:sections(name, classes(name))
           `)
-          .in('section_id', examData.section_ids);
+          .in('section_id', sectionIdsList);
         
         currentAllStudents = (studentsData || []).map(s => {
           const sectionData = s.section as any;
@@ -359,10 +364,12 @@ export default function ExamResults() {
                 <td className="p-3 text-sm text-slate-600 border border-slate-200">
                   {attempt.completed_at ? new Date(attempt.completed_at).toLocaleDateString('ar-SA') : 'لم يتقدم'}
                 </td>
-                <td className="p-3 text-sm font-black text-indigo-600 border border-slate-200" dir="ltr">{attempt.score}%</td>
+                <td className="p-3 text-sm font-black text-indigo-600 border border-slate-200" dir="ltr">
+                  {attempt.status === 'not_attempted' ? '—' : `${attempt.score} / ${exam?.max_score || 100}`}
+                </td>
                 <td className="p-3 text-sm font-bold border border-slate-200">
-                  <span className={attempt.status === 'not_attempted' ? 'text-slate-400' : attempt.score >= 50 ? 'text-emerald-600' : 'text-red-600'}>
-                    {attempt.status === 'not_attempted' ? 'لم يتقدم' : attempt.score >= 50 ? 'ناجح' : 'راسب'}
+                  <span className={attempt.status === 'not_attempted' ? 'text-slate-400' : (attempt.score / (exam?.max_score || 100)) >= 0.5 ? 'text-emerald-600' : 'text-red-600'}>
+                    {attempt.status === 'not_attempted' ? 'لم يتقدم' : attempt.status === 'completed' || attempt.status === 'graded' ? 'مكتمل' : 'جارٍ'}
                   </span>
                 </td>
               </tr>
@@ -412,10 +419,10 @@ export default function ExamResults() {
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 print:hidden">
         {[
-          { label: 'متوسط الدرجات', value: `${stats?.avg_score}%`, icon: BarChart2, color: 'text-indigo-600', bg: 'bg-indigo-50' },
-          { label: 'نسبة النجاح', value: `${stats?.pass_rate}%`, icon: CheckCircle, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-          { label: 'أعلى درجة', value: `${stats?.max_score}%`, icon: TrendingUp, color: 'text-blue-600', bg: 'bg-blue-50' },
-          { label: 'إجمالي المحاولات', value: stats?.total_attempts, icon: Users, color: 'text-amber-600', bg: 'bg-amber-50' },
+          { label: 'متوسط الدرجات', value: stats ? `${Math.round((stats.avg_score / 100) * (exam?.max_score || 100))} / ${exam?.max_score || 100}` : '—', icon: BarChart2, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+          { label: 'نسبة النجاح', value: `${stats?.pass_rate ?? 0}%`, icon: CheckCircle, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+          { label: 'أعلى درجة', value: stats ? `${Math.round((stats.max_score / 100) * (exam?.max_score || 100))} / ${exam?.max_score || 100}` : '—', icon: TrendingUp, color: 'text-blue-600', bg: 'bg-blue-50' },
+          { label: 'إجمالي المحاولات', value: stats?.total_attempts ?? 0, icon: Users, color: 'text-amber-600', bg: 'bg-amber-50' },
         ].map((stat, i) => (
           <motion.div
             key={i}

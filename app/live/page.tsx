@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabase";
-import { Clock, BookOpen, Users, GraduationCap, School } from "lucide-react";
+import { School } from "lucide-react";
 
 function timeToMinutes(time: string): number {
   if (!time) return 0;
@@ -34,7 +34,7 @@ export default function LiveMonitorPage() {
   const cache = useRef<Record<number, LiveClass[]>>({});
   const lastFetched = useRef<number | null>(null);
 
-  // ===== جلب الحصص (مرة واحدة فقط) =====
+  // جلب الحصص
   useEffect(() => {
     const load = async () => {
       const { data } = await supabase
@@ -48,13 +48,13 @@ export default function LiveMonitorPage() {
     load();
   }, []);
 
-  // ===== تحديث الوقت =====
+  // تحديث الوقت
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
 
-  // ===== تحديد الحصة الحالية (بدون setState داخل effect) =====
+  // حساب الحصة الحالية (بدون state)
   const nowMin = now.getHours() * 60 + now.getMinutes();
 
   const currentPeriod =
@@ -63,12 +63,9 @@ export default function LiveMonitorPage() {
       nowMin < timeToMinutes(p.end_time)
     ) || null;
 
-  // ===== جلب الحصص عند تغير الحصة فقط =====
+  // جلب البيانات فقط عند وجود حصة
   useEffect(() => {
-    if (!currentPeriod) {
-      setLiveClasses([]);
-      return;
-    }
+    if (!currentPeriod) return;
 
     if (lastFetched.current === currentPeriod.period_number) return;
 
@@ -115,8 +112,6 @@ export default function LiveMonitorPage() {
     load();
   }, [currentPeriod]);
 
-  // ===== UI =====
-
   return (
     <div className="min-h-screen bg-slate-900 text-white p-6" dir="rtl">
 
@@ -134,15 +129,18 @@ export default function LiveMonitorPage() {
           : "لا توجد حصة الآن"}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {liveClasses.map(c => (
-          <div key={c.id} className="p-4 bg-white/10 rounded-xl">
-            <div className="font-bold">{c.subjectName}</div>
-            <div className="text-sm">{c.teacherName}</div>
-            <div className="text-sm">{c.className}</div>
-          </div>
-        ))}
-      </div>
+      {/* لا يتم تفريغ البيانات، فقط لا تُعرض */}
+      {currentPeriod && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {liveClasses.map(c => (
+            <div key={c.id} className="p-4 bg-white/10 rounded-xl">
+              <div className="font-bold">{c.subjectName}</div>
+              <div className="text-sm">{c.teacherName}</div>
+              <div className="text-sm">{c.className}</div>
+            </div>
+          ))}
+        </div>
+      )}
 
     </div>
   );

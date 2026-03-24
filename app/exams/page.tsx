@@ -1,5 +1,5 @@
 'use client';
-
+ 
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { 
@@ -12,7 +12,7 @@ import Link from 'next/link';
 import { motion, AnimatePresence } from 'motion/react';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { deleteFromCloudinary } from '@/lib/cloudinary';
-
+ 
 type Exam = {
   id: string;
   title: string;
@@ -35,7 +35,7 @@ type Exam = {
   };
   studentAttempt?: any;
 };
-
+ 
 export default function ExamsDashboard() {
   const [exams, setExams] = useState<Exam[]>([]);
   const [loading, setLoading] = useState(true);
@@ -43,21 +43,21 @@ export default function ExamsDashboard() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [userRole, setUserRole] = useState<string | null>(null);
   const [now, setNow] = useState(new Date());
-
+ 
   // تحديث كل دقيقة لإظهار الاختبار فوراً عند بدء وقته
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 30000);
     return () => clearInterval(timer);
   }, []);
   const [examToDelete, setExamToDelete] = useState<string | null>(null);
-
+ 
   const fetchExams = useCallback(async () => {
     try {
       setLoading(true);
       
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
-
+ 
       const { data: userData } = await supabase
         .from('users')
         .select('role')
@@ -66,7 +66,7 @@ export default function ExamsDashboard() {
         
       const role = userData?.role || null;
       setUserRole(role);
-
+ 
       let query = supabase
         .from('exams')
         .select(`
@@ -75,7 +75,7 @@ export default function ExamsDashboard() {
           section:sections(name)
         `)
         .order('created_at', { ascending: false });
-
+ 
       if (role === 'teacher') {
         query = query.eq('teacher_id', session.user.id);
       } else if (role === 'student') {
@@ -110,13 +110,13 @@ export default function ExamsDashboard() {
           return;
         }
       }
-
+ 
       const { data, error } = await query;
-
+ 
       if (error) throw error;
-
+ 
       const examIds = (data || []).map(e => e.id);
-
+ 
       // جلب كل البيانات دفعة واحدة بدلاً من N+1 queries
       const [questionsCountRes, attemptsRes, studentAttemptsRes] = await Promise.all([
         supabase.from('questions').select('exam_id', { count: 'exact' }).in('exam_id', examIds),
@@ -128,18 +128,18 @@ export default function ExamsDashboard() {
               .eq('student_id', session.user.id)
           : Promise.resolve({ data: [] })
       ]);
-
+ 
       const examsWithStats = (data || []).map(exam => {
         const examAttempts = (attemptsRes.data || []).filter(a => a.exam_id === exam.id);
         const avgScore = examAttempts.length > 0
           ? Math.round(examAttempts.reduce((acc, a) => acc + (a.score || 0), 0) / examAttempts.length)
           : 0;
-
+ 
         const studentExamAttempts = (studentAttemptsRes.data || []).filter(a => a.exam_id === exam.id);
         const studentAttempt = studentExamAttempts.find(a => a.status === 'completed' || a.status === 'graded')
           || studentExamAttempts.find(a => a.status === 'ongoing')
           || null;
-
+ 
         return {
           ...exam,
           _count: {
@@ -150,7 +150,7 @@ export default function ExamsDashboard() {
           studentAttempt
         };
       });
-
+ 
       setExams(examsWithStats);
     } catch (err) {
       console.error('Error fetching exams:', err);
@@ -158,17 +158,17 @@ export default function ExamsDashboard() {
       setLoading(false);
     }
   }, []);
-
+ 
   useEffect(() => {
     fetchExams();
   }, [fetchExams]);
-
+ 
   const filteredExams = exams.filter(exam => {
     const matchesSearch = exam.title.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'all' || exam.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
-
+ 
   const handleDelete = async (examId: string) => {
     try {
       // 1. Fetch all questions for this exam to get their media_urls
@@ -178,7 +178,7 @@ export default function ExamsDashboard() {
         .eq('exam_id', examId);
       
       if (qError) throw qError;
-
+ 
       // 2. Delete all question images from Cloudinary
       if (questions && questions.length > 0) {
         for (const q of questions) {
@@ -187,7 +187,7 @@ export default function ExamsDashboard() {
           }
         }
       }
-
+ 
       const { error } = await supabase.from('exams').delete().eq('id', examId);
       if (error) throw error;
       setExams(exams.filter(e => e.id !== examId));
@@ -197,7 +197,7 @@ export default function ExamsDashboard() {
       console.error('Error deleting exam:', err);
     }
   };
-
+ 
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'published': return 'bg-emerald-50 text-emerald-700 border-emerald-100 shadow-emerald-50';
@@ -206,7 +206,7 @@ export default function ExamsDashboard() {
       default: return 'bg-slate-50 text-slate-700 border-slate-100 shadow-slate-50';
     }
   };
-
+ 
   const getStatusLabel = (status: string) => {
     switch (status) {
       case 'published': return 'منشور';
@@ -215,7 +215,7 @@ export default function ExamsDashboard() {
       default: return status;
     }
   };
-
+ 
   const isTeacherOrAdmin = userRole === 'teacher' || userRole === 'admin' || userRole === 'management';
   
   const getExamStatus = (exam: Exam) => {
@@ -236,7 +236,7 @@ export default function ExamsDashboard() {
     if (now > endDateTime) return 'expired';
     return 'available';
   };
-
+ 
   return (
     <div className="min-h-screen bg-[#F8FAFC] pb-24">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 space-y-12">
@@ -273,7 +273,7 @@ export default function ExamsDashboard() {
             </Link>
           )}
         </motion.div>
-
+ 
         {/* Stats Overview */}
         {isTeacherOrAdmin && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
@@ -316,7 +316,7 @@ export default function ExamsDashboard() {
             ))}
           </div>
         )}
-
+ 
         {/* Filters Section */}
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
@@ -356,7 +356,7 @@ export default function ExamsDashboard() {
             )}
           </div>
         </motion.div>
-
+ 
         {/* Exams List */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
           {loading ? (
@@ -435,14 +435,14 @@ export default function ExamsDashboard() {
                         </DropdownMenu.Root>
                       )}
                     </div>
-
+ 
                     <h3 className="text-3xl font-black text-slate-900 mb-4 group-hover:text-indigo-600 transition-colors tracking-tight leading-tight">
                       {exam.title}
                     </h3>
                     <p className="text-slate-500 font-medium line-clamp-2 mb-8 text-lg leading-relaxed">
                       {exam.description || 'لا يوجد وصف لهذا الاختبار'}
                     </p>
-
+ 
                     <div className="grid grid-cols-2 gap-5">
                       <div className="flex items-center gap-4 text-sm font-black text-slate-600 bg-slate-50/50 p-4 rounded-3xl border border-slate-100/50">
                         <div className="h-10 w-10 rounded-2xl bg-indigo-50 flex items-center justify-center">
@@ -474,7 +474,7 @@ export default function ExamsDashboard() {
                       )}
                     </div>
                   </div>
-
+ 
                   <div className="p-8 bg-slate-50/50 border-t border-slate-100 flex items-center justify-between">
                     {isTeacherOrAdmin ? (
                       <>

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Calendar, Clock, Plus, Trash2, X, Edit2, AlertCircle, Search } from 'lucide-react';
+import { Calendar, Clock, Plus, Trash2, X, AlertCircle } from 'lucide-react';
 import * as Dialog from '@radix-ui/react-dialog';
 
 // Types
@@ -54,10 +54,8 @@ export default function SchedulesPage() {
   const [selectedSectionId, setSelectedSectionId] = useState<string>('');
   const [userRole, setUserRole] = useState<string | null>(null);
   const [studentSectionName, setStudentSectionName] = useState<string>('');
-  const [teacherSchedule, setTeacherSchedule] = useState<any[]>([]);
   const [isTeacher, setIsTeacher] = useState(false);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
-  const [teacherAssignments, setTeacherAssignments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
   const [subjects, setSubjects] = useState<Subject[]>([]);
@@ -94,6 +92,7 @@ export default function SchedulesPage() {
     if (nowMin >= endMin) return 'past';
     return 'upcoming';
   };
+
   const [scheduleToDelete, setScheduleToDelete] = useState<string | null>(null);
 
   const showNotification = (type: 'success' | 'error', message: string) => {
@@ -141,18 +140,16 @@ export default function SchedulesPage() {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         
-        const [sectionsRes, subjectsRes, teachersRes, assignmentsRes, periodsRes] = await Promise.all([
+        const [sectionsRes, subjectsRes, teachersRes, periodsRes] = await Promise.all([
           supabase.from('sections').select('id, name, classes(name)').order('name'),
           supabase.from('subjects').select('id, name').order('name'),
           supabase.from('teachers').select('id, users(full_name)'),
-          supabase.from('teacher_sections').select('teacher_id, section_id, subject_id'),
           supabase.from('class_periods').select('*').order('period_number')
         ]);
 
         if (sectionsRes.data) setSections((sectionsRes.data as unknown) as Section[]);
         if (subjectsRes.data) setSubjects((subjectsRes.data as unknown) as Subject[]);
         if (teachersRes.data) setTeachers((teachersRes.data as unknown) as Teacher[]);
-        if (assignmentsRes.data) setTeacherAssignments(assignmentsRes.data);
         if (periodsRes.data) setPeriods(periodsRes.data);
 
         if (user) {
@@ -174,12 +171,6 @@ export default function SchedulesPage() {
 
           if (userData?.role === 'teacher') {
             setIsTeacher(true);
-            const { data: tSchedule } = await supabase
-              .from('schedules')
-              .select('id, day_of_week, period, subjects(name), sections(name, classes(name))')
-              .eq('teacher_id', user.id)
-              .order('day_of_week').order('period');
-            setTeacherSchedule(tSchedule || []);
             return;
           }
         }
@@ -206,7 +197,7 @@ export default function SchedulesPage() {
   }, [selectedSectionId, fetchSchedules]);
 
   const openCellModal = (day: number, period: number, existingSchedule?: Schedule) => {
-    if (userRole === 'student') return; // منع الطلاب تماماً
+    if (userRole === 'student') return;
     
     if (!selectedSectionId) {
       showNotification('error', 'الرجاء اختيار الشعبة أولاً');
@@ -248,23 +239,13 @@ export default function SchedulesPage() {
           .update(payload)
           .eq('id', currentCell.scheduleId);
           
-        if (error) {
-          if (error.code === '23505') {
-            throw new Error('المعلم لديه حصة أخرى في نفس الوقت');
-          }
-          throw error;
-        }
+        if (error) throw error;
       } else {
         const { error } = await supabase
           .from('schedules')
           .insert([payload]);
           
-        if (error) {
-          if (error.code === '23505') {
-            throw new Error('المعلم لديه حصة أخرى في نفس الوقت');
-          }
-          throw error;
-        }
+        if (error) throw error;
       }
 
       await fetchSchedules(selectedSectionId);
@@ -272,7 +253,7 @@ export default function SchedulesPage() {
       showNotification('success', 'تم حفظ الحصة بنجاح');
     } catch (error: any) {
       console.error('Error saving schedule:', error);
-      showNotification('error', error.message || 'حدث خطأ أثناء حفظ الحصة');
+      showNotification('error', 'حدث خطأ أثناء حفظ الحصة');
     } finally {
       setIsSubmitting(false);
     }
@@ -306,7 +287,7 @@ export default function SchedulesPage() {
         <div className={`fixed top-4 left-1/2 transform -translate-x-1/2 z-50 px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 transition-all ${
           notification.type === 'success' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-red-50 text-red-800 border border-red-200'
         }`}>
-          {notification.type === 'success' ? <Plus className="h-5 w-5" /> : <AlertCircle className="h-5 w-5" />}
+          <AlertCircle className="h-5 w-5" />
           <p className="font-bold text-sm">{notification.message}</p>
         </div>
       )}
@@ -325,12 +306,9 @@ export default function SchedulesPage() {
       )}
 
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">
-            {userRole === 'student' ? 'جدولي الدراسي' : 'الجدول الدراسي'}
-          </h1>
-          {!userRole === 'student' && <p className="text-slate-500">إدارة الجداول الدراسية للفصول والشعب</p>}
-        </div>
+        <h1 className="text-2xl font-bold text-slate-900">
+          {userRole === 'student' ? 'جدولي الدراسي' : 'الجدول الدراسي'}
+        </h1>
       </div>
 
       <div className="bg-white p-4 rounded-xl shadow-sm ring-1 ring-slate-200">

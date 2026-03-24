@@ -31,26 +31,41 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  const { data: { user } } = await supabase.auth.getUser();
+  // Use getSession() instead of getUser() for performance in middleware
+  const { data: { session } } = await supabase.auth.getSession();
   const path = request.nextUrl.pathname;
 
-  // Allow access to login, reset-password, and live pages without authentication
-  if (path.startsWith('/login') || path.startsWith('/reset-password') || path.startsWith('/live')) {
-    return response;
+  // Define public routes that do not require authentication
+  const PUBLIC_ROUTES = [
+    '/login',
+    '/reset-password',
+    '/live',
+    '/_next',
+    '/api/',
+    'favicon.ico',
+  ];
+
+  const isPublicRoute = PUBLIC_ROUTES.some(route => path.startsWith(route) || path.includes(route));
+
+  // If no session and trying to access a protected route, redirect to login
+  if (!session && !isPublicRoute) {
+    const redirectUrl = new URL('/login', request.url);
+    return NextResponse.redirect(redirectUrl);
   }
 
-  // If no user and trying to access any other page, redirect to login
-  if (!user) {
-    return NextResponse.redirect(new URL('/login', request.url));
+  // If session exists and user is on login page, redirect to home (or dashboard)
+  if (session && path.startsWith('/login')) {
+    // In a real app, you might redirect based on user role here
+    return NextResponse.redirect(new URL('/', request.url));
   }
 
-  // If user is authenticated, allow access to all other pages.
-  // Role-based access control and password reset checks will be handled within page components.
   return response;
 }
 
 export const config = {
   matcher: [
-    '/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*),',
+    // Exclude files in /public (like images, favicon) and /_next (Next.js internals)
+    // Also exclude API routes unless specifically needed for middleware logic
+    '/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 };

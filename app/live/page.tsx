@@ -68,7 +68,7 @@ export default function LiveMonitorPage() {
     load();
   }, []);
 
-  /* ================= Compute ================= */
+  /* ================= Time Calculation ================= */
 
   const nowMin = now.getHours() * 60 + now.getMinutes();
   const jsDay = now.getDay();
@@ -103,7 +103,7 @@ export default function LiveMonitorPage() {
     ? `${dbDay}-${currentPeriod.period_number}`
     : null;
 
-  /* ================= Smart Timer (بدل كل ثانية) ================= */
+  /* ================= Smart Timer ================= */
 
   useEffect(() => {
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
@@ -127,7 +127,7 @@ export default function LiveMonitorPage() {
     };
   }, [currentPeriod]);
 
-  /* ================= Fetch Data ================= */
+  /* ================= Data Fetch ================= */
 
   useEffect(() => {
     if (!currentPeriod || dbDay === -1) return;
@@ -195,7 +195,7 @@ export default function LiveMonitorPage() {
         </div>
       </div>
 
-      {/* الحالة الزمنية */}
+      {/* الحالة */}
       <div className="mb-6 p-4 bg-white/10 rounded-xl">
         {currentPeriod && `الحصة ${currentPeriod.period_number} جارية`}
         {!currentPeriod && isBreak && "استراحة"}

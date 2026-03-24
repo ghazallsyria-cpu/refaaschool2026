@@ -1,4 +1,4 @@
-"use client";
+
 
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
@@ -308,7 +308,7 @@ export default function StudentDashboard() {
       {/* روابط سريعة */}
       <div className="grid grid-cols-4 gap-3">
         {[
-          { label: "الجدول",      icon: Calendar, href: "/schedules",  color: "text-indigo-600",  bg: "bg-indigo-50"  },
+          { label: "الجدول",      icon: Calendar, href: "/dashboard/student/schedule",  color: "text-indigo-600",  bg: "bg-indigo-50"  },
           { label: "الاختبارات", icon: FileText,  href: "/exams",      color: "text-emerald-600", bg: "bg-emerald-50" },
           { label: "الواجبات",   icon: BookOpen,  href: "/assignments", color: "text-amber-600",   bg: "bg-amber-50"   },
           { label: "التنبيهات",  icon: Bell,      href: "/messages",   color: "text-sky-600",     bg: "bg-sky-50"     },

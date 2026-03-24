@@ -1,459 +1,554 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import {
-  Users, GraduationCap, BookOpen, CalendarDays,
-  Plus, Bell, School, ArrowUpRight, Activity,
-  AlertTriangle, FileText, Clock, CheckCircle2,
-  TrendingUp, TrendingDown, Minus, Radio
+  BookOpen, Calendar, CheckCircle2, Clock,
+  FileText, GraduationCap, TrendingUp, AlertCircle,
+  Bell, ChevronLeft, Award, Target, BarChart2,
+  Zap, AlertTriangle, Star, XCircle
 } from "lucide-react";
-import Link from "next/link";
 import { motion } from "motion/react";
+import {
+  AreaChart, Area, XAxis, YAxis, CartesianGrid,
+  Tooltip, ResponsiveContainer
+} from "recharts";
+import Link from "next/link";
+import { format } from "date-fns";
+import { arSA } from "date-fns/locale";
 import AnnouncementsWidget from "@/components/AnnouncementsWidget";
 
-type Stage = "all" | "middle" | "high";
+const DAY_MAP: Record<number,string> = {0:"الأحد",1:"الاثنين",2:"الثلاثاء",3:"الأربعاء",4:"الخميس",5:"الجمعة",6:"السبت"};
 
-function getTeacherStage(levels: number[]): "middle" | "high" | "shared" | "none" {
-  const hasMiddle = levels.some(l => l >= 6 && l <= 9);
-  const hasHigh   = levels.some(l => l >= 10 && l <= 12);
-  if (hasMiddle && hasHigh) return "shared";
-  if (hasMiddle) return "middle";
-  if (hasHigh)   return "high";
-  return "none";
+function timeToMinutes(t: string): number {
+  if (!t) return 0;
+  const [h, m] = t.split(":").map(Number);
+  return h * 60 + m;
 }
 
-const containerVariants: any = {
-  hidden:  { opacity: 0 },
-  visible: { opacity: 1, transition: { staggerChildren: 0.08 } }
-};
-const itemVariants: any = {
-  hidden:  { y: 20, opacity: 0 },
-  visible: { y: 0, opacity: 1, transition: { type: "spring", stiffness: 100 } }
-};
+export default function StudentDashboard() {
+  const [studentData, setStudentData]         = useState<any>(null);
+  const [attendanceStats, setAttendanceStats] = useState<any>(null);
+  const [recentGrades, setRecentGrades]       = useState<any[]>([]);
+  const [upcomingExams, setUpcomingExams]     = useState<any[]>([]);
+  const [upcomingAssignments, setUpcomingAssignments] = useState<any[]>([]);
+  const [submittedIds, setSubmittedIds]       = useState<Set<string>>(new Set());
+  const [currentLesson, setCurrentLesson]     = useState<any>(null);
+  const [nextLesson, setNextLesson]           = useState<any>(null);
+  const [classAvg, setClassAvg]               = useState<number>(0);
+  const [loading, setLoading]                 = useState(true);
+  const [now, setNow]                         = useState(new Date());
 
-const MONTH_AR = ["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"];
-const DAY_AR   = ["الأحد","الاثنين","الثلاثاء","الأربعاء","الخميس","الجمعة","السبت"];
+  // تحديث الوقت كل دقيقة
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 60000);
+    return () => clearInterval(t);
+  }, []);
 
-export default function AdminDashboard() {
-  const [stage, setStage] = useState<Stage>("all");
-  const [loading, setLoading] = useState(true);
-  const [recentActivities, setRecentActivities] = useState<any[]>([]);
-  const [alerts, setAlerts] = useState<{title: string; desc: string; color: string; href: string}[]>([]);
-
-  const [allStats, setAllStats] = useState({
-    middle: { students: 0, teachers: 0, sections: 0, attendance: 0, absent: 0 },
-    high:   { students: 0, teachers: 0, sections: 0, attendance: 0, absent: 0 },
-    all:    { students: 0, teachers: 0, sections: 0, attendance: 0, absent: 0, activeExams: 0, pendingAssignments: 0 },
-  });
-
-  const now = new Date();
-  const todayStr = `${DAY_AR[now.getDay()]}، ${now.getDate()} ${MONTH_AR[now.getMonth()]} ${now.getFullYear()}`;
-
-  useEffect(() => { fetchDashboardData(); }, []);
-
-  const fetchDashboardData = async () => {
+  const fetchData = useCallback(async () => {
     try {
-      const today = now.toISOString().split("T")[0];
+      setLoading(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
 
-      const { data: classesData } = await supabase.from("classes").select("id, level");
-      const { data: sectionsData } = await supabase.from("sections").select("id, class_id");
+      const { data: student } = await supabase
+        .from("students")
+        .select("*, users(*), sections(*, classes(*))")
+        .eq("id", user.id)
+        .single();
+      setStudentData(student);
+      if (!student) return;
 
-      const middleSectionIds = sectionsData?.filter(s => {
-        const cls = classesData?.find(c => c.id === s.class_id);
-        return cls && cls.level <= 9;
-      }).map(s => s.id) || [];
-      const highSectionIds = sectionsData?.filter(s => {
-        const cls = classesData?.find(c => c.id === s.class_id);
-        return cls && cls.level >= 10;
-      }).map(s => s.id) || [];
+      const today      = now.toISOString().split("T")[0];
+      const jsDay      = now.getDay();
+      const dbDay      = jsDay === 0 ? 1 : jsDay === 1 ? 2 : jsDay === 2 ? 3 :
+                         jsDay === 3 ? 4 : jsDay === 4 ? 5 : 0;
+      const nowMin     = now.getHours() * 60 + now.getMinutes();
 
-      const { data: studentsData } = await supabase.from("students").select("id, section_id");
-      const { data: attendanceData } = await supabase.from("attendance").select("status, section_id").eq("date", today);
-
-      const calcStats = (sectionIds: string[]) => {
-        const students = studentsData?.filter(s => sectionIds.includes(s.section_id)).length || 0;
-        const att = attendanceData?.filter(a => sectionIds.includes(a.section_id)) || [];
-        const present = att.filter(a => a.status === "present" || a.status === "late").length;
-        const absent = att.filter(a => a.status === "absent").length;
-        const rate = att.length > 0 ? Math.round((present / att.length) * 100) : 0;
-        return { students, attendance: rate, absent };
-      };
-
-      // تحديد مرحلة المعلمين
-      const { data: tsData } = await supabase
-        .from("teacher_sections")
-        .select("teacher_id, sections(class_id, classes(level))");
-      const teacherIds = [...new Set(tsData?.map(ts => ts.teacher_id) || [])];
-      let middleTeachers = 0, highTeachers = 0;
-      teacherIds.forEach(tid => {
-        const levels = (tsData?.filter(ts => ts.teacher_id === tid) || [])
-          .map((ts: any) => ts.sections?.classes?.level)
-          .filter(Boolean);
-        const s = getTeacherStage(levels);
-        if (s === "middle" || s === "shared") middleTeachers++;
-        if (s === "high"   || s === "shared") highTeachers++;
-      });
-
-      const middleStats = calcStats(middleSectionIds);
-      const highStats   = calcStats(highSectionIds);
-      const allAtt      = calcStats([...middleSectionIds, ...highSectionIds]);
-
-      // اختبارات نشطة اليوم
-      const { count: activeExams } = await supabase
-        .from("exams")
-        .select("id", { count: "exact", head: true })
-        .eq("status", "published")
-        .eq("exam_date", today);
-
-      // واجبات منتهية بدون تقييم
-      const { count: pendingGrading } = await supabase
-        .from("assignment_submissions")
-        .select("id", { count: "exact", head: true })
-        .is("grade", null)
-        .lt("submitted_at", now.toISOString());
-
-      setAllStats({
-        middle: { ...middleStats, teachers: middleTeachers, sections: middleSectionIds.length },
-        high:   { ...highStats,   teachers: highTeachers,   sections: highSectionIds.length },
-        all:    { ...allAtt, teachers: teacherIds.length, sections: sectionsData?.length || 0, students: studentsData?.length || 0, activeExams: activeExams || 0, pendingAssignments: pendingGrading || 0 },
-      });
-
-      // التنبيهات الذكية
-      const newAlerts: typeof alerts = [];
-
-      if (allAtt.absent > 0) {
-        newAlerts.push({
-          title: `${allAtt.absent} طالب غائب اليوم`,
-          desc: "تم تسجيل الغياب — يمكن مراجعة التفاصيل",
-          color: "bg-amber-50 border-amber-200 text-amber-800",
-          href: "/attendance"
-        });
-      }
-      if ((pendingGrading || 0) > 0) {
-        newAlerts.push({
-          title: `${pendingGrading} تسليم واجب بانتظار التقييم`,
-          desc: "طلاب سلّموا واجباتهم ولم تُقيَّم بعد",
-          color: "bg-indigo-50 border-indigo-200 text-indigo-800",
-          href: "/assignments"
-        });
-      }
-      if ((activeExams || 0) > 0) {
-        newAlerts.push({
-          title: `${activeExams} اختبار نشط اليوم`,
-          desc: "اختبارات منشورة متاحة للطلاب الآن",
-          color: "bg-emerald-50 border-emerald-200 text-emerald-800",
-          href: "/exams"
-        });
-      }
-      setAlerts(newAlerts);
-
-      // آخر النشاطات — جلب صحيح
-      const [{ data: recentStudents }, { data: recentExams }, { data: recentNotifs }, { data: recentDocs }] = await Promise.all([
-        supabase.from("students").select("users(full_name), created_at").order("created_at", { ascending: false }).limit(3),
-        supabase.from("exams").select("title, created_at").order("created_at", { ascending: false }).limit(2),
-        supabase.from("notifications").select("title, created_at").eq("type", "announcement").order("created_at", { ascending: false }).limit(2),
-        supabase.from("documents").select("title, created_at").order("created_at", { ascending: false }).limit(2),
+      const [
+        { data: attendance },
+        { data: grades },
+        { data: exams },
+        { data: assignments },
+        { data: mySubmissions },
+        { data: periodsData },
+        { data: scheduleData },
+        { data: classAttempts },
+      ] = await Promise.all([
+        // الحضور
+        supabase.from("attendance").select("status").eq("student_id", student.id),
+        // آخر الدرجات — كلها للمتوسط الحقيقي
+        supabase.from("exam_attempts")
+          .select("*, exam:exams(title, subject:subjects(name))")
+          .eq("student_id", student.id)
+          .in("status", ["completed", "graded"])
+          .order("completed_at", { ascending: false }),
+        // الاختبارات القادمة — باستخدام exam_date الصحيح
+        supabase.from("exams")
+          .select("*, subject:subjects(name)")
+          .eq("section_id", student.section_id)
+          .eq("status", "published")
+          .gte("exam_date", today)
+          .order("exam_date", { ascending: true })
+          .limit(3),
+        // الواجبات القادمة
+        supabase.from("assignments")
+          .select("*, subject:subjects(name)")
+          .eq("section_id", student.section_id)
+          .gte("due_date", now.toISOString())
+          .order("due_date", { ascending: true })
+          .limit(5),
+        // الواجبات المسلّمة
+        supabase.from("assignment_submissions")
+          .select("assignment_id")
+          .eq("student_id", student.id),
+        // أوقات الحصص
+        supabase.from("class_periods")
+          .select("period_number, start_time, end_time")
+          .order("period_number"),
+        // جدول الطالب اليوم
+        supabase.from("schedules")
+          .select("period, subjects(name), teachers(users(full_name), zoom_link)")
+          .eq("section_id", student.section_id)
+          .eq("day_of_week", dbDay)
+          .order("period"),
+        // محاولات الفصل لحساب المتوسط
+        supabase.from("exam_attempts")
+          .select("score, exams!inner(section_id)")
+          .eq("exams.section_id", student.section_id)
+          .in("status", ["completed", "graded"]),
       ]);
 
-      const activities = [
-        ...(recentStudents || []).map((s: any) => ({ title: `طالب جديد: ${s.users?.full_name || "—"}`, time: s.created_at, color: "bg-indigo-100 text-indigo-600", href: "/students" })),
-        ...(recentExams    || []).map((e: any) => ({ title: `اختبار جديد: ${e.title}`, time: e.created_at, color: "bg-amber-100 text-amber-600", href: "/exams" })),
-        ...(recentNotifs   || []).map((n: any) => ({ title: `إعلان: ${n.title}`, time: n.created_at, color: "bg-sky-100 text-sky-600", href: "/announcements" })),
-        ...(recentDocs     || []).map((d: any) => ({ title: `مستند: ${d.title}`, time: d.created_at, color: "bg-emerald-100 text-emerald-600", href: "/documents" })),
-      ].sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime()).slice(0, 6);
+      // حساب الحضور (present + late)
+      if (attendance) {
+        const total   = attendance.length;
+        const present = attendance.filter(a => a.status === "present").length;
+        const late    = attendance.filter(a => a.status === "late").length;
+        const absent  = attendance.filter(a => a.status === "absent").length;
+        setAttendanceStats({
+          total, present, late, absent,
+          rate: total > 0 ? Math.round(((present + late) / total) * 100) : 100
+        });
+      }
 
-      setRecentActivities(activities);
+      setRecentGrades(grades || []);
+
+      // الواجبات المسلمة
+      setSubmittedIds(new Set((mySubmissions || []).map(s => s.assignment_id)));
+
+      setUpcomingExams(exams || []);
+      setUpcomingAssignments(assignments || []);
+
+      // الحصة الحالية والتالية
+      if (scheduleData && periodsData) {
+        let current = null;
+        let next    = null;
+        for (const slot of scheduleData) {
+          const p = periodsData.find(per => per.period_number === slot.period);
+          if (!p) continue;
+          const start = timeToMinutes(p.start_time);
+          const end   = timeToMinutes(p.end_time);
+          if (nowMin >= start && nowMin < end) {
+            current = { ...slot, start_time: p.start_time, end_time: p.end_time, remaining: end - nowMin };
+          } else if (nowMin < start && !next) {
+            next = { ...slot, start_time: p.start_time, end_time: p.end_time };
+          }
+        }
+        setCurrentLesson(current);
+        setNextLesson(next);
+      }
+
+      // متوسط الفصل
+      if (classAttempts && classAttempts.length > 0) {
+        const avg = Math.round(classAttempts.reduce((a, c) => a + (c.score || 0), 0) / classAttempts.length);
+        setClassAvg(avg);
+      }
+
     } catch (error) {
-      console.error("Dashboard error:", error);
+      console.error("Student dashboard error:", error);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const formatTime = (t: string) => {
-    const diff = (Date.now() - new Date(t).getTime()) / 60000;
-    if (diff < 1)    return "الآن";
-    if (diff < 60)   return `منذ ${Math.floor(diff)} دقيقة`;
-    if (diff < 1440) return `منذ ${Math.floor(diff / 60)} ساعة`;
-    return `منذ ${Math.floor(diff / 1440)} يوم`;
-  };
-
-  const currentStats = allStats[stage];
-
-  const stageConfig = {
-    all:    { label: "الإجمالي",  grad: "from-indigo-600 to-violet-700",   badge: "bg-indigo-100 text-indigo-700" },
-    middle: { label: "المتوسطة", grad: "from-emerald-600 to-teal-700",     badge: "bg-emerald-100 text-emerald-700" },
-    high:   { label: "الثانوية", grad: "from-amber-500 to-orange-600",     badge: "bg-amber-100 text-amber-700" },
-  };
-
-  const mainStats = [
-    { name: "الطلاب",        value: currentStats.students.toString(),   icon: Users,         color: "text-indigo-600",  bg: "bg-indigo-50"  },
-    { name: "المعلمين",      value: currentStats.teachers.toString(),   icon: GraduationCap, color: "text-emerald-600", bg: "bg-emerald-50" },
-    { name: "الفصول",        value: currentStats.sections.toString(),   icon: BookOpen,      color: "text-amber-600",   bg: "bg-amber-50"   },
-    { name: "حضور اليوم",    value: `${currentStats.attendance}%`,      icon: CalendarDays,  color: "text-sky-600",     bg: "bg-sky-50"     },
-  ];
+  useEffect(() => { fetchData(); }, [fetchData]);
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="relative w-16 h-16">
-          <div className="absolute inset-0 border-4 border-indigo-100 rounded-full" />
-          <div className="absolute inset-0 border-4 border-indigo-600 rounded-full border-t-transparent animate-spin" />
+      <div className="flex h-[80vh] items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="h-12 w-12 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent" />
+          <p className="text-slate-500 font-medium animate-pulse">جاري تحميل بياناتك...</p>
         </div>
       </div>
     );
   }
 
+  const allGrades  = recentGrades.filter(g => g.score !== null);
+  const avgScore   = allGrades.length > 0
+    ? Math.round(allGrades.reduce((a, c) => a + c.score, 0) / allGrades.length)
+    : 0;
+
+  const unsubmittedCount = upcomingAssignments.filter(a => !submittedIds.has(a.id)).length;
+  const tomorrowStr = new Date(Date.now() + 86400000).toISOString().split("T")[0];
+  const dueTomorrow = upcomingAssignments.filter(a =>
+    !submittedIds.has(a.id) && a.due_date.startsWith(tomorrowStr)
+  );
+
+  // شارة الحضور المثالي
+  const perfectAttendance = attendanceStats && attendanceStats.absent === 0 && attendanceStats.total > 0;
+
   return (
-    <motion.div initial="hidden" animate="visible" variants={containerVariants} className="space-y-8 pb-12">
+    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6 pb-8 max-w-7xl mx-auto">
 
       {/* Hero */}
-      <motion.div variants={itemVariants}
-        className={`relative overflow-hidden rounded-[2.5rem] bg-gradient-to-br ${stageConfig[stage].grad} p-6 sm:p-10 text-white shadow-2xl transition-all duration-500`}
-      >
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="space-y-3 max-w-2xl">
-            <div className="text-white/60 text-sm font-bold">{todayStr}</div>
-            <h1 className="text-3xl sm:text-4xl font-black tracking-tight leading-tight">
-              {stage === "all" && <>لوحة التحكم<br /><span className="opacity-70 text-2xl sm:text-3xl">مدرسة الرفعة النموذجية</span></>}
-              {stage === "middle" && <>المرحلة المتوسطة<br /><span className="opacity-70 text-2xl">الصف السادس — التاسع</span></>}
-              {stage === "high"   && <>المرحلة الثانوية<br /><span className="opacity-70 text-2xl">الصف العاشر — الثاني عشر</span></>}
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-600 to-violet-700 p-6 sm:p-8 text-white shadow-xl">
+        <div className="relative z-10 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-black mb-1">
+              مرحباً، {studentData?.users?.full_name} 👋
             </h1>
-            <div className="flex flex-wrap gap-3 pt-2">
-              <Link href="/admin/teachers-monitor"
-                className="bg-white text-indigo-600 px-5 py-2.5 rounded-2xl font-black text-sm hover:bg-indigo-50 transition-all shadow-lg flex items-center gap-2">
-                <Activity className="h-4 w-4" /> متابعة المعلمين
-              </Link>
-              <Link href="/admin/teacher-assignments"
-                className="bg-white/15 text-white border border-white/20 px-5 py-2.5 rounded-2xl font-black text-sm hover:bg-white/25 transition-all flex items-center gap-2">
-                <Plus className="h-4 w-4" /> إدارة التعيينات
-              </Link>
-              <Link href="/live" target="_blank"
-                className="bg-white/15 text-white border border-white/20 px-5 py-2.5 rounded-2xl font-black text-sm hover:bg-white/25 transition-all flex items-center gap-2">
-                <Radio className="h-4 w-4" /> الحصص الحية
-              </Link>
-            </div>
+            <p className="text-indigo-200 flex items-center gap-2 text-sm font-bold">
+              <GraduationCap className="h-4 w-4" />
+              {studentData?.sections?.classes?.name} — {studentData?.sections?.name}
+            </p>
+            <p className="text-indigo-300 text-xs mt-1 font-bold">
+              {DAY_MAP[now.getDay()]}، {now.getDate()} {["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"][now.getMonth()]}
+            </p>
           </div>
-          <div className="hidden lg:flex flex-col items-center gap-2">
-            <div className="h-36 w-36 rounded-full bg-white/10 backdrop-blur border border-white/20 flex items-center justify-center relative">
-              <School className="h-20 w-20 text-white/30" />
-              <div className="absolute inset-0 rounded-full border-2 border-white/20 animate-ping opacity-10" />
+          <div className="flex flex-wrap gap-3">
+            <div className="rounded-2xl bg-white/15 backdrop-blur p-4 border border-white/20 text-center min-w-[100px]">
+              <p className="text-[10px] text-indigo-200 font-black uppercase tracking-widest mb-1">نسبة الحضور</p>
+              <p className="text-3xl font-black">{attendanceStats?.rate || 0}%</p>
+              {perfectAttendance && <p className="text-[10px] text-amber-300 font-black mt-1">⭐ مثالي</p>}
             </div>
+            <div className="rounded-2xl bg-white/15 backdrop-blur p-4 border border-white/20 text-center min-w-[100px]">
+              <p className="text-[10px] text-indigo-200 font-black uppercase tracking-widest mb-1">متوسطك</p>
+              <p className={`text-3xl font-black ${avgScore >= classAvg ? "text-white" : "text-red-300"}`}>{avgScore}%</p>
+              {classAvg > 0 && (
+                <p className={`text-[10px] font-black mt-1 ${avgScore >= classAvg ? "text-emerald-300" : "text-red-300"}`}>
+                  {avgScore >= classAvg ? `↑ +${avgScore - classAvg}% عن الفصل` : `↓ ${avgScore - classAvg}% عن الفصل`}
+                </p>
+              )}
+            </div>
+            {unsubmittedCount > 0 && (
+              <div className="rounded-2xl bg-amber-500/30 backdrop-blur p-4 border border-amber-300/30 text-center min-w-[100px]">
+                <p className="text-[10px] text-amber-200 font-black uppercase tracking-widest mb-1">واجبات باقية</p>
+                <p className="text-3xl font-black text-amber-200">{unsubmittedCount}</p>
+              </div>
+            )}
           </div>
         </div>
-        <div className="absolute top-0 left-0 -translate-x-1/2 -translate-y-1/2 h-96 w-96 rounded-full bg-white/5 blur-3xl" />
-        <div className="absolute bottom-0 right-0 translate-x-1/3 translate-y-1/3 h-64 w-64 rounded-full bg-black/10 blur-3xl" />
-      </motion.div>
+        <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-white/5 blur-3xl" />
+        <div className="absolute -left-20 -bottom-20 h-64 w-64 rounded-full bg-indigo-500/20 blur-3xl" />
+      </div>
 
-      {/* Stage Filter */}
-      <motion.div variants={itemVariants} className="flex flex-wrap items-center gap-3">
-        {(["all", "middle", "high"] as Stage[]).map(s => (
-          <button key={s} onClick={() => setStage(s)}
-            className={`px-4 py-2 sm:px-6 sm:py-3 rounded-2xl font-black text-xs sm:text-sm transition-all ${
-              stage === s
-                ? s === "all" ? "bg-indigo-600 text-white shadow-lg shadow-indigo-200"
-                  : s === "middle" ? "bg-emerald-600 text-white shadow-lg shadow-emerald-200"
-                  : "bg-amber-500 text-white shadow-lg shadow-amber-200"
-                : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
-            }`}>
-            {s === "all" ? "🏫 الإجمالي" : s === "middle" ? "📚 المتوسطة (6-9)" : "🎓 الثانوية (10-12)"}
-          </button>
-        ))}
-        {stage === "all" && allStats.all.absent > 0 && (
-          <div className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-amber-50 border border-amber-200 text-amber-700 text-xs font-bold">
-            <AlertTriangle className="h-4 w-4" />
-            {allStats.all.absent} غائب اليوم
-          </div>
-        )}
-      </motion.div>
-
-      {/* Stats Cards */}
-      <motion.div variants={itemVariants} className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-        {mainStats.map(stat => (
-          <motion.div key={stat.name} whileHover={{ y: -4 }}
-            className="bg-white/70 backdrop-blur-xl rounded-[2rem] p-4 sm:p-6 shadow-sm ring-1 ring-slate-200/50 flex flex-col justify-between group relative overflow-hidden"
-          >
-            <div className="flex items-center justify-between mb-3 relative z-10">
-              <div className={`p-3 rounded-2xl ${stat.bg} ${stat.color} group-hover:scale-110 transition-transform shadow-sm`}>
-                <stat.icon className="h-5 w-5 sm:h-6 sm:w-6" />
-              </div>
-              <span className={`text-[9px] sm:text-[10px] font-black px-2 py-1 rounded-full ${stageConfig[stage].badge}`}>
-                {stageConfig[stage].label}
-              </span>
-            </div>
-            <div className="relative z-10">
-              <p className="text-xs sm:text-sm font-bold text-slate-500">{stat.name}</p>
-              <motion.p key={`${stage}-${stat.name}`}
-                initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-                className="text-2xl sm:text-3xl font-black text-slate-900 mt-1 tracking-tight"
-              >
-                {stat.value}
-              </motion.p>
-            </div>
-            <div className={`absolute -bottom-4 -right-4 h-24 w-24 rounded-full ${stat.bg} opacity-0 group-hover:opacity-20 transition-opacity blur-2xl`} />
-          </motion.div>
-        ))}
-      </motion.div>
-
-      {/* مقارنة المرحلتين */}
-      {stage === "all" && (
-        <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {[
-            { key: "middle", label: "المتوسطة", sub: "الصف السادس — التاسع",  color: "emerald", char: "م", data: allStats.middle },
-            { key: "high",   label: "الثانوية", sub: "الصف العاشر — الثاني عشر", color: "amber",   char: "ث", data: allStats.high   },
-          ].map(item => (
-            <div key={item.key} className="bg-white rounded-[2rem] p-5 ring-1 ring-slate-200/50 shadow-sm">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className={`h-10 w-10 rounded-2xl bg-${item.color}-50 flex items-center justify-center text-${item.color}-600 font-black text-lg`}>
-                    {item.char}
-                  </div>
-                  <div>
-                    <div className="font-black text-slate-900">{item.label}</div>
-                    <div className="text-xs text-slate-400 font-bold">{item.sub}</div>
-                  </div>
-                </div>
-                <button onClick={() => setStage(item.key as Stage)}
-                  className={`text-xs font-black text-${item.color}-600 bg-${item.color}-50 px-3 py-1.5 rounded-xl hover:bg-${item.color}-100 transition-all`}>
-                  التفاصيل
-                </button>
-              </div>
-              <div className="grid grid-cols-3 gap-3">
-                {[
-                  { label: "طلاب",  value: item.data.students,              color: `text-${item.color}-600` },
-                  { label: "معلمين", value: item.data.teachers,              color: `text-${item.color}-600` },
-                  { label: "حضور",  value: `${item.data.attendance}%`,       color: item.data.attendance >= 85 ? "text-emerald-600" : "text-red-500" },
-                ].map(d => (
-                  <div key={d.label} className="text-center bg-slate-50 rounded-2xl p-3">
-                    <div className={`text-2xl font-black ${d.color}`}>{d.value}</div>
-                    <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">{d.label}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
-        </motion.div>
-      )}
-
-      {/* التنبيهات الذكية */}
-      {alerts.length > 0 && (
-        <motion.div variants={itemVariants} className="space-y-3">
-          <h2 className="text-lg font-black text-slate-700 flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5 text-amber-500" />
-            تنبيهات اليوم
-          </h2>
-          {alerts.map((alert, i) => (
-            <Link key={i} href={alert.href}
-              className={`flex items-center justify-between p-4 rounded-2xl border ${alert.color} hover:opacity-90 transition-all`}>
-              <div>
-                <div className="font-black text-sm">{alert.title}</div>
-                <div className="text-xs font-medium opacity-70 mt-0.5">{alert.desc}</div>
-              </div>
-              <ArrowUpRight className="h-4 w-4 shrink-0 opacity-60" />
-            </Link>
-          ))}
-        </motion.div>
-      )}
-
-      {/* Main Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-        {/* آخر النشاطات */}
-        <motion.div variants={itemVariants}
-          className="lg:col-span-2 bg-white/70 backdrop-blur-xl rounded-[2.5rem] p-6 sm:p-8 shadow-sm ring-1 ring-slate-200/50"
+      {/* تنبيه واجبات غداً */}
+      {dueTomorrow.length > 0 && (
+        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
+          className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-3"
         >
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-indigo-50 rounded-xl text-indigo-600">
-                <Activity className="h-5 w-5" />
-              </div>
-              <h2 className="text-xl font-black text-slate-900">آخر النشاطات</h2>
-            </div>
-          </div>
-          <div className="space-y-3">
-            {recentActivities.length === 0 ? (
-              <div className="text-center py-10 text-slate-400 font-bold">لا توجد نشاطات حديثة</div>
-            ) : recentActivities.map((activity, i) => (
-              <Link key={i} href={activity.href}>
-                <motion.div whileHover={{ x: -4 }}
-                  className="flex items-center gap-4 p-3 sm:p-4 rounded-3xl hover:bg-slate-50 transition-all border border-transparent hover:border-slate-100 group cursor-pointer"
-                >
-                  <div className={`h-10 w-10 sm:h-12 sm:w-12 rounded-2xl flex items-center justify-center font-black shrink-0 ${activity.color} group-hover:scale-105 transition-transform shadow-sm`}>
-                    {activity.title[0]}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-bold text-slate-900 group-hover:text-indigo-600 transition-colors truncate">{activity.title}</p>
-                    <p className="text-xs text-slate-400 mt-0.5">{formatTime(activity.time)}</p>
-                  </div>
-                  <ArrowUpRight className="h-4 w-4 text-slate-300 opacity-0 group-hover:opacity-100 shrink-0" />
-                </motion.div>
+          <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+          <div>
+            <p className="font-black text-amber-800 text-sm">⚠️ واجبات تنتهي غداً!</p>
+            {dueTomorrow.map(a => (
+              <Link key={a.id} href={`/assignments/${a.id}`}
+                className="block text-xs text-amber-700 font-bold mt-1 hover:underline"
+              >
+                • {a.title} — {a.subject?.name} — {format(new Date(a.due_date), "h:mm a", { locale: arSA })}
               </Link>
             ))}
           </div>
         </motion.div>
+      )}
 
-        {/* الجانب الأيمن */}
-        <div className="space-y-6">
-          <AnnouncementsWidget role="admin" />
-
-          {/* الحصص الحية */}
-          <motion.div variants={itemVariants}
-            className="bg-gradient-to-br from-red-600 to-rose-700 rounded-[2.5rem] p-5 shadow-xl shadow-red-200 text-white relative overflow-hidden"
-          >
-            <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16 blur-2xl" />
-            <div className="relative z-10">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="h-10 w-10 rounded-2xl bg-white/20 flex items-center justify-center">
-                  <Radio className="h-5 w-5 text-white" />
-                </div>
-                <div>
-                  <div className="font-black text-base">الحصص الحية</div>
-                  <div className="text-red-200 text-xs font-bold">للمراقبين التربويين</div>
-                </div>
-              </div>
-              <div className="bg-white/15 rounded-2xl px-3 py-2 mb-3 text-xs font-black text-white/90 truncate">
-                {typeof window !== "undefined" ? window.location.origin : "ehab2026.netlify.app"}/live
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => { if (typeof window !== "undefined") navigator.clipboard.writeText(window.location.origin + "/live"); }}
-                  className="flex-1 py-2.5 rounded-2xl bg-white text-red-600 text-xs font-black hover:bg-red-50 transition-all"
-                >
-                  📋 نسخ الرابط
-                </button>
-                <a href="/live" target="_blank"
-                  className="flex-1 py-2.5 rounded-2xl bg-white/20 text-white text-xs font-black hover:bg-white/30 transition-all text-center"
-                >
-                  🔗 فتح
-                </a>
-              </div>
+      {/* الحصة الحالية */}
+      {(currentLesson || nextLesson) && (
+        <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}
+          className={`rounded-2xl p-4 border flex items-center justify-between gap-4 ${
+            currentLesson
+              ? "bg-emerald-50 border-emerald-200"
+              : "bg-slate-50 border-slate-200"
+          }`}
+        >
+          <div className="flex items-center gap-3">
+            <div className={`h-10 w-10 rounded-2xl flex items-center justify-center ${
+              currentLesson ? "bg-emerald-500" : "bg-slate-300"
+            }`}>
+              {currentLesson ? <Zap className="h-5 w-5 text-white" /> : <Clock className="h-5 w-5 text-white" />}
             </div>
-          </motion.div>
+            <div>
+              <p className={`font-black text-sm ${currentLesson ? "text-emerald-800" : "text-slate-700"}`}>
+                {currentLesson ? "⚡ الحصة الحالية" : `التالية — ${(currentLesson || nextLesson)?.start_time?.slice(0,5)}`}
+              </p>
+              <p className={`text-xs font-bold ${currentLesson ? "text-emerald-600" : "text-slate-500"}`}>
+                {(currentLesson || nextLesson)?.subjects?.name}
+                {" — "}
+                أ. {(currentLesson || nextLesson)?.teachers?.users?.full_name}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {currentLesson && (
+              <span className="text-xs font-black text-emerald-700 bg-emerald-100 px-3 py-1.5 rounded-xl">
+                {currentLesson.remaining} دقيقة متبقية
+              </span>
+            )}
+            {(currentLesson || nextLesson)?.teachers?.zoom_link && (
+              <a href={(currentLesson || nextLesson).teachers.zoom_link} target="_blank" rel="noopener noreferrer"
+                className="text-xs font-black text-white bg-indigo-600 hover:bg-indigo-700 px-4 py-1.5 rounded-xl transition-all"
+              >
+                دخول Zoom
+              </a>
+            )}
+          </div>
+        </motion.div>
+      )}
 
-          {/* إجراءات سريعة */}
-          <motion.div variants={itemVariants}
-            className="bg-white/70 backdrop-blur-xl rounded-[2.5rem] p-6 shadow-sm ring-1 ring-slate-200/50"
-          >
-            <h2 className="text-lg font-black text-slate-900 mb-4">إجراءات سريعة</h2>
+      {/* روابط سريعة */}
+      <div className="grid grid-cols-4 gap-3">
+        {[
+          { label: "الجدول",      icon: Calendar, href: "/schedules",  color: "text-indigo-600",  bg: "bg-indigo-50"  },
+          { label: "الاختبارات", icon: FileText,  href: "/exams",      color: "text-emerald-600", bg: "bg-emerald-50" },
+          { label: "الواجبات",   icon: BookOpen,  href: "/assignments", color: "text-amber-600",   bg: "bg-amber-50"   },
+          { label: "التنبيهات",  icon: Bell,      href: "/messages",   color: "text-sky-600",     bg: "bg-sky-50"     },
+        ].map(a => (
+          <Link key={a.label} href={a.href} className="group">
+            <div className="p-3 sm:p-4 rounded-2xl bg-white border border-slate-100 shadow-sm hover:shadow-md hover:border-indigo-100 transition-all flex flex-col sm:flex-row items-center gap-2">
+              <div className={`p-2 rounded-xl ${a.bg} group-hover:scale-110 transition-transform`}>
+                <a.icon className={`h-4 w-4 sm:h-5 sm:w-5 ${a.color}`} />
+              </div>
+              <span className="font-bold text-slate-900 group-hover:text-indigo-600 transition-colors text-xs sm:text-sm">{a.label}</span>
+            </div>
+          </Link>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* العمود الرئيسي */}
+        <div className="lg:col-span-2 space-y-6">
+
+          {/* الرسم البياني */}
+          <div className="rounded-3xl bg-white/80 backdrop-blur-xl p-6 shadow-sm ring-1 ring-slate-200/50">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-xl font-black text-slate-900 flex items-center gap-2">
+                <div className="p-2 bg-indigo-50 rounded-xl">
+                  <TrendingUp className="h-5 w-5 text-indigo-600" />
+                </div>
+                تطور المستوى الأكاديمي
+              </h2>
+              {classAvg > 0 && (
+                <div className={`text-xs font-black px-3 py-1.5 rounded-xl ${
+                  avgScore >= classAvg ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"
+                }`}>
+                  معدل الفصل: {classAvg}%
+                </div>
+              )}
+            </div>
+            <div className="h-[250px] w-full">
+              {allGrades.length > 1 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={allGrades.slice(0, 8).reverse()}>
+                    <defs>
+                      <linearGradient id="colorScore" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%"  stopColor="#4f46e5" stopOpacity={0.2}/>
+                        <stop offset="95%" stopColor="#4f46e5" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                    <XAxis dataKey="exam.title" axisLine={false} tickLine={false}
+                      tick={{ fill: "#94a3b8", fontSize: 10 }} dy={8}
+                      tickFormatter={(v: string) => v?.slice(0, 10) || ""}
+                    />
+                    <YAxis axisLine={false} tickLine={false}
+                      tick={{ fill: "#94a3b8", fontSize: 11 }} domain={[0, 100]}
+                    />
+                    <Tooltip contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 10px 25px -5px rgb(0 0 0/0.1)" }} />
+                    {classAvg > 0 && (
+                      <Area type="monotone" dataKey={() => classAvg}
+                        stroke="#e2e8f0" strokeWidth={1.5} strokeDasharray="4 4"
+                        fill="transparent" name="معدل الفصل"
+                      />
+                    )}
+                    <Area type="monotone" dataKey="score" stroke="#4f46e5" strokeWidth={3}
+                      fillOpacity={1} fill="url(#colorScore)" name="درجتك"
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-full flex flex-col items-center justify-center text-slate-400 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                  <BarChart2 className="h-10 w-10 text-slate-200 mb-3" />
+                  <p className="font-bold text-sm">لا توجد بيانات كافية بعد</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* آخر النتائج */}
+          <div className="rounded-3xl bg-white/80 backdrop-blur-xl p-6 shadow-sm ring-1 ring-slate-200/50">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-xl font-black text-slate-900 flex items-center gap-2">
+                <div className="p-2 bg-emerald-50 rounded-xl">
+                  <Award className="h-5 w-5 text-emerald-600" />
+                </div>
+                آخر النتائج
+              </h2>
+              <Link href="/exams"
+                className="text-sm font-bold text-emerald-600 hover:text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-lg hover:bg-emerald-100 transition-colors flex items-center gap-1"
+              >
+                كل الاختبارات <ChevronLeft className="h-4 w-4" />
+              </Link>
+            </div>
+            <div className="space-y-3">
+              {allGrades.slice(0, 5).length > 0 ? allGrades.slice(0, 5).map(grade => (
+                <div key={grade.id}
+                  className="flex items-center justify-between p-4 rounded-2xl bg-white border border-slate-100 shadow-sm hover:shadow-md transition-all"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`h-10 w-10 rounded-xl flex items-center justify-center shadow-sm ${
+                      grade.score >= 80 ? "bg-emerald-50 text-emerald-600"
+                      : grade.score >= 60 ? "bg-amber-50 text-amber-600"
+                      : "bg-red-50 text-red-600"
+                    }`}>
+                      {grade.score >= 60 ? <CheckCircle2 className="h-5 w-5" /> : <XCircle className="h-5 w-5" />}
+                    </div>
+                    <div>
+                      <p className="font-bold text-slate-900 text-sm">{grade.exam?.title}</p>
+                      <p className="text-xs text-slate-400">{grade.exam?.subject?.name}</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className={`text-lg font-black ${
+                      grade.score >= 80 ? "text-emerald-600"
+                      : grade.score >= 60 ? "text-amber-600" : "text-red-600"
+                    }`}>{grade.score}%</p>
+                    {classAvg > 0 && (
+                      <p className={`text-[10px] font-bold ${grade.score >= classAvg ? "text-emerald-500" : "text-red-400"}`}>
+                        {grade.score >= classAvg ? `↑ +${grade.score - classAvg}` : `↓ ${grade.score - classAvg}`} عن الفصل
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )) : (
+                <div className="text-center py-10 text-slate-400 bg-slate-50 rounded-2xl border border-dashed border-slate-200 font-bold text-sm">
+                  لا توجد نتائج اختبارات حالياً
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* الشريط الجانبي */}
+        <div className="space-y-6">
+          <AnnouncementsWidget role="student" />
+
+          {/* ملخص الحضور */}
+          <div className="rounded-3xl bg-white/80 backdrop-blur-xl p-6 shadow-sm ring-1 ring-slate-200/50">
+            <h2 className="text-lg font-black text-slate-900 mb-4 flex items-center gap-2">
+              <div className="p-2 bg-indigo-50 rounded-xl">
+                <Calendar className="h-5 w-5 text-indigo-600" />
+              </div>
+              ملخص الحضور
+              {perfectAttendance && (
+                <span className="text-xs font-black text-amber-600 bg-amber-50 border border-amber-100 px-2 py-0.5 rounded-full flex items-center gap-1">
+                  <Star className="h-3 w-3" /> مثالي
+                </span>
+              )}
+            </h2>
             <div className="grid grid-cols-2 gap-3">
               {[
-                { name: "إضافة طالب",     icon: Users,         href: "/students",      color: "text-indigo-600",  bg: "bg-indigo-50"  },
-                { name: "إضافة معلم",     icon: GraduationCap, href: "/teachers",      color: "text-emerald-600", bg: "bg-emerald-50" },
-                { name: "تقرير المعلمين", icon: FileText,      href: "/admin/teachers-report",  color: "text-amber-600",   bg: "bg-amber-50"   },
-                { name: "إرسال إعلان",    icon: Bell,          href: "/announcements", color: "text-sky-600",     bg: "bg-sky-50"     },
-              ].map(action => (
-                <Link key={action.name} href={action.href}
-                  className="flex flex-col items-center justify-center p-4 rounded-3xl bg-slate-50/50 hover:bg-white hover:shadow-md hover:ring-1 hover:ring-slate-200 transition-all group"
-                >
-                  <div className={`p-3 rounded-2xl ${action.bg} ${action.color} mb-2 group-hover:scale-110 transition-transform`}>
-                    <action.icon className="h-5 w-5" />
-                  </div>
-                  <span className="text-[11px] font-bold text-slate-700 group-hover:text-indigo-600 transition-colors text-center leading-tight">{action.name}</span>
-                </Link>
+                { label: "حضور",  val: attendanceStats?.present || 0, color: "emerald" },
+                { label: "غياب",  val: attendanceStats?.absent  || 0, color: "red"     },
+                { label: "تأخير", val: attendanceStats?.late    || 0, color: "amber"   },
+                { label: "إجمالي",val: attendanceStats?.total   || 0, color: "sky"     },
+              ].map(item => (
+                <div key={item.label} className={`p-4 rounded-2xl bg-${item.color}-50 border border-${item.color}-100 flex flex-col items-center`}>
+                  <p className={`text-[10px] text-${item.color}-600 font-black uppercase tracking-wider`}>{item.label}</p>
+                  <p className={`text-3xl font-black text-${item.color}-700 mt-1`}>{item.val}</p>
+                </div>
               ))}
             </div>
-          </motion.div>
+          </div>
+
+          {/* الواجبات القادمة */}
+          <div className="rounded-3xl bg-white/80 backdrop-blur-xl p-6 shadow-sm ring-1 ring-slate-200/50">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-lg font-black text-slate-900 flex items-center gap-2">
+                <div className="p-2 bg-amber-50 rounded-xl">
+                  <Target className="h-5 w-5 text-amber-500" />
+                </div>
+                الواجبات
+              </h2>
+              {unsubmittedCount > 0 && (
+                <span className="text-xs font-black text-red-600 bg-red-50 border border-red-100 px-2 py-1 rounded-xl">
+                  {unsubmittedCount} غير مسلّم
+                </span>
+              )}
+            </div>
+            <div className="space-y-3">
+              {upcomingAssignments.length > 0 ? upcomingAssignments.map(a => {
+                const submitted = submittedIds.has(a.id);
+                const overdue   = new Date(a.due_date) < now;
+                return (
+                  <Link href={`/assignments/${a.id}`} key={a.id} className="block group">
+                    <div className={`p-3 rounded-2xl border transition-all hover:shadow-sm ${
+                      submitted ? "bg-emerald-50/50 border-emerald-100" :
+                      overdue   ? "bg-red-50/50 border-red-100"         :
+                                  "bg-white border-slate-100 hover:border-amber-200"
+                    }`}>
+                      <div className="flex items-center justify-between mb-1">
+                        <p className="font-bold text-slate-900 group-hover:text-amber-600 transition-colors text-sm line-clamp-1">{a.title}</p>
+                        {submitted ? (
+                          <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
+                        ) : (
+                          <span className="text-[10px] font-black text-amber-700 bg-amber-50 px-2 py-0.5 rounded-lg whitespace-nowrap">
+                            {format(new Date(a.due_date), "d MMM", { locale: arSA })}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-slate-400">{a.subject?.name}</p>
+                    </div>
+                  </Link>
+                );
+              }) : (
+                <div className="text-center py-6 text-slate-400 text-sm bg-slate-50 rounded-2xl border border-dashed border-slate-200 font-bold">
+                  لا توجد واجبات قادمة
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* الاختبارات القادمة */}
+          <div className="rounded-3xl bg-white/80 backdrop-blur-xl p-6 shadow-sm ring-1 ring-slate-200/50">
+            <h2 className="text-lg font-black text-slate-900 mb-4 flex items-center gap-2">
+              <div className="p-2 bg-indigo-50 rounded-xl">
+                <FileText className="h-5 w-5 text-indigo-600" />
+              </div>
+              اختبارات قادمة
+            </h2>
+            <div className="space-y-3">
+              {upcomingExams.length > 0 ? upcomingExams.map(exam => (
+                <Link href={`/exams`} key={exam.id} className="block group">
+                  <div className="p-3 rounded-2xl border border-slate-100 hover:border-indigo-200 hover:shadow-sm transition-all bg-white">
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="font-bold text-slate-900 group-hover:text-indigo-600 transition-colors text-sm line-clamp-1">{exam.title}</p>
+                      <Clock className="h-4 w-4 text-indigo-400 shrink-0" />
+                    </div>
+                    <p className="text-xs text-slate-400 mb-2">{exam.subject?.name}</p>
+                    <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400 bg-slate-50 px-2 py-1.5 rounded-lg">
+                      <Calendar className="h-3 w-3 text-indigo-400" />
+                      {format(new Date(exam.exam_date), "EEEE، d MMMM", { locale: arSA })}
+                      {exam.start_time && ` — ${exam.start_time.slice(0,5)}`}
+                    </div>
+                  </div>
+                </Link>
+              )) : (
+                <div className="text-center py-6 text-slate-400 text-sm bg-slate-50 rounded-2xl border border-dashed border-slate-200 font-bold">
+                  لا توجد اختبارات مجدولة
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </motion.div>

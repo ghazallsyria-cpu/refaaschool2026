@@ -11,7 +11,7 @@ export default function LivePage() {
   const cache = useRef<any>({});
   const lastFetchedPeriod = useRef<number | null>(null);
 
-  // ===== دوال =====
+  // ===== الدوال =====
 
   async function fetchPeriods() {
     const { data } = await supabase
@@ -61,27 +61,68 @@ export default function LivePage() {
     setLiveClasses(classes);
   }
 
+  // ===== تحديد الحصة الحالية =====
+
+  function calculateCurrentPeriod() {
+    const now = new Date();
+    const minutes = now.getHours() * 60 + now.getMinutes();
+
+    return periods.find((p) => {
+      const start = p.start_minutes;
+      const end = p.end_minutes;
+      return minutes >= start && minutes < end;
+    });
+  }
+
   // ===== effects =====
 
   useEffect(() => {
-    const load = async () => {
-      await fetchPeriods();
-    };
-    load();
+    fetchPeriods();
   }, []);
 
   useEffect(() => {
-    if (!currentPeriod) return;
+    if (periods.length === 0) return;
 
-    if (lastFetchedPeriod.current === currentPeriod.period_number) return;
+    const interval = setInterval(() => {
+      const current = calculateCurrentPeriod();
 
-    lastFetchedPeriod.current = currentPeriod.period_number;
+      if (!current) return;
 
-    const load = async () => {
-      await fetchLiveClasses(currentPeriod.period_number);
-    };
-    load();
-  }, [currentPeriod]);
+      if (
+        lastFetchedPeriod.current === current.period_number
+      ) return;
 
-  return null;
+      lastFetchedPeriod.current = current.period_number;
+      setCurrentPeriod(current);
+
+      fetchLiveClasses(current.period_number);
+    }, 30000); // تحديث كل 30 ثانية
+
+    return () => clearInterval(interval);
+  }, [periods]);
+
+  // ===== UI =====
+
+  return (
+    <div style={{ padding: 20 }}>
+      <h1>Live Classes</h1>
+
+      {!currentPeriod && <p>لا توجد حصة حالياً</p>}
+
+      {liveClasses.map((cls) => (
+        <div key={cls.id} style={{ marginBottom: 10 }}>
+          <div><strong>{cls.subjectName}</strong></div>
+          <div>{cls.teacherName}</div>
+          <div>{cls.sectionName}</div>
+          <div>{cls.className}</div>
+
+          {cls.zoomLink && (
+            <a href={cls.zoomLink} target="_blank">
+              دخول
+            </a>
+          )}
+        </div>
+      ))}
+    </div>
+  );
 }

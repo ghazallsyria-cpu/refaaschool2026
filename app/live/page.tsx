@@ -11,18 +11,18 @@ export default function LivePage() {
   const cache = useRef<any>({});
   const lastFetchedPeriod = useRef<number | null>(null);
 
-  // ===== الدوال (فوق useEffect) =====
+  // ===== دوال =====
 
-  const fetchPeriods = async () => {
+  async function fetchPeriods() {
     const { data } = await supabase
       .from("class_periods")
       .select("*")
       .order("period_number");
 
     setPeriods(data || []);
-  };
+  }
 
-  const fetchLiveClasses = async (periodNum: number) => {
+  async function fetchLiveClasses(periodNum: number) {
     if (cache.current[periodNum]) {
       setLiveClasses(cache.current[periodNum]);
       return;
@@ -59,12 +59,15 @@ export default function LivePage() {
 
     cache.current[periodNum] = classes;
     setLiveClasses(classes);
-  };
+  }
 
   // ===== effects =====
 
   useEffect(() => {
-    fetchPeriods();
+    const load = async () => {
+      await fetchPeriods();
+    };
+    load();
   }, []);
 
   useEffect(() => {
@@ -73,8 +76,11 @@ export default function LivePage() {
     if (lastFetchedPeriod.current === currentPeriod.period_number) return;
 
     lastFetchedPeriod.current = currentPeriod.period_number;
-    fetchLiveClasses(currentPeriod.period_number);
 
+    const load = async () => {
+      await fetchLiveClasses(currentPeriod.period_number);
+    };
+    load();
   }, [currentPeriod]);
 
   return null;

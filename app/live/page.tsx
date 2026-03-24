@@ -94,18 +94,7 @@ export default function LiveMonitorPage() {
     ? `${dbDay}-${currentPeriod.period_number}`
     : null;
 
-  /* ================= تنظيف الحالة (مفصول لتجنب الخطأ) ================= */
-
-  useEffect(() => {
-    if (!currentPeriod || dbDay === -1) {
-      if (liveClasses.length !== 0) {
-        setLiveClasses([]);
-      }
-      lastKey.current = null;
-    }
-  }, [currentPeriod, dbDay]);
-
-  /* ================= Data Fetch ================= */
+  /* ================= Fetch Data ================= */
 
   useEffect(() => {
     if (!currentPeriod || dbDay === -1) return;
@@ -136,7 +125,6 @@ export default function LiveMonitorPage() {
 
       if (error) {
         setError("فشل تحميل الحصص المباشرة");
-        setLiveClasses([]);
         return;
       }
 
@@ -187,13 +175,13 @@ export default function LiveMonitorPage() {
         </div>
       )}
 
-      {currentPeriod && liveClasses.length === 0 && (
+      {currentPeriod && dbDay !== -1 && liveClasses.length === 0 && (
         <div className="p-4 bg-white/10 rounded-xl">
           لا توجد حصص مسجلة لهذه الفترة
         </div>
       )}
 
-      {currentPeriod && liveClasses.length > 0 && (
+      {currentPeriod && dbDay !== -1 && liveClasses.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {liveClasses.map((c) => (
             <div key={c.id} className="p-4 bg-white/10 rounded-xl">

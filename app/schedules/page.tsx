@@ -403,13 +403,19 @@ export default function SchedulesPage() {
               </button>
             </div>
           </Dialog.Content>
-        </Dialog.Portal>
-      </Dialog.Root>
+</Dialog.Portal>
+	      </Dialog.Root>}
 
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">الجدول الدراسي</h1>
-          <p className="text-slate-500">إدارة الجداول الدراسية للفصول والشعب</p>
+          {userRole === 'student' ? (
+            <h1 className="text-2xl font-bold text-slate-900">جدولي الدراسي</h1>
+          ) : (
+            <>
+              <h1 className="text-2xl font-bold text-slate-900">الجدول الدراسي</h1>
+              <p className="text-slate-500">إدارة الجداول الدراسية للفصول والشعب</p>
+            </>
+          )}
         </div>
       </div>
 
@@ -505,8 +511,7 @@ export default function SchedulesPage() {
       )}
 
       {!isTeacher && <div className="bg-white p-4 rounded-xl shadow-sm ring-1 ring-slate-200">
-        <div className="flex flex-col sm:flex-row items-center gap-4">
-          {userRole === 'student' ? (
+{userRole === 'student' ? (
             <div className="flex items-center gap-3">
               <span className="text-sm font-medium text-slate-700">فصلك الدراسي:</span>
               <span className="bg-indigo-50 text-indigo-700 font-black px-4 py-2 rounded-xl text-sm border border-indigo-100">
@@ -514,7 +519,7 @@ export default function SchedulesPage() {
               </span>
             </div>
           ) : (
-            <>
+            <div className="flex flex-col sm:flex-row items-center gap-4">
               <label className="text-sm font-medium text-slate-700 whitespace-nowrap">
                 اختر الشعبة:
               </label>
@@ -534,9 +539,8 @@ export default function SchedulesPage() {
                   ))
                 )}
               </select>
-            </>
+            </div>
           )}
-        </div>
       </div>}
 
       {!isTeacher && <div className="bg-white rounded-xl shadow-sm ring-1 ring-slate-200 overflow-hidden">
@@ -577,7 +581,7 @@ export default function SchedulesPage() {
                       return (
                         <td 
                           key={`${day.id}-${period.period_number}`} 
-                          className={`relative p-2 border-l border-slate-200 h-24 align-top group transition-colors ${
+className={`relative p-2 border-l border-slate-200 h-24 align-top group transition-colors ${
                             userRole === 'admin' || userRole === 'management'
                               ? 'cursor-pointer hover:bg-indigo-50/50'
                               : cellData && (cellData as any).teachers?.zoom_link
@@ -675,8 +679,8 @@ export default function SchedulesPage() {
         )}
       </div>}
 
-      {/* Add/Edit Schedule Modal */}
-      <Dialog.Root open={isModalOpen} onOpenChange={setIsModalOpen}>
+{/* Add/Edit Schedule Modal - Only for Admin/Management */}
+      {(userRole === 'admin' || userRole === 'management') && <Dialog.Root open={isModalOpen} onOpenChange={setIsModalOpen}>
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-40" />
           <Dialog.Content className="fixed left-[50%] top-[50%] z-50 w-full max-w-md translate-x-[-50%] translate-y-[-50%] rounded-xl bg-white p-6 shadow-lg focus:outline-none" dir="rtl">

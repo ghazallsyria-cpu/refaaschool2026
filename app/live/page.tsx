@@ -3,9 +3,6 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
 import { School } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 
 /* ================= Helpers ================= */
 
@@ -144,78 +141,97 @@ export default function LiveMonitorPage() {
   /* ================= UI ================= */
 
   return (
-    <div className="min-h-screen bg-slate-900 text-white p-6" dir="rtl">
+    <div dir="rtl" className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 text-white p-6">
 
       {/* Header */}
-      <div className="flex justify-between items-center mb-6">
-        <div className="flex items-center gap-2">
-          <School />
-          <span className="font-bold">مدرسة الرفعة</span>
+      <div className="flex justify-between items-center mb-8">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-white/10 rounded-xl">
+            <School size={20} />
+          </div>
+          <div className="text-lg font-bold">مدرسة الرفعة</div>
         </div>
 
-        <div className="text-sm opacity-80">
-          {now.toLocaleTimeString("ar")}
+        <div className="text-sm opacity-70">
+          {now.toLocaleTimeString("ar-KW", {
+            hour: "2-digit",
+            minute: "2-digit",
+          })}
         </div>
       </div>
 
-      {/* Status Card */}
-      <Card className="mb-6">
-        <CardContent className="p-6 text-center">
+      {/* Status */}
+      <div className="mb-8 p-6 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-xl shadow-xl">
 
-          {currentPeriod && (
-            <>
-              <Badge className="mb-2">
-                الحصة {currentPeriod.period_number}
-              </Badge>
+        {currentPeriod && (
+          <div className="text-center space-y-3">
+            <div className="text-3xl font-bold text-green-400">
+              الحصة {currentPeriod.period_number}
+            </div>
 
-              <div className="text-lg font-bold">
-                {currentPeriod.start_time} → {currentPeriod.end_time}
-              </div>
+            <div className="text-sm opacity-70">
+              {currentPeriod.start_time} → {currentPeriod.end_time}
+            </div>
 
-              <Progress value={progress * 100} className="mt-4" />
-            </>
-          )}
+            {/* Progress */}
+            <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden mt-4">
+              <div
+                className="h-full bg-green-400 transition-all duration-500"
+                style={{ width: `${Math.min(progress * 100, 100)}%` }}
+              />
+            </div>
+          </div>
+        )}
 
-          {!currentPeriod && isBreak && (
-            <>
-              <Badge variant="secondary" className="mb-2">
-                استراحة
-              </Badge>
-            </>
-          )}
+        {!currentPeriod && isBreak && (
+          <div className="text-center space-y-2">
+            <div className="text-2xl font-bold text-yellow-400">
+              استراحة
+            </div>
+            <div className="text-sm opacity-70">
+              سيتم الانتقال للحصة القادمة قريبًا
+            </div>
+          </div>
+        )}
 
-          {!currentPeriod && !isBreak && (
-            <>
-              <Badge variant="destructive" className="mb-2">
-                انتهى الدوام
-              </Badge>
-            </>
-          )}
+        {!currentPeriod && !isBreak && (
+          <div className="text-center space-y-2">
+            <div className="text-2xl font-bold text-red-400">
+              انتهى الدوام
+            </div>
+            <div className="text-sm opacity-70">
+              لا توجد حصص حالياً
+            </div>
+          </div>
+        )}
 
-        </CardContent>
-      </Card>
+      </div>
 
       {/* Classes */}
       {currentPeriod && (
-        <div className="grid md:grid-cols-3 gap-4">
+        <div className="grid gap-4 md:grid-cols-3">
           {classes.map((c) => (
-            <Card key={c.id}>
-              <CardContent className="p-4 space-y-1">
-                <div className="font-bold">{c.subjectName}</div>
-                <div className="text-sm opacity-70">
-                  {c.teacherName}
-                </div>
-                <div className="text-sm opacity-70">
-                  {c.className}
-                </div>
-              </CardContent>
-            </Card>
+            <div
+              key={c.id}
+              className="p-5 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 transition"
+            >
+              <div className="font-bold text-lg mb-2">
+                {c.subjectName}
+              </div>
+              <div className="text-sm opacity-70">
+                {c.teacherName}
+              </div>
+              <div className="text-sm opacity-70">
+                {c.className}
+              </div>
+            </div>
           ))}
         </div>
       )}
 
+      {/* Error */}
       {error && (
-        <div className="mt-4 text-red-400 text-sm">
+        <div className="mt-6 text-red-400 text-sm">
           {error}
         </div>
       )}

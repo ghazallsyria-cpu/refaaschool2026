@@ -42,6 +42,13 @@ export default function ExamsDashboard() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [userRole, setUserRole] = useState<string | null>(null);
+  const [now, setNow] = useState(new Date());
+
+  // تحديث كل دقيقة لإظهار الاختبار فوراً عند بدء وقته
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 30000);
+    return () => clearInterval(timer);
+  }, []);
   const [examToDelete, setExamToDelete] = useState<string | null>(null);
 
   const fetchExams = useCallback(async () => {
@@ -214,7 +221,6 @@ export default function ExamsDashboard() {
   const getExamStatus = (exam: Exam) => {
     if (exam.status !== 'published') return null;
     
-    const now = new Date();
     const examDate = new Date(exam.exam_date);
     
     const startTimeParts = (exam.start_time || '00:00').split(':');

@@ -1,8 +1,20 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { supabase } from "@/lib/supabase";
+import { 
+  Video, 
+  Clock, 
+  User, 
+  BookOpen, 
+  ExternalLink, 
+  Calendar,
+  AlertCircle,
+  Zap,
+  CheckCircle2,
+  School
+} from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import { Clock, BookOpen, Users, GraduationCap, School, Zap, ChevronLeft, ChevronRight } from "lucide-react";
 
 const DAY_MAP: Record<number, string> = {
   0: "الأحد", 1: "الاثنين", 2: "الثلاثاء",
@@ -15,378 +27,286 @@ const MONTH_MAP: Record<number, string> = {
   8: "سبتمبر", 9: "أكتوبر", 10: "نوفمبر", 11: "ديسمبر"
 };
 
-function timeToMinutes(time: string): number {
-  if (!time) return 0;
-  const [h, m] = time.split(":").map(Number);
-  return h * 60 + m;
-}
-
-interface LiveClass {
-  id: string;
-  teacherName: string;
-  sectionName: string;
-  className: string;
-  subjectName: string;
-  periodNumber: number;
-  zoomLink: string | null;
-}
-
-interface Period {
-  id: string;
-  period_number: number;
-  start_time: string;
-  end_time: string;
-}
-
-export default function LiveMonitorPage() {
-  const [now, setNow] = useState(new Date());
-  const [periods, setPeriods] = useState<Period[]>([]);
-  const [currentPeriod, setCurrentPeriod] = useState<Period | null>(null);
-  const [nextPeriod, setNextPeriod] = useState<Period | null>(null);
-  const [liveClasses, setLiveClasses] = useState<LiveClass[]>([]);
+export default function LiveClassesPage() {
+  const [liveClasses, setLiveClasses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [countdown, setCountdown] = useState("");
+  const [now, setNow] = useState(new Date());
+  const [studentInfo, setStudentInfo] = useState<any>(null);
 
-  // تحديث الوقت كل ثانية
+  // تحديث الوقت كل ثانية لضمان دقة العداد
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
 
-  // جلب البيانات عند التحميل
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  // تحديث الحصة الحالية عند تغير الوقت
-  useEffect(() => {
-    updateCurrentPeriod();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [now, periods]);
-
-  const fetchData = async () => {
+  const fetchLiveClasses = useCallback(async () => {
     try {
-      // API route يستخدم service role — لا يحتاج تسجيل دخول
-      const res = await fetch('/api/live');
-      const data = await res.json();
-      setPeriods(data.periods || []);
-    } catch (e) {
-      console.error(e);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: student } = await supabase
+        .from("students")
+        .select("section_id, sections(name, classes(name))")
+        .eq("id", user.id)
+        .single();
+
+      setStudentInfo(student);
+
+      if (!student?.section_id) return;
+
+      const jsDay = now.getDay();
+      const dbDay = jsDay === 0 ? 1 : jsDay === 1 ? 2 : jsDay === 2 ? 3 :
+                    jsDay === 3 ? 4 : jsDay === 4 ? 5 : 0;
+
+      if (dbDay === 0) {
+        setLiveClasses([]);
+        return;
+      }
+
+      const { data: scheduleData } = await supabase
+        .from("schedules")
+        .select(`
+          id,
+          period,
+          day_of_week,
+          subjects(name),
+          teachers(zoom_link, users:teacher_id(full_name))
+        `)
+        .eq("section_id", student.section_id)
+        .eq("day_of_week", dbDay);
+
+      const { data: periodsData } = await supabase
+        .from("class_periods")
+        .select("period_number, start_time, end_time")
+        .order("period_number");
+
+      if (!scheduleData || !periodsData) {
+        setLiveClasses([]);
+        return;
+      }
+
+      const nowMinutes = now.getHours() * 60 + now.getMinutes();
+
+      const processedClasses = scheduleData.map(item => {
+        const periodInfo = periodsData.find(p => p.period_number === item.period);
+        if (!periodInfo) return null;
+
+        const [startH, startM] = periodInfo.start_time.split(":").map(Number);
+        const [endH, endM] = periodInfo.end_time.split(":").map(Number);
+        const startTotal = startH * 60 + startM;
+        const endTotal = endH * 60 + endM;
+
+        let status: 'live' | 'upcoming' | 'past' = 'past';
+        if (nowMinutes >= startTotal && nowMinutes < endTotal) status = 'live';
+        else if (nowMinutes < startTotal) status = 'upcoming';
+
+        return {
+          ...item,
+          start_time: periodInfo.start_time.slice(0, 5),
+          end_time: periodInfo.end_time.slice(0, 5),
+          startTotal,
+          endTotal,
+          status
+        };
+      }).filter(Boolean) as any[];
+
+      processedClasses.sort((a, b) => a.startTotal - b.startTotal);
+      setLiveClasses(processedClasses);
+
+    } catch (error) {
+      console.error("Error fetching live classes:", error);
     } finally {
       setLoading(false);
     }
+  }, [now]);
+
+  useEffect(() => {
+    fetchLiveClasses();
+  }, [fetchLiveClasses]);
+
+  const getCountdown = (endTotal: number) => {
+    const nowMinutes = now.getHours() * 60 + now.getMinutes();
+    const diff = endTotal - nowMinutes;
+    if (diff <= 0) return "انتهت";
+    const secs = 60 - now.getSeconds();
+    return `${diff - 1}:${secs.toString().padStart(2, "0")}`;
   };
 
-  const updateCurrentPeriod = () => {
-    if (periods.length === 0) return;
-    const nowMin = now.getHours() * 60 + now.getMinutes();
-    
-    const current = periods.find(p =>
-      nowMin >= timeToMinutes(p.start_time) && nowMin < timeToMinutes(p.end_time)
-    ) || null;
+  if (loading) {
+    return (
+      <div className="flex h-[60vh] items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-4 border-indigo-600 border-t-transparent" />
+      </div>
+    );
+  }
 
-    const next = periods.find(p => timeToMinutes(p.start_time) > nowMin) || null;
-
-    setCurrentPeriod(current);
-    setNextPeriod(next);
-
-    // حساب العد التنازلي
-    if (current) {
-      const endMin = timeToMinutes(current.end_time);
-      const rem = endMin - nowMin;
-      const secs = 60 - now.getSeconds();
-      setCountdown(`${rem > 0 ? rem - 1 : 0}:${secs.toString().padStart(2, "0")}`);
-    } else if (next) {
-      const startMin = timeToMinutes(next.start_time);
-      const rem = startMin - nowMin;
-      const secs = 60 - now.getSeconds();
-      setCountdown(`${rem > 0 ? rem - 1 : 0}:${secs.toString().padStart(2, "0")}`);
-    }
-
-    // جلب الحصص الحالية
-    if (current) {
-      fetchLiveClasses(current.period_number);
-    } else {
-      setLiveClasses([]);
-    }
-  };
-
-  const fetchLiveClasses = async (periodNum: number) => {
-    try {
-      // API route يستخدم service role — يعمل بدون تسجيل دخول
-      const res = await fetch('/api/live');
-      const data = await res.json();
-      const schedules = data.schedules || [];
-
-      const classes: LiveClass[] = schedules
-        .filter((s: any) => s.period === periodNum)
-        .map((s: any) => ({
-          id: s.id,
-          teacherName: s.teachers?.users?.full_name || "غير محدد",
-          sectionName: s.sections?.name || "غير محدد",
-          className: s.sections?.classes?.name || "غير محدد",
-          subjectName: s.subjects?.name || "غير محدد",
-          periodNumber: periodNum,
-          zoomLink: s.teachers?.zoom_link || null,
-        }));
-
-      setLiveClasses(classes);
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const nowMin = now.getHours() * 60 + now.getMinutes();
+  const activeClasses = liveClasses.filter(c => c.status === 'live');
+  const upcomingClasses = liveClasses.filter(c => c.status === 'upcoming');
   const dayName = DAY_MAP[now.getDay()];
   const dateStr = `${now.getDate()} ${MONTH_MAP[now.getMonth()]} ${now.getFullYear()}`;
-  const timeStr = now.toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-
-  const isWorkDay = now.getDay() >= 0 && now.getDay() <= 4;
-  const beforeSchool = nowMin < timeToMinutes(periods[0]?.start_time || "09:00");
-  const afterSchool = nowMin >= timeToMinutes(periods[periods.length - 1]?.end_time || "12:35");
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-white" dir="rtl">
-      
-      {/* Header */}
-      <div className="border-b border-white/10 bg-white/5 backdrop-blur-md">
-        <div className="max-w-7xl mx-auto px-4 sm:px-8 py-4 flex flex-col sm:flex-row items-center justify-between gap-4">
-          {/* School name */}
-          <div className="flex items-center gap-3">
-            <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-xl shadow-indigo-500/30">
-              <School className="h-7 w-7 text-white" />
-            </div>
-            <div>
-              <div className="font-black text-xl text-white">مدرسة الرفعة النموذجية</div>
-              <div className="text-[11px] text-indigo-300 font-bold uppercase tracking-widest">لوحة المراقبة الحية</div>
-            </div>
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="max-w-5xl mx-auto space-y-8 pb-12"
+      dir="rtl"
+    >
+      {/* Header Section */}
+      <div className="bg-white p-6 md:p-8 rounded-[2.5rem] shadow-sm border border-slate-100 flex flex-col md:flex-row justify-between items-center gap-6">
+        <div className="flex items-center gap-4">
+          <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-xl shadow-indigo-500/20">
+            <School className="h-8 w-8 text-white" />
           </div>
-
-          {/* Clock */}
-          <div className="flex items-center gap-6">
-            <div className="text-center">
-              <div className="text-3xl font-black text-white tabular-nums">{timeStr}</div>
-              <div className="text-xs text-indigo-300 font-bold mt-0.5">{dayName} — {dateStr}</div>
-            </div>
+          <div>
+            <h1 className="text-2xl font-black text-slate-900">الحصص الحية</h1>
+            <p className="text-slate-500 font-bold text-sm">{dayName} — {dateStr}</p>
           </div>
+        </div>
+        
+        <div className="flex flex-col items-center bg-slate-50 px-8 py-4 rounded-[2rem] border border-slate-100 min-w-[180px]">
+          <div className="flex items-center gap-2 text-indigo-600 mb-1">
+            <Clock className="h-4 w-4" />
+            <span className="text-[10px] font-black uppercase tracking-widest">الوقت الحالي</span>
+          </div>
+          <span className="text-2xl font-black text-slate-900 tabular-nums">
+            {now.toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+          </span>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-8 py-6 space-y-6">
-
-        {/* Period Status Bar */}
-        <div className={`rounded-3xl p-5 border flex flex-col sm:flex-row items-center justify-between gap-4 ${
-          currentPeriod
-            ? "bg-emerald-500/20 border-emerald-500/30"
-            : nextPeriod
-            ? "bg-amber-500/20 border-amber-500/30"
-            : "bg-slate-500/20 border-slate-500/30"
-        }`}>
-          <div className="flex items-center gap-4">
-            {currentPeriod ? (
-              <>
-                <div className="h-12 w-12 rounded-2xl bg-emerald-500 flex items-center justify-center shadow-lg shadow-emerald-500/30">
-                  <Zap className="h-6 w-6 text-white" />
-                </div>
-                <div>
-                  <div className="font-black text-xl text-emerald-300">
-                    الحصة {currentPeriod.period_number} — جارية الآن
-                  </div>
-                  <div className="text-sm text-emerald-400/80 font-bold">
-                    {currentPeriod.start_time?.slice(0,5)} — {currentPeriod.end_time?.slice(0,5)}
-                  </div>
-                </div>
-              </>
-            ) : nextPeriod && isWorkDay ? (
-              <>
-                <div className="h-12 w-12 rounded-2xl bg-amber-500 flex items-center justify-center shadow-lg shadow-amber-500/30">
-                  <Clock className="h-6 w-6 text-white" />
-                </div>
-                <div>
-                  <div className="font-black text-xl text-amber-300">
-                    استراحة — الحصة {nextPeriod.period_number} قادمة
-                  </div>
-                  <div className="text-sm text-amber-400/80 font-bold">
-                    تبدأ الساعة {nextPeriod.start_time?.slice(0,5)}
-                  </div>
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="h-12 w-12 rounded-2xl bg-slate-500 flex items-center justify-center">
-                  <Clock className="h-6 w-6 text-white" />
-                </div>
-                <div>
-                  <div className="font-black text-xl text-slate-300">
-                    {!isWorkDay ? "يوم إجازة" : afterSchool ? "انتهى الدوام" : "قبل بدء الدوام"}
-                  </div>
-                  <div className="text-sm text-slate-400 font-bold">لا توجد حصص جارية</div>
-                </div>
-              </>
-            )}
-          </div>
-
-          {/* Countdown */}
-          {(currentPeriod || nextPeriod) && isWorkDay && (
-            <div className="text-center bg-white/10 rounded-2xl px-6 py-3">
-              <div className="text-3xl font-black tabular-nums text-white">{countdown}</div>
-              <div className="text-[10px] font-bold text-white/60 uppercase tracking-widest mt-1">
-                {currentPeriod ? "متبقي" : "لبدء الحصة"}
-              </div>
-            </div>
-          )}
+      {/* Live Now Section */}
+      <section className="space-y-4">
+        <div className="flex items-center gap-2 px-2">
+          <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+          <h2 className="text-lg font-black text-slate-800">جارية الآن</h2>
         </div>
 
-        {/* Periods Timeline */}
-        <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-          {periods.map(p => {
-            const isNow = currentPeriod?.period_number === p.period_number;
-            const isPast = nowMin >= timeToMinutes(p.end_time);
-            return (
-              <div key={p.id} className={`flex-shrink-0 px-4 py-3 rounded-2xl border text-center min-w-[100px] transition-all ${
-                isNow
-                  ? "bg-emerald-500 border-emerald-400 shadow-lg shadow-emerald-500/30"
-                  : isPast
-                  ? "bg-white/5 border-white/10 opacity-50"
-                  : "bg-white/10 border-white/20"
-              }`}>
-                <div className={`text-xs font-black ${isNow ? "text-white" : "text-slate-300"}`}>
-                  الحصة {p.period_number}
-                  {isNow && <span className="mr-1">⚡</span>}
-                </div>
-                <div className={`text-[10px] font-bold mt-0.5 ${isNow ? "text-emerald-100" : "text-slate-400"}`}>
-                  {p.start_time?.slice(0,5)}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Live Classes Grid */}
-        {currentPeriod ? (
-          <>
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-black text-white flex items-center gap-2">
-                <div className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-                الحصص الجارية الآن
-                <span className="text-sm font-bold text-emerald-400">({liveClasses.length} حصة)</span>
-              </h2>
-            </div>
-
-            <AnimatePresence mode="wait">
-              {liveClasses.length === 0 ? (
+        <div className="grid grid-cols-1 gap-4">
+          <AnimatePresence mode="popLayout">
+            {activeClasses.length > 0 ? (
+              activeClasses.map((item) => (
                 <motion.div
-                  key="empty"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="text-center py-20 text-slate-400"
+                  key={item.id}
+                  layout
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="group relative bg-white border-2 border-emerald-100 rounded-[2rem] p-6 shadow-xl shadow-emerald-50 hover:border-emerald-500 transition-all duration-500"
                 >
-                  <BookOpen className="h-12 w-12 mx-auto mb-3 opacity-30" />
-                  <p className="font-bold">لا توجد حصص مسجلة لهذه الحصة</p>
-                </motion.div>
-              ) : (
-                <motion.div
-                  key={currentPeriod.period_number}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20 }}
-                  className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
-                >
-                  {liveClasses.map((cls, idx) => (
-                    <motion.div
-                      key={cls.id}
-                      initial={{ opacity: 0, scale: 0.95 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      transition={{ delay: idx * 0.05 }}
-                      className="bg-white/10 backdrop-blur-md border border-white/20 rounded-3xl p-5 hover:bg-white/15 transition-all hover:scale-[1.02] relative overflow-hidden"
-                    >
-                      {/* Glow */}
-                      <div className="absolute top-0 right-0 w-20 h-20 bg-indigo-500/20 rounded-full -mr-10 -mt-10 blur-xl" />
-
-                      {/* Subject */}
-                      <div className="relative z-10 mb-4">
-                        <div className="flex items-center gap-2 mb-1">
-                          <div className="h-8 w-8 rounded-xl bg-indigo-500/30 flex items-center justify-center">
-                            <BookOpen className="h-4 w-4 text-indigo-300" />
-                          </div>
-                          <span className="text-[10px] font-black text-indigo-300 uppercase tracking-widest">المادة</span>
+                  <div className="flex flex-col md:flex-row justify-between items-center gap-6">
+                    <div className="flex items-center gap-6">
+                      <div className="h-20 w-20 bg-emerald-50 rounded-[1.5rem] flex items-center justify-center group-hover:bg-emerald-500 transition-colors duration-500">
+                        <Zap className="h-10 w-10 text-emerald-600 group-hover:text-white transition-colors duration-500" />
+                      </div>
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 text-emerald-600 text-xs font-black uppercase">
+                          <BookOpen className="h-3 w-3" />
+                          <span>الحصة {item.period}</span>
                         </div>
-                        <div className="font-black text-xl text-white leading-tight">
-                          {cls.subjectName}
+                        <h3 className="text-2xl font-black text-slate-900">{item.subjects?.name}</h3>
+                        <div className="flex items-center gap-2 text-slate-500 font-bold text-sm">
+                          <User className="h-4 w-4" />
+                          <span>أ. {item.teachers?.users?.full_name}</span>
                         </div>
                       </div>
+                    </div>
 
-                      <div className="relative z-10 space-y-3">
-                        {/* Teacher */}
-                        <div className="flex items-center gap-3 bg-white/10 rounded-2xl px-3 py-2.5">
-                          <div className="h-8 w-8 rounded-xl bg-emerald-500/30 flex items-center justify-center flex-shrink-0">
-                            <GraduationCap className="h-4 w-4 text-emerald-300" />
-                          </div>
-                          <div>
-                            <div className="text-[9px] font-black text-emerald-300 uppercase tracking-widest">المعلم</div>
-                            <div className="font-bold text-sm text-white leading-tight">{cls.teacherName}</div>
-                          </div>
+                    <div className="flex flex-col items-center md:items-end gap-4">
+                      <div className="text-center md:text-right">
+                        <div className="text-emerald-600 font-black text-lg tabular-nums mb-1">
+                          {getCountdown(item.endTotal)}
                         </div>
-
-                        {/* Class */}
-                        <div className="flex items-center gap-3 bg-white/10 rounded-2xl px-3 py-2.5">
-                          <div className="h-8 w-8 rounded-xl bg-amber-500/30 flex items-center justify-center flex-shrink-0">
-                            <Users className="h-4 w-4 text-amber-300" />
-                          </div>
-                          <div>
-                            <div className="text-[9px] font-black text-amber-300 uppercase tracking-widest">الفصل</div>
-                            <div className="font-bold text-sm text-white leading-tight">
-                              {cls.className} — {cls.sectionName}
-                            </div>
-                          </div>
+                        <div className="text-slate-400 text-xs font-bold">
+                          ينتهي {item.end_time}
                         </div>
                       </div>
-
-                      {/* Zoom Link */}
-                      {cls.zoomLink && (
+                      
+                      {item.teachers?.zoom_link ? (
                         <a
-                          href={cls.zoomLink}
+                          href={item.teachers.zoom_link}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="mt-4 flex items-center justify-center gap-2 w-full py-3 rounded-2xl bg-indigo-500 hover:bg-indigo-400 transition-all text-white text-sm font-black shadow-lg shadow-indigo-500/30 active:scale-95"
+                          className="flex items-center gap-2 bg-emerald-600 text-white px-8 py-4 rounded-2xl font-black shadow-lg shadow-emerald-200 hover:bg-emerald-700 hover:-translate-y-1 transition-all active:scale-95"
                         >
-                          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M15 10l4.553-2.277A1 1 0 0 1 21 8.624v6.752a1 1 0 0 1-1.447.899L15 14v-4zM3 8a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8z"/>
-                          </svg>
-                          دخول الحصة عبر Zoom
+                          <Video className="h-5 w-5" />
+                          دخول الحصة (Zoom)
                         </a>
+                      ) : (
+                        <div className="text-amber-600 bg-amber-50 px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2">
+                          <AlertCircle className="h-4 w-4" />
+                          رابط Zoom غير متوفر
+                        </div>
                       )}
-                    </motion.div>
-                  ))}
+                    </div>
+                  </div>
                 </motion.div>
-              )}
-            </AnimatePresence>
-          </>
-        ) : (
-          <div className="text-center py-24">
-            <div className="h-24 w-24 rounded-full bg-white/5 flex items-center justify-center mx-auto mb-6">
-              <Clock className="h-12 w-12 text-slate-400" />
-            </div>
-            <h3 className="text-2xl font-black text-slate-300 mb-2">
-              {!isWorkDay ? "يوم إجازة" : afterSchool ? "انتهى الدوام اليومي" : "لم يبدأ الدوام بعد"}
-            </h3>
-            {nextPeriod && isWorkDay && (
-              <p className="text-slate-400 font-bold">
-                الحصة {nextPeriod.period_number} تبدأ الساعة {nextPeriod.start_time?.slice(0,5)}
-              </p>
+              ))
+            ) : (
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-[2rem] p-12 text-center"
+              >
+                <div className="h-16 w-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
+                  <Calendar className="h-8 w-8 text-slate-300" />
+                </div>
+                <h3 className="text-lg font-black text-slate-400">لا توجد حصص جارية حالياً</h3>
+                <p className="text-slate-400 text-sm font-medium mt-1">تأكد من الجدول الدراسي لمواعيد حصصك</p>
+              </motion.div>
             )}
-          </div>
-        )}
-
-        {/* Footer */}
-        <div className="border-t border-white/10 pt-4 text-center">
-          <p className="text-[11px] text-slate-500 font-bold">
-            مدرسة الرفعة النموذجية — لوحة المراقبة الحية
-            <span className="mx-2">·</span>
-            يتحدث تلقائياً
-          </p>
+          </AnimatePresence>
         </div>
+      </section>
+
+      {/* Upcoming Classes Section */}
+      {upcomingClasses.length > 0 && (
+        <section className="space-y-4">
+          <div className="flex items-center gap-2 px-2">
+            <div className="h-2 w-2 rounded-full bg-indigo-400" />
+            <h2 className="text-lg font-black text-slate-800">الحصص القادمة اليوم</h2>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {upcomingClasses.map((item) => (
+              <div 
+                key={item.id}
+                className="bg-white border border-slate-100 rounded-[1.5rem] p-5 flex items-center justify-between group hover:shadow-md transition-all"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="h-12 w-12 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                    <Clock className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <h4 className="font-black text-slate-900">{item.subjects?.name}</h4>
+                    <p className="text-xs font-bold text-slate-400">أ. {item.teachers?.users?.full_name}</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="text-indigo-600 font-black text-xs">الحصة {item.period}</div>
+                  <div className="text-slate-400 text-[10px] font-bold">تبدأ {item.start_time}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Info Card */}
+      <div className="bg-indigo-900 rounded-[2.5rem] p-8 text-white relative overflow-hidden shadow-2xl shadow-indigo-200">
+        <div className="relative z-10 flex flex-col md:flex-row items-center gap-6">
+          <div className="h-16 w-16 bg-white/10 rounded-2xl backdrop-blur-md flex items-center justify-center">
+            <CheckCircle2 className="h-8 w-8 text-indigo-300" />
+          </div>
+          <div className="text-center md:text-right flex-1">
+            <h3 className="text-xl font-black mb-1">تنبيه الطالب</h3>
+            <p className="text-indigo-100 text-sm font-medium leading-relaxed">
+              يُرجى التواجد قبل بدء الحصة بـ 5 دقائق. في حال واجهت مشكلة في الدخول، تواصل مع الدعم الفني للمدرسة.
+            </p>
+          </div>
+        </div>
+        <div className="absolute -right-20 -bottom-20 h-64 w-64 bg-white/5 rounded-full blur-3xl" />
+        <div className="absolute -left-20 -top-20 h-64 w-64 bg-indigo-500/10 rounded-full blur-3xl" />
       </div>
-    </div>
+    </motion.div>
   );
 }

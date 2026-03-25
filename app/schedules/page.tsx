@@ -167,17 +167,10 @@ export default function SchedulesPage() {
           setIsTeacher(true);
           const { data: tSchedule } = await supabase
             .from('schedules')
-            .select('id, day_of_week, period, subjects(name), sections(name, classes(name)), teachers(zoom_link)')
+            .select('id, day_of_week, period, subjects(name), sections(name, classes(name))')
             .eq('teacher_id', user.id)
             .order('day_of_week').order('period');
           setTeacherSchedule(tSchedule || []);
-          // جلب رابط Zoom الخاص بالمعلم
-          const { data: teacherInfo } = await supabase
-            .from('teachers')
-            .select('zoom_link')
-            .eq('id', user.id)
-            .single();
-          setTeacherZoomLink(teacherInfo?.zoom_link || '');
           return;
         }
       }
@@ -194,26 +187,9 @@ export default function SchedulesPage() {
   };
 
   const fetchSchedules = async (sectionId: string) => {
-  setLoading(true);
-  try {
-    const { data: { user } } = await supabase.auth.getUser();
-
-    const { data: userData } = await supabase
-      .from('users')
-      .select('role')
-      .eq('id', user?.id)
-      .single();
-
-    let data: any[] = [];
-
-    if (userData?.role === 'student') {
-      const { data: studentData } = await supabase
-        .from('students')
-        .select('section_id')
-        .eq('id', user?.id)
-        .single();
-
-      const res = await supabase
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
         .from('schedules')
         .select(`
           id,
@@ -223,52 +199,18 @@ export default function SchedulesPage() {
           day_of_week,
           period,
           subjects (name),
-          teachers (zoom_link, users (full_name))
-        `)
-        .eq('section_id', studentData?.section_id);
-
-      data = res.data || [];
-    } else if (userData?.role === 'teacher') {
-      const res = await supabase
-        .from('schedules')
-        .select(`
-          id,
-          section_id,
-          subject_id,
-          teacher_id,
-          day_of_week,
-          period,
-          subjects (name),
-          teachers (zoom_link, users (full_name))
-        `)
-        .eq('teacher_id', user?.id);
-
-      data = res.data || [];
-    } else {
-      const res = await supabase
-        .from('schedules')
-        .select(`
-          id,
-          section_id,
-          subject_id,
-          teacher_id,
-          day_of_week,
-          period,
-          subjects (name),
-          teachers (zoom_link, users (full_name))
+          teachers (users (full_name))
         `)
         .eq('section_id', sectionId);
 
-      data = res.data || [];
+      if (error) throw error;
+      setSchedules((data as unknown) as Schedule[] || []);
+    } catch (error) {
+      console.error('Error fetching schedules:', error);
+    } finally {
+      setLoading(false);
     }
-
-    setSchedules((data as unknown) as Schedule[]);
-  } catch (error) {
-    console.error('Error fetching schedules:', error);
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   const openCellModal = (day: number, period: number, existingSchedule?: Schedule) => {
     if (!selectedSectionId) {

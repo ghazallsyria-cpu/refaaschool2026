@@ -253,7 +253,8 @@ export default function AssignmentsPage() {
 
   const handleSaveAssignment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!currentAssignment.title || !currentAssignment.subject_id || !currentAssignment.section_id || !currentAssignment.teacher_id || !currentAssignment.due_date) {
+    const hasSections = (currentAssignment.section_ids && currentAssignment.section_ids.length > 0) || !!currentAssignment.section_id;
+    if (!currentAssignment.title || !currentAssignment.subject_id || !hasSections || !currentAssignment.teacher_id || !currentAssignment.due_date) {
       showNotification('error', 'يرجى تعبئة جميع الحقول المطلوبة');
       return;
     }
@@ -285,7 +286,7 @@ export default function AssignmentsPage() {
         total_marks: questions.reduce((sum, q) => sum + (q.points || 0), 0),
       };
       // للتوافق مع الكود القديم - section_id = أول شعبة
-      const payload = { ...basePayload, section_id: sectionIds[0], section_ids: sectionIds };
+      const payload = { ...basePayload, section_id: sectionIds[0] };
 
       if (currentAssignment.id) {
         // حذف الملف القديم من Cloudinary إذا وُجد

@@ -221,7 +221,12 @@ export default function ExamsDashboard() {
   const getExamStatus = (exam: Exam) => {
     if (exam.status !== 'published') return null;
     
+    // إذا لم يحدد المعلم تاريخاً للاختبار → متاح دائماً
+    if (!exam.exam_date) return 'available';
+    
     const examDate = new Date(exam.exam_date);
+    // تحقق من صحة التاريخ
+    if (isNaN(examDate.getTime())) return 'available';
     
     const startTimeParts = (exam.start_time || '00:00').split(':');
     const endTimeParts = (exam.end_time || '23:59').split(':');

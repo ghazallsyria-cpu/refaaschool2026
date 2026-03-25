@@ -22,19 +22,25 @@ export default function AssignmentForm({
   readOnly = false,
   children
 }: AssignmentFormProps) {
-
   const [answers, setAnswers] = useState<Record<string, any>>(initialAnswers);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  // إصلاح: منع setState غير الضروري داخل useEffect
   useEffect(() => {
-    if (initialAnswers && Object.keys(initialAnswers).length > 0) {
-      setAnswers(initialAnswers);
-    }
+    if (!initialAnswers) return;
+
+    setAnswers(prev => {
+      const same =
+        JSON.stringify(prev) === JSON.stringify(initialAnswers);
+      return same ? prev : initialAnswers;
+    });
   }, [initialAnswers]);
 
   const handleAnswerChange = (questionId: string, value: any) => {
     if (readOnly) return;
+
     setAnswers(prev => ({ ...prev, [questionId]: value }));
+
     if (errors[questionId]) {
       setErrors(prev => {
         const newErrors = { ...prev };
@@ -44,16 +50,23 @@ export default function AssignmentForm({
     }
   };
 
-  const handleCheckboxChange = (questionId: string, option: string, checked: boolean) => {
+  const handleCheckboxChange = (
+    questionId: string,
+    option: string,
+    checked: boolean
+  ) => {
     if (readOnly) return;
 
-    const current = (answers[questionId] as string[]) || [];
+    const currentAnswers = (answers[questionId] as string[]) || [];
+    let newAnswers: string[];
 
-    const updated = checked
-      ? [...current, option]
-      : current.filter(a => a !== option);
+    if (checked) {
+      newAnswers = [...currentAnswers, option];
+    } else {
+      newAnswers = currentAnswers.filter(a => a !== option);
+    }
 
-    handleAnswerChange(questionId, updated);
+    handleAnswerChange(questionId, newAnswers);
   };
 
   const validate = () => {
@@ -61,8 +74,9 @@ export default function AssignmentForm({
 
     questions.forEach(q => {
       if (q.isRequired) {
-        const ans = answers[q.id];
-        if (!ans || (Array.isArray(ans) && ans.length === 0)) {
+        const answer = answers[q.id];
+
+        if (!answer || (Array.isArray(answer) && answer.length === 0)) {
           newErrors[q.id] = 'هذا السؤال مطلوب';
         }
       }
@@ -83,100 +97,120 @@ export default function AssignmentForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-8">
+      {questions.map((question, index) => (
+        <motion.div
+          key={question.id}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: index * 0.1 }}
+          className="glass-card p-8 rounded-4xl border border-white/60 shadow-xl"
+        >
+          <div className="flex flex-col gap-6">
 
-      {questions.map((question, index) => {
-        const answer = answers[question.id];
-
-        return (
-          <motion.div
-            key={question.id}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.05 }}
-            className="p-6 rounded-2xl border bg-white shadow space-y-4"
-          >
-            <div className="flex justify-between">
-              <h3 className="font-black text-lg">
+            {/* السؤال */}
+            <div className="flex items-start justify-between gap-4">
+              <h3 className="text-xl font-black text-slate-900">
                 {question.text}
+                {question.isRequired && <span className="text-red-500 mr-1">*</span>}
               </h3>
-              <span className="text-xs text-slate-400">
+
+              <div className="text-xs font-bold text-slate-400">
                 {question.points} نقاط
-              </span>
+              </div>
             </div>
 
-            {/* TEXT */}
-            {question.type === 'text' && (
-              <input
-                type="text"
-                value={answer || ''}
-                onChange={(e) => handleAnswerChange(question.id, e.target.value)}
-                disabled={readOnly}
-                className="w-full p-3 bg-slate-100 rounded-xl"
-              />
-            )}
-
-            {/* PARAGRAPH */}
-            {question.type === 'paragraph' && (
-              <textarea
-                rows={4}
-                value={answer || ''}
-                onChange={(e) => handleAnswerChange(question.id, e.target.value)}
-                disabled={readOnly}
-                className="w-full p-3 bg-slate-100 rounded-xl"
-              />
-            )}
-
-            {/* MULTIPLE */}
-            {question.type === 'multiple_choice' && question.options?.map((opt, i) => (
-              <label key={i} className="flex gap-2 items-center">
-                <input
-                  type="radio"
-                  checked={answer === opt}
-                  onChange={() => handleAnswerChange(question.id, opt)}
-                  disabled={readOnly}
+            {/* عرض الصورة إن وجدت */}
+            {question.file && (
+              <div className="mt-2">
+                <img
+                  src={question.file}
+                  alt="question"
+                  className="max-w-full rounded-xl border"
                 />
-                {opt}
-              </label>
-            ))}
-
-            {/* CHECKBOX */}
-            {question.type === 'checkbox' && question.options?.map((opt, i) => {
-              const isChecked = (answer || []).includes(opt);
-
-              return (
-                <label key={i} className="flex gap-2 items-center">
-                  <input
-                    type="checkbox"
-                    checked={isChecked}
-                    onChange={(e) => handleCheckboxChange(question.id, opt, e.target.checked)}
-                    disabled={readOnly}
-                  />
-                  {opt}
-                </label>
-              );
-            })}
-
-            {/* IMAGE (الحل الأساسي) */}
-            {question.type === 'image' && answer && (
-              <div>
-                {typeof answer === 'string' ? (
-                  <img src={answer} className="max-w-full rounded-xl" />
-                ) : (
-                  answer?.file && (
-                    <img src={answer.file} className="max-w-full rounded-xl" />
-                  )
-                )}
               </div>
             )}
 
+            {/* الإدخالات */}
+            <div className="space-y-4">
+
+              {/* نص */}
+              {question.type === 'text' && (
+                <input
+                  type="text"
+                  className="w-full p-4 rounded-xl bg-slate-50"
+                  value={answers[question.id] || ''}
+                  onChange={(e) =>
+                    handleAnswerChange(question.id, e.target.value)
+                  }
+                  disabled={readOnly}
+                />
+              )}
+
+              {/* فقرة */}
+              {question.type === 'paragraph' && (
+                <textarea
+                  rows={4}
+                  className="w-full p-4 rounded-xl bg-slate-50"
+                  value={answers[question.id] || ''}
+                  onChange={(e) =>
+                    handleAnswerChange(question.id, e.target.value)
+                  }
+                  disabled={readOnly}
+                />
+              )}
+
+              {/* اختيار متعدد */}
+              {question.type === 'multiple_choice' &&
+                question.options?.map((option, i) => (
+                  <label key={i} className="flex gap-3 items-center">
+                    <input
+                      type="radio"
+                      name={question.id}
+                      checked={answers[question.id] === option}
+                      onChange={() =>
+                        handleAnswerChange(question.id, option)
+                      }
+                      disabled={readOnly}
+                    />
+                    {option}
+                  </label>
+                ))}
+
+              {/* checkbox */}
+              {question.type === 'checkbox' &&
+                question.options?.map((option, i) => {
+                  const isChecked = (answers[question.id] || []).includes(option);
+
+                  return (
+                    <label key={i} className="flex gap-3 items-center">
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={(e) =>
+                          handleCheckboxChange(
+                            question.id,
+                            option,
+                            e.target.checked
+                          )
+                        }
+                        disabled={readOnly}
+                      />
+                      {option}
+                    </label>
+                  );
+                })}
+            </div>
+
+            {/* الخطأ */}
             {errors[question.id] && (
               <div className="text-red-500 text-sm">
+                <AlertCircle className="inline w-4 h-4 mr-1" />
                 {errors[question.id]}
               </div>
             )}
-          </motion.div>
-        );
-      })}
+          </div>
+        </motion.div>
+      ))}
 
       {children}
 
@@ -184,12 +218,11 @@ export default function AssignmentForm({
         <button
           type="submit"
           disabled={isSubmitting}
-          className="w-full p-4 bg-indigo-600 text-white rounded-xl font-black"
+          className="w-full p-5 bg-indigo-600 text-white rounded-2xl"
         >
-          {isSubmitting ? '...' : 'إرسال'}
+          {isSubmitting ? 'جاري الإرسال...' : 'إرسال'}
         </button>
       )}
-
     </form>
   );
 }

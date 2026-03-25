@@ -22,18 +22,14 @@ export default function AssignmentForm({
   readOnly = false,
   children
 }: AssignmentFormProps) {
-  const [answers, setAnswers] = useState<Record<string, any>>(initialAnswers);
+  const [answers, setAnswers] = useState<Record<string, any>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // إصلاح: منع setState غير الضروري داخل useEffect
+  // تحميل الإجابات مرة واحدة فقط (بدون useEffect يسبب loop)
   useEffect(() => {
-    if (!initialAnswers) return;
-
-    setAnswers(prev => {
-      const same =
-        JSON.stringify(prev) === JSON.stringify(initialAnswers);
-      return same ? prev : initialAnswers;
-    });
+    if (initialAnswers && Object.keys(initialAnswers).length > 0) {
+      setAnswers(initialAnswers);
+    }
   }, [initialAnswers]);
 
   const handleAnswerChange = (questionId: string, value: any) => {
@@ -103,112 +99,99 @@ export default function AssignmentForm({
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: index * 0.1 }}
-          className="glass-card p-8 rounded-4xl border border-white/60 shadow-xl"
+          className="p-8 rounded-2xl border shadow"
         >
-          <div className="flex flex-col gap-6">
+          <h3 className="font-bold text-lg">
+            {question.text}
+            {question.isRequired && <span className="text-red-500">*</span>}
+          </h3>
 
-            {/* السؤال */}
-            <div className="flex items-start justify-between gap-4">
-              <h3 className="text-xl font-black text-slate-900">
-                {question.text}
-                {question.isRequired && <span className="text-red-500 mr-1">*</span>}
-              </h3>
-
-              <div className="text-xs font-bold text-slate-400">
-                {question.points} نقاط
-              </div>
+          {/* عرض الصورة */}
+          {question.file && (
+            <div className="mt-4">
+              <img
+                src={question.file}
+                alt="question"
+                className="max-w-full rounded-xl border"
+              />
             </div>
+          )}
 
-            {/* عرض الصورة إن وجدت */}
-            {question.file && (
-              <div className="mt-2">
-                <img
-                  src={question.file}
-                  alt="question"
-                  className="max-w-full rounded-xl border"
-                />
-              </div>
-            )}
+          {/* نص */}
+          {question.type === 'text' && (
+            <input
+              type="text"
+              className="w-full p-3 border rounded mt-4"
+              value={answers[question.id] || ''}
+              onChange={(e) =>
+                handleAnswerChange(question.id, e.target.value)
+              }
+              disabled={readOnly}
+            />
+          )}
 
-            {/* الإدخالات */}
-            <div className="space-y-4">
+          {/* فقرة */}
+          {question.type === 'paragraph' && (
+            <textarea
+              rows={4}
+              className="w-full p-3 border rounded mt-4"
+              value={answers[question.id] || ''}
+              onChange={(e) =>
+                handleAnswerChange(question.id, e.target.value)
+              }
+              disabled={readOnly}
+            />
+          )}
 
-              {/* نص */}
-              {question.type === 'text' && (
+          {/* خيارات */}
+          {question.type === 'multiple_choice' &&
+            question.options?.map((option, i) => (
+              <label key={i} className="block mt-2">
                 <input
-                  type="text"
-                  className="w-full p-4 rounded-xl bg-slate-50"
-                  value={answers[question.id] || ''}
-                  onChange={(e) =>
-                    handleAnswerChange(question.id, e.target.value)
+                  type="radio"
+                  name={question.id}
+                  checked={answers[question.id] === option}
+                  onChange={() =>
+                    handleAnswerChange(question.id, option)
                   }
                   disabled={readOnly}
                 />
-              )}
+                {option}
+              </label>
+            ))}
 
-              {/* فقرة */}
-              {question.type === 'paragraph' && (
-                <textarea
-                  rows={4}
-                  className="w-full p-4 rounded-xl bg-slate-50"
-                  value={answers[question.id] || ''}
-                  onChange={(e) =>
-                    handleAnswerChange(question.id, e.target.value)
-                  }
-                  disabled={readOnly}
-                />
-              )}
+          {/* checkbox */}
+          {question.type === 'checkbox' &&
+            question.options?.map((option, i) => {
+              const isChecked =
+                (answers[question.id] || []).includes(option);
 
-              {/* اختيار متعدد */}
-              {question.type === 'multiple_choice' &&
-                question.options?.map((option, i) => (
-                  <label key={i} className="flex gap-3 items-center">
-                    <input
-                      type="radio"
-                      name={question.id}
-                      checked={answers[question.id] === option}
-                      onChange={() =>
-                        handleAnswerChange(question.id, option)
-                      }
-                      disabled={readOnly}
-                    />
-                    {option}
-                  </label>
-                ))}
+              return (
+                <label key={i} className="block mt-2">
+                  <input
+                    type="checkbox"
+                    checked={isChecked}
+                    onChange={(e) =>
+                      handleCheckboxChange(
+                        question.id,
+                        option,
+                        e.target.checked
+                      )
+                    }
+                    disabled={readOnly}
+                  />
+                  {option}
+                </label>
+              );
+            })}
 
-              {/* checkbox */}
-              {question.type === 'checkbox' &&
-                question.options?.map((option, i) => {
-                  const isChecked = (answers[question.id] || []).includes(option);
-
-                  return (
-                    <label key={i} className="flex gap-3 items-center">
-                      <input
-                        type="checkbox"
-                        checked={isChecked}
-                        onChange={(e) =>
-                          handleCheckboxChange(
-                            question.id,
-                            option,
-                            e.target.checked
-                          )
-                        }
-                        disabled={readOnly}
-                      />
-                      {option}
-                    </label>
-                  );
-                })}
+          {/* خطأ */}
+          {errors[question.id] && (
+            <div className="text-red-500 text-sm mt-2 flex items-center gap-1">
+              <AlertCircle className="w-4 h-4" />
+              {errors[question.id]}
             </div>
-
-            {/* الخطأ */}
-            {errors[question.id] && (
-              <div className="text-red-500 text-sm">
-                <AlertCircle className="inline w-4 h-4 mr-1" />
-                {errors[question.id]}
-              </div>
-            )}
-          </div>
+          )}
         </motion.div>
       ))}
 
@@ -218,7 +201,7 @@ export default function AssignmentForm({
         <button
           type="submit"
           disabled={isSubmitting}
-          className="w-full p-5 bg-indigo-600 text-white rounded-2xl"
+          className="w-full p-4 bg-indigo-600 text-white rounded-xl"
         >
           {isSubmitting ? 'جاري الإرسال...' : 'إرسال'}
         </button>

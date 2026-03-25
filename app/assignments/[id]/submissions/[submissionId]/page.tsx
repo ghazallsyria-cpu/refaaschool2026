@@ -31,7 +31,6 @@ type Submission = {
 
 export default function GradingPage({ params }: { params: Promise<{ id: string, submissionId: string }> }) {
   const { id: assignmentId, submissionId } = use(params);
-  const router = useRouter();
 
   const [assignment, setAssignment] = useState<Assignment | null>(null);
   const [submission, setSubmission] = useState<Submission | null>(null);
@@ -92,8 +91,7 @@ export default function GradingPage({ params }: { params: Promise<{ id: string, 
 
           answersData.forEach(a => {
             answersMap[a.question_id] = {
-              text: a.answer_text,
-              options: a.selected_options,
+              value: a.answer_text || a.selected_options,
               file: a.file_url
             };
           });
@@ -102,7 +100,7 @@ export default function GradingPage({ params }: { params: Promise<{ id: string, 
         }
       }
     } catch (error) {
-      console.error('Error fetching data:', error);
+      console.error(error);
     } finally {
       setLoading(false);
     }
@@ -113,121 +111,88 @@ export default function GradingPage({ params }: { params: Promise<{ id: string, 
   }, [fetchData]);
 
   const handleSaveGrade = async () => {
-    if (grade === '') {
-      setNotification({ type: 'error', message: 'يرجى إدخال الدرجة' });
-      return;
-    }
+    if (grade === '') return;
 
     setIsSaving(true);
+
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-
       const numericGrade = parseFloat(grade);
-      if (isNaN(numericGrade)) {
-        setNotification({ type: 'error', message: 'يرجى إدخال درجة صحيحة' });
-        return;
-      }
 
-      const { error } = await supabase
+      await supabase
         .from('assignment_submissions')
         .update({
           grade: numericGrade,
           feedback,
-          status: 'graded',
-          graded_at: new Date().toISOString(),
-          graded_by: user?.id
+          status: 'graded'
         })
         .eq('id', submissionId);
 
-      if (error) throw error;
-
-      setNotification({ type: 'success', message: 'تم حفظ التقييم بنجاح' });
-
-      setTimeout(() => setNotification(null), 3000);
-
-      fetchData();
+      setNotification({ type: 'success', message: 'تم الحفظ' });
     } catch (error: any) {
-      setNotification({ type: 'error', message: 'خطأ في الحفظ: ' + error.message });
+      setNotification({ type: 'error', message: error.message });
     } finally {
       setIsSaving(false);
     }
   };
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="h-12 w-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
-      </div>
-    );
+    return <div className="p-10 text-center">Loading...</div>;
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-20 font-sans" dir="rtl">
-      <div className="bg-white border-b border-slate-200 sticky top-0 z-30">
-        <div className="max-w-5xl mx-auto px-4 h-20 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Link href={`/assignments/${assignmentId}`} className="p-2 hover:bg-slate-100 rounded-2xl transition-all text-slate-500">
-              <ArrowRight className="h-6 w-6" />
-            </Link>
-            <div>
-              <h1 className="text-xl font-black text-slate-900 tracking-tight">تقييم إجابة الطالب</h1>
-              <p className="text-xs font-bold text-slate-400">{assignment?.title}</p>
-            </div>
-          </div>
+    <div className="min-h-screen bg-slate-50" dir="rtl">
 
-          <button
-            onClick={handleSaveGrade}
-            disabled={isSaving}
-            className="inline-flex items-center gap-2 rounded-2xl bg-indigo-600 px-6 py-3 text-sm font-black text-white"
-          >
-            <Save className="h-4 w-4" />
-            حفظ التقييم
-          </button>
-        </div>
+      <div className="p-6 bg-white border-b">
+        <h1 className="font-black text-xl">تقييم إجابة الطالب</h1>
       </div>
 
-      <div className="max-w-5xl mx-auto px-4 mt-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 space-y-6">
-          <div className="p-6 rounded-3xl bg-white shadow">
-            <h2 className="font-black mb-4">
-              {submission?.students?.users?.full_name}
-            </h2>
+      <div className="max-w-5xl mx-auto p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-            <AssignmentForm
-              questions={questions}
-              onSubmit={() => {}}
-              initialAnswers={answers}
-              readOnly={true}
-            />
-          </div>
+        {/* الإجابات */}
+        <div className="lg:col-span-2 bg-white p-6 rounded-2xl shadow">
+          <h2 className="font-black mb-4">
+            {submission?.students?.users?.full_name}
+          </h2>
+
+          <AssignmentForm
+            questions={questions}
+            onSubmit={() => {}}
+            initialAnswers={answers}
+            readOnly={true}
+          />
         </div>
 
-        <div className="p-6 bg-white rounded-3xl shadow">
+        {/* التقييم */}
+        <div className="bg-white p-6 rounded-2xl shadow space-y-4">
           <input
             type="number"
             value={grade}
             onChange={(e) => setGrade(e.target.value)}
-            className="w-full text-center text-2xl font-black p-4 bg-slate-100 rounded-xl mb-4"
+            className="w-full p-3 bg-slate-100 rounded-xl text-center font-black text-xl"
+            placeholder="الدرجة"
           />
 
           <textarea
             value={feedback}
             onChange={(e) => setFeedback(e.target.value)}
-            className="w-full p-4 bg-slate-100 rounded-xl mb-4"
-            rows={6}
+            className="w-full p-3 bg-slate-100 rounded-xl"
+            rows={5}
+            placeholder="ملاحظات"
           />
 
           <button
             onClick={handleSaveGrade}
+            disabled={isSaving}
             className="w-full bg-indigo-600 text-white py-3 rounded-xl font-black"
           >
             حفظ
           </button>
         </div>
+
       </div>
 
       {notification && (
-        <div className="fixed bottom-6 right-6 p-4 bg-white shadow rounded-xl">
+        <div className="fixed bottom-4 right-4 bg-white shadow p-4 rounded-xl">
           {notification.message}
         </div>
       )}
